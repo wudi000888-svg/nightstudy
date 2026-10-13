@@ -26,7 +26,7 @@ SITES_FILE= CONTENT_PACK=demo DATABASE_URL="$TEST_DATABASE_URL" CONTENT_TEST_DAT
 
 集成suite会创建/删除合成用户、修改SiteState与限流记录，不能指向生产或日常开发库。内容夹具先拒绝非空fixture命名空间，仅安装3行原创合成CSV，验证摘要失败不写库、原ID/旧Sense保留、admin编辑保护、幂等、错误站点与事务回滚；结束精确清理自建词/词义/词书/pack，并恢复SiteState的contentVersion/initialized/initializedAt。它不全量再次导入770k，也不把合成文本或假音标作为学习数据。
 
-CI使用双PG17演示测试库、激活上述源码fixture并只运行一次pnpm test；另外在隔离Compose安装完整ECDICT/英美音标、核对770,611元数据，并做闭合网关401鉴权smoke。本机54项测试与全量安装已验证，但本版完整Compose/网关步骤仍须等待新CI实际run。平台部署与性能证据分别记录，不能将本机PG18.4结果替代PG17/容器验收。
+CI使用双PG17演示测试库、激活上述源码fixture并只运行一次pnpm test；另在隔离Compose安装完整ECDICT/英美音标、明确核对installedDictionary=true/declaredEntryCount=770611，并做网关健康与401鉴权smoke。代码基线 `577f48b` 的本机55项测试及 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 均已通过，包括真实PG17/完整Compose安装。VPS也已发布同一版本，完成22项生产HTTP检查、容器重建后的数据保留及独立临时库恢复。记录证据时固定实际验收的代码版本，不把文档后续提交、容器重建或本机结果扩写为未执行的主机断电恢复、手机live、跨机HA或生产容量；详细范围见 [部署文档](docs/DEPLOYMENT.md)。
 
 内容/音标工具贡献遵循 [CONTENT.md](docs/CONTENT.md)、[PHONETICS.md](docs/PHONETICS.md) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。缺例句、IPA或录音时保持缺失；不得猜测数据覆盖、将旧式音标标为验证过的现代IPA，或把上游考试标签写成官方完整大纲。在线翻译的provider、网关与失败契约见 [TRANSLATION.md](docs/TRANSLATION.md)，不能把受控mock通过当作真实Google/VPS链路通过。
 

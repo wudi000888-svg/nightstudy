@@ -1,6 +1,6 @@
 # Alpha 运行与部署
 
-本文件对应 `0.2.0-alpha.1`、Node24、pnpm11.25、Prisma7与目标Postgres17。本机真实PG18.4完整内容安装成功，7个文件的54项测试通过；浏览器核心流程与验证范围见 [验证记录](../README.md#本机验证与待验收项)。上一版PG17、镜像与Compose已在 [GitHub CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38452093122) 通过，对应源码commit `a2d8e7d`；**本版完整字典、英美音标和网关容器的新CI尚待执行**，不能沿用上一版结果当作已验收。本机没有Docker。Render及目标VPS实际部署/恢复未执行，没有创建付费平台资源，也没有高并发容量基准。
+本文件对应 `0.2.0-alpha.1`、Node24、pnpm11.25、Prisma7与Postgres17，已验收代码基线为 `577f48b`。[对应CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 完成55项测试、格式/类型/构建、真实PG17/Compose全量安装，明确核对installedDictionary=true/declaredEntryCount=770611和网关健康/未鉴权401。VPS发布、容器重建与数据/内容缓存保留、22项HTTPS生产HTTP检查及首份数据库备份/独立库恢复已验证。Render、主机断电恢复、异机/密钥灾备、高并发容量和真人录音尚未验收。浏览器范围见 [验证记录](../README.md#本机验证与待验收项)。
 
 ## Docker Compose minimal
 
@@ -24,7 +24,7 @@ docker compose up --build --detach --wait --wait-timeout 600 app
 
 PG业务数据与内容源缓存分别保存在postgres-data、content-cache named volume；源缓存挂载 `/app/.local/content`，不塞入Git或应用镜像。首次源下载约71MB，安装耗时取决于网络与机器。等待600秒是CI smoke等待上限，不是承诺安装时间；超时先检查init日志再决定增加等待。重复准备验证缓存与已安装pack，保留历史和管理编辑；摘要失败停止安装。离线内容导入、来源许可与目标书规则见 [CONTENT.md](CONTENT.md)，独立音标见 [PHONETICS.md](PHONETICS.md)。
 
-本机全量库实测Word770,611、追加源Sense1,113,723、5本新目标词书，原40词ID和历史保留。US IPA匹配83,424词、UK匹配64,321词，至少一种现代IPA匹配104,261词；含原始音标的任一种音标覆盖256,047词。该安装数据库约974,468,799字节（约975MB）；这是一次本机数据体量记录，不能推断最小磁盘、内存或并发容量。各站各存一份核心词义和进度，另需预算WAL、索引、备份及升级空间。
+本机全量库实测Word770,611、追加源Sense1,113,723、5本新目标词书，原40词ID和历史保留。本机/VPS查询US IPA匹配83,424词、UK匹配64,321词及3个ready包；至少一种现代IPA匹配104,261词；含原始音标的任一种音标覆盖256,047词。该安装数据库约974,468,799字节（约975MB）；这是一次本机数据体量记录，不能推断最小磁盘、内存或并发容量。各站各存一份核心词义和进度，另需预算WAL、索引、备份及升级空间。
 
 检查 `/health/live` 与 `/health/ready`，再查询 `/api/v2/dictionary/stats` 核对installedDictionary、pack摘要与declaredEntryCount=770611；子路径安装给API添加basePath。ready检查配置站点的DB/SiteState身份，不能代替内容数量验收。查看 `docker compose logs init app`，日志分享前移除凭据与个人数据。`docker compose down` 停止服务但保留named volume；`down --volumes` 删除本站数据库和内容缓存，仅用于可丢弃测试安装。
 
@@ -33,6 +33,12 @@ PG业务数据与内容源缓存分别保存在postgres-data、content-cache nam
 生产使用已配置的 HTTPS 入口转发到回环端口，设置真实 `PUBLIC_URL=https://...` 并明确可信代理 CIDR。已有网站占用 443 时不启用第二个抢占端口的入口；先清点配置、生成审阅片段和回滚计划。[官方 Compose 启动顺序](https://docs.docker.com/compose/how-tos/startup-order/)
 
 可信入口须保留或显式设置实际请求的规范 `Host`，并覆盖或按已核验的链规则处理来自客户端的 forwarded IP/proto；不能仅因为 app 信任某个 CIDR 就透传外部任意值。Realm 始终按 wire Host 选择，不使用 X-Forwarded-Host；socket IP profile 使用 Fastify 按 TRUST_PROXY_CIDRS 解析后的 IP。额外反代接在 scale Caddy 前时，也需配置 Caddy 的可信链；否则 Caddy 默认将该反代当作客户端，正常用户可能共享同一限流桶。伪造 forwarded host 不应切换站点，伪造 forwarded IP 不应绕过限流。
+
+## 共享TLS入口与已有站点共存
+
+服务器已有443 TLS/SNI分流时，新Web域名必须同时登记在上层入口的精确域名映射与Web反代中；仅新增Nginx的server_name不能让上层分流自动识别它。保留已有域名、默认分流和监听边界，先保存可恢复配置，再检查入口/反代配置并分别探测新旧站点。数据库和应用仍由自己的Compose project维护，入口共存不合并认证Realm。
+
+当前公开Web域名为 `english.minminlove.top`。若重新生成已有广月stream入口，须保留原完整配置参数及 `--web-domain english.minminlove.top`，让这个域名继续转入Web TLS入口；参数丢失会使上层SNI路由失去该站映射。按已安装生成器版本核对参数，检查配置后再加载，并验证HTTPS health及既有站点。公开文档只记录域名和通用共存规则，不包含连接凭据或主机私有配置。
 
 ## 独立多站部署
 
@@ -93,9 +99,11 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 
 ## 翻译网关与目标VPS
 
-默认Google官方网页入口不需要网关；网页不支持本站iframe。站内结果由私密VPS网关请求Google网页兼容接口，该接口非官方，本机真实请求已经遇到429，不能保证可用性或加速。生产配置、同机Compose override与独立网关入口见 [TRANSLATION.md](TRANSLATION.md)。应用默认不保存翻译历史，网关ready仅表示进程就绪；必须用真实鉴权请求检查上游链路。
+保留Google官方网页入口和私密VPS备用网关，暂不接收费Cloud API；网页不支持本站iframe。网关请求非官方网页兼容接口，本机及目标VPS真实请求均遇到429，不能宣称站内结果已可用或实现加速。生产配置、同机Compose override与独立网关入口见 [TRANSLATION.md](TRANSLATION.md)。应用不保存翻译历史，网关ready仅表示进程就绪，鉴权401只验证入口关闭；上游可用性仍取决于真实鉴权翻译请求。
 
-目标VPS已只读核验域名A记录与SSH端口可达；仍缺SSH用户/认证信息，尚未执行安装、TLS、反代变更或重启恢复。因此本文不将DNS/端口连通写为VPS部署完成。
+目标VPS运行0.2应用镜像、独立PG17、私密网关和内容缓存，外网 `https://english.minminlove.top/health/ready` 返回200。22项HTTPS生产HTTP检查已全部通过：主页CSP/JS/CSS、770,611词及3包、分页检索/rain全义/英美IPA、注册Secure/HttpOnly Cookie、客户端role无法提权、普通用户admin403、空曲线、目标词书与5词会话/reveal/rate、真实FSRS曲线记录、Google私密配置/官方deep link、网关真实429及退出/登录；临时学习账号已清理。这是HTTP契约验证，不是新版手机浏览器live验收，也不说明Google上游可用。
+
+2026-10-14生产镜像 `nightstudy-english:0.2.0-alpha.1-577f48b` 发布成功，运行代码与 [成功CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 的基线相同，包含HEAD SPA修复。app/gateway容器重建后健康，init退出0，Word770611/3个ready包及内容缓存保留。外网HEAD `/` 返回200/HTML/CSP/no-store，HTTP→HTTPS301，site接口version=0.2.0-alpha.1/publicUrl正确。验收/交付时initialized=false，尚未初始化，管理员由部署者使用私有初始化口令自行创建；生产测试账号已删除。这次发布证明容器重建与已有卷保留，未执行主机断电恢复或跨机HA验证。
 
 ## 环境变量
 
@@ -138,12 +146,14 @@ docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exi
 
 多 Realm 的每个业务 DB 单独导出和恢复，外部托管 PG 使用其受控连接与匹配客户端；不要把默认 `$POSTGRES_DB` 的备份当成所有站备份。演练后核对迁移状态、SiteState/siteId、用户/进度/审计计数和一次隔离环境的登录/学习请求，另验证 registry/密钥的安全恢复；不把 dump 提交 Git 或上传公开 issue。
 
+2026-10-14已完成目标VPS的首份生产数据库备份与独立临时DB恢复：归档140,510,271字节，私有目录0700/文件0600；pg_restore --list通过，实际restore使用 --exit-on-error --no-owner成功，恢复后Word=770611、readyPacks=3、SiteState singleton=1且siteId与原库一致。临时DB已删除，主库未修改，应用未因这次恢复检查重启。该证据只覆盖本次数据库归档和独立库恢复，不代表异机灾备、registry/密钥恢复或整个服务恢复已验收；实际归档路径保持私有。
+
 升级先保存备份和当前镜像版本，再检查迁移、重跑独立 init job、启动新 app。不要假定回滚镜像会撤销数据库变更。正式发行时记录 app/schema/dataset 兼容范围；alpha 当前不提供自动无损跨版本恢复保证。
 
 ## CI 与镜像发行
 
 CI对PR/main运行锁文件安装、格式、双PG17 migration/seed、sites/typecheck/build与一次 `pnpm test`。测试库显式CONTENT_PACK=demo，CONTENT_TEST_DATABASE_URL启用源码内合成内容PG fixture；不重复执行独立CLI夹具。随后验证基础/scale/翻译Compose描述，构建镜像，并在隔离Compose默认ecdict安装完整字典及英美音标，等待最多600秒，核对ready和catalog声明770,611；另启动闭合网关容器，验证无鉴权请求返回401，不依赖真实Google可用性。清理只针对CI隔离project的卷。
 
-本版这些完整Compose/网关步骤尚待新CI实际执行，结果以该commit的run为准；上一版成功不等于本版通过。没有本地Docker时，YAML静态解析不能当作镜像启动成功。
+上述步骤已在 [源码577f48b的CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 实际通过，包括55项测试、PG17全量安装、770611声明数量核对和网关健康/401；本机同一代码基线也完成format/type/build和55项测试。VPS发布重建、生产HTTP与独立库恢复的限定证据见上文。容量、主机断电恢复与异机灾备仍分别验收；YAML静态解析不能代替实际启动。
 
 `release.yml` 仅在维护者发布GitHub Release时触发，版本tag须为 `v0.2.0-alpha.1` 等格式；先复用完整CI，通过后使用仓库GITHUB_TOKEN推送GHCR（当前目标linux/amd64），保留版本、commit、provenance与SBOM。初次发布后维护者须核对package visibility，公开仓库不意味着镜像自动公开。当前未创建Release或发布发行镜像。部署使用CI输出的 `ghcr.io/...@sha256:...` 固定摘要，不依赖浮动latest。[GitHub官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)

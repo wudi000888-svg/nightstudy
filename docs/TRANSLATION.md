@@ -2,7 +2,7 @@
 
 NightStudy 的翻译面板可展示 Google 的在线翻译结果，并提供带原文的官方网页入口。Google 网页当前返回 `X-Frame-Options: SAMEORIGIN`，不能在本站 iframe 中直接加载；本项目不删除它的安全响应头、不复制 Google 登录页。
 
-站内结果使用固定 `https://translate.googleapis.com/translate_a/single` 的网页兼容接口。这不是受支持的 Google Cloud Translation API，可能变更、限流或停止服务。失败时返回明确错误，用户仍可打开官方网页；系统不把离线词义冒充成在线翻译结果。默认部署只开启网页入口，配置 VPS 网关后才开启站内结果。官方 Cloud API 需要另行启用项目、凭据和计费，不由此功能自动开通。
+站内结果使用固定 `https://translate.googleapis.com/translate_a/single` 的网页兼容接口。这不是受支持的Google Cloud Translation API，可能变更、限流或停止服务。失败返回明确错误，用户仍可打开官方网页；系统不把离线词义冒充在线结果。默认部署只开启网页入口，配置VPS网关后才尝试站内结果。当前选择保留Google官方网页入口和已部署的私密备用网关，暂不接入收费Cloud API。
 
 ## 三种运行方式
 
@@ -12,7 +12,7 @@ NightStudy 的翻译面板可展示 Google 的在线翻译结果，并提供带�
 | `TRANSLATION_MODE=direct`           | 本机开发   | 本机 API 直接访问兼容接口；生产配置拒绝此值 |
 | `TRANSLATION_MODE=gateway`          | VPS / 生产 | API 经带私密 token 的固定 VPS 地址请求结果  |
 
-网关可改善应用服务器到 Google 的网络路径，是否更快取决于 VPS 的地区和网络；部署前后应测延时。它不代理用户的整个浏览器，也不保证 Google 网页在所有地区可直接打开。
+网关提供固定上游路径、私密鉴权与请求预算，不改变Google的限流。本机及目标VPS真实请求均遇到上游429；当前不能宣称站内翻译可用或已加速。它不代理用户整个浏览器，官方网页能否打开也取决于用户网络。
 
 ## 同一 VPS 的 Compose 安装
 
@@ -20,7 +20,7 @@ NightStudy 的翻译面板可展示 Google 的在线翻译结果，并提供带�
 
 ```sh
 docker compose -f compose.yaml -f compose.translation.yaml config --quiet
-docker compose -f compose.yaml -f compose.translation.yaml up --build --detach --wait app
+docker compose -f compose.yaml -f compose.translation.yaml up --build --detach --wait --wait-timeout 600 app
 ```
 
 override 自动将应用连接到私有网络内的 `http://translation-gateway:3099/translate`。网关不开放公网端口，只接收来自应用的鉴权请求。应用及每个站点的用户仍由各自认证 Realm 决定。
@@ -59,6 +59,12 @@ TRANSLATION_GATEWAY_SECRET=<与VPS相同的私密token>
 - 用户点击翻译时，所输入文本会传送到所配置 VPS 和 Google。打开官方网页也会把原文放入网页 URL；请勿在面板输入密码或私密凭据。
 - `/health/ready` 只验证网关进程就绪，不证明 Google 上游畅通。应使用真实的鉴权翻译请求检查整条链路。
 
-验证分开记录：单测使用受控 provider 验证鉴权、缓存、并发合并与失败；本机真实 Google 请求验证兼容接口；VPS SSH、TLS、网络延时、重启恢复需要在目标 VPS 实测。未提供连接信息时，不标记 VPS 部署或加速为已完成。
+## 已验证与待验收
+
+[源码577f48b的CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 已通过55项测试及真实PG17/Compose完整内容安装；受控provider验证鉴权、缓存、并发合并与失败，网关容器健康及未携鉴权的请求返回401。这些检查不依赖真实Google结果，也不证明上游畅通。
+
+目标VPS的0.2应用镜像、独立PG17、私密网关与内容缓存已运行，22项HTTPS生产HTTP检查全部通过，包括认证Cookie/角色隔离、真实FSRS学习、Google官方deep link与网关鉴权链路；临时账号已删除。网关真实请求返回429 `translation_upstream_limited`，本机也遇到上游429；保留明确错误与官方网页入口，备用网关不宣称加速已完成。
+
+包含HEAD SPA修复的 `577f48b` 在本机及 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 通过55项测试；同一代码基线的VPS镜像已发布，app/gateway容器重建健康，完整词典与3个ready包保留。首份数据库归档与独立临时库恢复也已验证。这只覆盖发布重建的数据保留及本次独立库恢复，不代表主机断电恢复、跨机HA或完整灾备，详见 [部署文档](DEPLOYMENT.md)。生产HTTP检查不替代0.2手机live验收；共享TLS入口的精确域名登记与配置再生成要求见 [共存规则](DEPLOYMENT.md#共享tls入口与已有站点共存)。
 
 参考：[Google 翻译网页帮助](https://support.google.com/translate/answer/2534559?hl=en&co=GENIE.Platform%3DDesktop)、[Cloud Translation 官方设置](https://cloud.google.com/translate/docs/setup)。

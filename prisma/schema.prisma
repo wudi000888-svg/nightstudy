@@ -1,0 +1,398 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String             @id
+  name          String
+  email         String             @unique
+  emailVerified Boolean            @default(false)
+  image         String?
+  role          String             @default("user")
+  disabled      Boolean            @default(false)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  settings      UserSettings?
+  words         UserWord[]
+  progress      StudyProgress[]
+  studySessions StudySession[]
+  receipts      CommandReceipt[]
+  reviews       ReviewLog[]
+  imports       KnownImport[]
+  claims        KnownClaim[]
+  assessments   Assessment[]
+  mastery       MasteryProfile[]
+  activity      ActivityInterval[]
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@index([expiresAt])
+}
+
+model SiteState {
+  id             String    @id @default("singleton")
+  siteId         String
+  initialized    Boolean   @default(false)
+  initializedAt  DateTime?
+  contentVersion String    @default("demo-2026-10-14")
+}
+
+model UserSettings {
+  userId        String   @id
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal          String   @default("daily")
+  currentBookId String?
+  dailyNewLimit Int      @default(20)
+  groupSize     Int      @default(5)
+  timeZone      String   @default("Asia/Shanghai")
+  revision      Int      @default(0)
+  updatedAt     DateTime @updatedAt
+}
+
+model Word {
+  id              String           @id
+  lemma           String
+  normalizedLemma String           @unique
+  phonetic        String           @default("")
+  goalTags        String[]
+  difficulty      Int              @default(1)
+  status          String           @default("published")
+  sourceRef       String           @default("NightStudy original demo")
+  contentVersion  String           @default("demo-2026-10-14")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  senses          Sense[]
+  bookItems       BookItem[]
+  userWords       UserWord[]
+  progress        StudyProgress[]
+  sessionItems    SessionItem[]
+  reviews         ReviewLog[]
+  claims          KnownClaim[]
+  assessmentItems AssessmentItem[]
+
+  @@index([status, difficulty])
+}
+
+model Sense {
+  id           String @id
+  wordId       String
+  word         Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  pos          String
+  definitionZh String
+  definitionEn String @default("")
+  exampleEn    String @default("")
+  exampleZh    String @default("")
+  ordinal      Int    @default(0)
+
+  @@index([wordId, ordinal])
+}
+
+model Book {
+  id          String         @id
+  slug        String         @unique
+  title       String
+  description String
+  goal        String
+  status      String         @default("published")
+  version     String         @default("demo-2026-10-14")
+  items       BookItem[]
+  sessions    StudySession[]
+  updatedAt   DateTime       @updatedAt
+}
+
+model BookItem {
+  id           String  @id @default(cuid())
+  bookId       String
+  book         Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  wordId       String
+  word         Word    @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  focusSenseId String?
+  ordinal      Int
+
+  @@unique([bookId, wordId])
+  @@unique([bookId, ordinal])
+}
+
+model UserWord {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId    String
+  word      Word     @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  note      String   @default("")
+  favorite  Boolean  @default(true)
+  paused    Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, wordId])
+}
+
+model StudyProgress {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId           String
+  word             Word      @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  fsrsJson         Json
+  dueAt            DateTime
+  lastReviewAt     DateTime?
+  firstLearnedAt   DateTime?
+  revision         Int       @default(0)
+  algorithmVersion String    @default("ts-fsrs-5.4.2")
+  paramVersion     String    @default("retention-0.9-v1")
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, wordId])
+  @@index([userId, dueAt])
+}
+
+model StudySession {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId    String?
+  book      Book?         @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  mode      String
+  status    String        @default("in_progress")
+  phase     String        @default("recall")
+  cursor    Int           @default(0)
+  step      String        @default("prompt")
+  revision  Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  items     SessionItem[]
+
+  @@index([userId, status, mode])
+}
+
+model SessionItem {
+  id               String       @id @default(cuid())
+  sessionId        String
+  session          StudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  wordId           String
+  word             Word         @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  focusSenseId     String?
+  ordinal          Int
+  contentSnapshot  Json
+  questionJson     Json
+  revealed         Boolean      @default(false)
+  rated            Boolean      @default(false)
+  exerciseDone     Boolean      @default(false)
+  status           String       @default("pending")
+  progressRevision Int          @default(0)
+
+  @@unique([sessionId, wordId])
+  @@unique([sessionId, ordinal])
+}
+
+model CommandReceipt {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commandId    String
+  requestHash  String
+  responseJson Json
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, commandId])
+}
+
+model ReviewLog {
+  id                   String   @id @default(cuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId               String
+  word                 Word     @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  commandId            String
+  rating               String
+  reviewedAt           DateTime @default(now())
+  beforeState          Json
+  afterState           Json
+  retrievabilityBefore Float?
+  wasNew               Boolean  @default(false)
+
+  @@unique([userId, commandId])
+  @@index([userId, reviewedAt])
+}
+
+model KnownImport {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status        String       @default("preview")
+  formatVersion String       @default("1")
+  rowsJson      Json
+  countsJson    Json
+  confirmedAt   DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime     @default(now())
+  claims        KnownClaim[]
+
+  @@index([userId, createdAt])
+}
+
+model KnownClaim {
+  id        String      @id @default(cuid())
+  importId  String
+  import    KnownImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId    String
+  word      Word        @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  createdAt DateTime    @default(now())
+
+  @@unique([importId, wordId])
+  @@index([userId, wordId])
+}
+
+model Assessment {
+  id               String           @id @default(cuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal             String
+  blueprintVersion String           @default("demo-baseline-v1")
+  status           String           @default("in_progress")
+  seed             String
+  reportJson       Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  items            AssessmentItem[]
+
+  @@index([userId, createdAt])
+}
+
+model AssessmentItem {
+  id           String     @id @default(cuid())
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  wordId       String
+  word         Word       @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  type         String
+  stratum      String
+  ordinal      Int
+  questionJson Json
+  answerJson   Json?
+  correct      Boolean?
+  score        Float?
+  answeredAt   DateTime?
+
+  @@unique([assessmentId, ordinal])
+}
+
+model MasteryProfile {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal           String
+  profileVersion String   @default("demo-baseline-v1")
+  evidenceJson   Json
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, goal])
+}
+
+model ActivityInterval {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId          String
+  startAt          DateTime
+  endAt            DateTime
+  validatedSeconds Int
+
+  @@unique([userId, eventId])
+  @@index([userId, startAt])
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  status    String   @default("published")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  targetId  String
+  detail    Json
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  type        String
+  status      String    @default("pending")
+  payload     Json
+  result      Json?
+  attempts    Int       @default(0)
+  runAfter    DateTime  @default(now())
+  lockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, runAfter])
+}
+
+model RateBucket {
+  key       String   @id
+  count     Int      @default(1)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

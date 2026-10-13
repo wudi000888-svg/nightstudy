@@ -12,7 +12,9 @@ NightStudy 当前处于 alpha 施工阶段。请围绕一个明确的问题提�
 
 ## 验证与提交
 
-运行与变更相关的 lint、类型检查、测试和构建；报告实际执行结果以及尚未验证的部分。认证、权限、进度、迁移和并发问题需要针对触发条件的回归验证。样式与文档修改不要求为实现细节机械增加测试。
+先按 [README](README.md) 配置和构建，再运行 `pnpm format:check`、`pnpm sites:check`、`pnpm typecheck`、`pnpm build`、`pnpm test`。`pnpm format` 可自动格式化；当前没有 lint 脚本。报告实际执行结果以及尚未验证的部分。认证、权限、进度、迁移和并发问题需要针对触发条件的回归验证。样式与文档修改不要求为实现细节机械增加测试。
+
+真实 PG 集成测试只用于可丢弃数据库，名称必须以 `_test` 结尾。先对 TEST_DATABASE_URL 对应数据库执行迁移/seed，再运行 `pnpm test:integration`；第二站隔离测试额外设置 TEST_DATABASE_URL_B 并准备另一独立 DB。测试会创建/删除合成用户、修改 SiteState 与限流记录，不能指向生产或日常开发库。不设置 TEST_DATABASE_URL 时该集成 suite 跳过，不能把单元测试结果写成 PG 集成通过。CI 使用两个 PG17 隔离库，并包括 Compose 配置/镜像/启动验证。
 
 PR 说明要包含问题、修改后行为及验证。改变部署、数据结构或外部契约时，同步更新文档和升级步骤。不要用未经测量的 QPS、在线人数或测试夹具结果宣称生产容量。
 

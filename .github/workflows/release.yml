@@ -1,0 +1,67 @@
+name: Release container
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Validate release identity
+        id: identity
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+            echo 'Release tag must be a v-prefixed semantic version.' >&2
+            exit 1
+          fi
+          node --input-type=module -e "import fs from 'node:fs'; const version=JSON.parse(fs.readFileSync('package.json','utf8')).version; if(process.env.RELEASE_TAG !== 'v'+version) throw new Error('Release tag must match package.json version');"
+          echo "image=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish verified release
+        id: image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          provenance: true
+          sbom: true
+          tags: |
+            ${{ steps.identity.outputs.image }}:${{ steps.identity.outputs.tag }}
+            ${{ steps.identity.outputs.image }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.identity.outputs.tag }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Record immutable deployment reference
+        env:
+          IMAGE_NAME: ${{ steps.identity.outputs.image }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: printf 'Release image `%s@%s`\n' "$IMAGE_NAME" "$IMAGE_DIGEST" >> "$GITHUB_STEP_SUMMARY"

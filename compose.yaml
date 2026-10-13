@@ -1,0 +1,71 @@
+name: nightstudy
+
+x-application: &application
+  image: ${NIGHTSTUDY_IMAGE:-nightstudy:local}
+  build:
+    context: .
+    dockerfile: Dockerfile
+  init: true
+  env_file: [.env]
+  environment: &application-environment
+    NODE_ENV: production
+    HOST: 0.0.0.0
+    PORT: '3000'
+    DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-nightstudy}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-nightstudy}}
+    BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+    BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:?Set BOOTSTRAP_TOKEN in .env}
+    PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:5198}
+    REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
+    TRUST_PROXY_CIDRS: ${TRUST_PROXY_CIDRS:-}
+    CLIENT_IP_PROFILE: ${CLIENT_IP_PROFILE:-socket}
+    SITES_FILE: ${SITES_FILE:-}
+    BASE_PATH: ${BASE_PATH:-}
+    DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+    MAX_ACTIVE_SITES: ${MAX_ACTIVE_SITES:-20}
+  volumes:
+    - ./.local/sites:/run/nightstudy/sites:ro
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nightstudy}
+      POSTGRES_DB: ${POSTGRES_DB:-nightstudy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [backend]
+
+  init:
+    <<: *application
+    command: [pnpm, db:prepare]
+    restart: 'no'
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+
+  app:
+    <<: *application
+    command: [pnpm, start]
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${NIGHTSTUDY_HTTP_PORT:-5198}:3000'
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    networks: [backend]
+
+volumes:
+  postgres-data:
+
+networks:
+  backend:

@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+  esbuild: true
+  '@swc/core': true
+minimumReleaseAgeExclude:
+  - fastify@5.12.7
+  - lucide-react@1.56.0

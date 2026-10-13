@@ -1,0 +1,46 @@
+{
+  "name": "nightstudy",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24.11.0 <25",
+    "pnpm": ">=11 <12"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @nightstudy/core build && pnpm --parallel --filter @nightstudy/api --filter @nightstudy/web dev",
+    "dev:api": "pnpm --filter @nightstudy/core build && pnpm --filter @nightstudy/api dev",
+    "dev:web": "pnpm --filter @nightstudy/web dev",
+    "generate": "prisma generate",
+    "typecheck": "pnpm generate && pnpm --filter @nightstudy/core typecheck && pnpm --filter @nightstudy/api typecheck && pnpm --filter @nightstudy/web typecheck && tsc -p tsconfig.tools.json",
+    "build": "pnpm generate && pnpm --filter @nightstudy/core build && pnpm --filter @nightstudy/api build && pnpm --filter @nightstudy/web build",
+    "start": "node apps/api/dist/server.js",
+    "worker": "node apps/api/dist/worker.js",
+    "db:deploy": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:prepare": "pnpm generate && pnpm db:deploy && pnpm db:seed",
+    "test": "vitest run",
+    "test:integration": "vitest run apps/api/src/integration.test.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "sites:check": "tsx scripts/check-sites.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "7.10.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "better-auth": "1.7.7",
+    "pg": "8.23.1",
+    "zod": "4.6.7",
+    "ts-fsrs": "5.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/pg": "8.23.1",
+    "prisma": "7.10.0",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.0.4"
+  }
+}

@@ -32,27 +32,27 @@ MVP 使用同源前后端：Fastify 处理 API 并提供构建后的前端静态
 
 ## 2. 模块和责任
 
-| 模块 | 拥有的数据和行为 | 不承担的责任 |
-| --- | --- | --- |
-| sites | 可信域名/basepath解析、站点上下文、站点配置、账户realm与角色边界 | 让客户端site_id或任意Host决定访问权限 |
-| identity | Better Auth 集成、当前用户、会话吊销、账号状态、受控管理员初始化 | 手写密码加密、匿名 ID 换取旧身份 |
-| authorization | user/admin 角色映射、对象归属、管理员操作白名单 | 根据客户端 role/userId 放行 |
-| profile | 用户公开显示资料、学习偏好、目标、账户操作协调 | 任意用户的管理员式资料修改 |
-| content | 词条、义项、词形、例句、主学习对象、来源与发布版本 | 保存个人 FSRS 状态 |
-| dictionary | 统一查词、可选只读data-pack适配、可信外部词条materialize | 将客户端snapshot当作词典事实，或在worker中写个人进度 |
-| books | 词书、集合、顺序、筛选维度、书版本、用户选择 | 通过每次请求全量重排所有卡片 |
-| learning-plan | 每日新词额度、复习优先级、当前词书、队列生成规则 | 将“词书索引”当作用户已学进度 |
-| known-words | 熟词文件预览、来源claims、映射、幂等导入、撤销和导出 | 将自述熟词伪装成真实FSRS复习历史 |
-| assessment | 目标词表内分层抽样、认知/拼写评分、诊断可信度和版本 | 以少量题目把全部未测词标为已掌握，或声称等同考试分数 |
-| mastery-profile | 汇总诊断证据、熟悉度先验和不确定性、个性化选词权重 | 直接改写历史reps、due和真实review |
-| study-session | 固定批次清单、批次条目、学习步骤、断点恢复 | 自行判断一次操作属于哪个目录下标 |
-| review | 权威 FSRS 调度、复习命令、卡状态版本、冲突和幂等 | 接受客户端提供的完整权威调度状态 |
-| activity | 查词、练习、有效时长事件、重试去重 | 将任意客户端秒数直接计为在线学习 |
-| statistics | 自然日计数、学习趋势、打卡、唯一词条与复习/练习次数 | 在请求内逐秒遍历全部历史事件 |
-| memory-curves | 固定词集的记忆预测、真实review点、覆盖率、模型/状态追溯 | 把模型曲线说成对个人记忆的科学保证 |
-| administration | 受控账户管理、内容编辑发布、导入任务、基础指标、审计 | 默认模拟用户登录、任意强制改密、读取所有个人笔记 |
-| jobs | 导入、导出、必要的汇总重建、账号删除、任务重试 | 把大型工作放在常规 HTTP 请求内执行 |
-| optional-ai | 基于已发布义项的辅助解释 / 练习、配额和上游抽象 | 修改词典事实、改变复习评级、作为核心学习的必需依赖 |
+| 模块            | 拥有的数据和行为                                                 | 不承担的责任                                         |
+| --------------- | ---------------------------------------------------------------- | ---------------------------------------------------- |
+| sites           | 可信域名/basepath解析、站点上下文、站点配置、账户realm与角色边界 | 让客户端site_id或任意Host决定访问权限                |
+| identity        | Better Auth 集成、当前用户、会话吊销、账号状态、受控管理员初始化 | 手写密码加密、匿名 ID 换取旧身份                     |
+| authorization   | user/admin 角色映射、对象归属、管理员操作白名单                  | 根据客户端 role/userId 放行                          |
+| profile         | 用户公开显示资料、学习偏好、目标、账户操作协调                   | 任意用户的管理员式资料修改                           |
+| content         | 词条、义项、词形、例句、主学习对象、来源与发布版本               | 保存个人 FSRS 状态                                   |
+| dictionary      | 统一查词、可选只读data-pack适配、可信外部词条materialize         | 将客户端snapshot当作词典事实，或在worker中写个人进度 |
+| books           | 词书、集合、顺序、筛选维度、书版本、用户选择                     | 通过每次请求全量重排所有卡片                         |
+| learning-plan   | 每日新词额度、复习优先级、当前词书、队列生成规则                 | 将“词书索引”当作用户已学进度                         |
+| known-words     | 熟词文件预览、来源claims、映射、幂等导入、撤销和导出             | 将自述熟词伪装成真实FSRS复习历史                     |
+| assessment      | 目标词表内分层抽样、认知/拼写评分、诊断可信度和版本              | 以少量题目把全部未测词标为已掌握，或声称等同考试分数 |
+| mastery-profile | 汇总诊断证据、熟悉度先验和不确定性、个性化选词权重               | 直接改写历史reps、due和真实review                    |
+| study-session   | 固定批次清单、批次条目、学习步骤、断点恢复                       | 自行判断一次操作属于哪个目录下标                     |
+| review          | 权威 FSRS 调度、复习命令、卡状态版本、冲突和幂等                 | 接受客户端提供的完整权威调度状态                     |
+| activity        | 查词、练习、有效时长事件、重试去重                               | 将任意客户端秒数直接计为在线学习                     |
+| statistics      | 自然日计数、学习趋势、打卡、唯一词条与复习/练习次数              | 在请求内逐秒遍历全部历史事件                         |
+| memory-curves   | 固定词集的记忆预测、真实review点、覆盖率、模型/状态追溯          | 把模型曲线说成对个人记忆的科学保证                   |
+| administration  | 受控账户管理、内容编辑发布、导入任务、基础指标、审计             | 默认模拟用户登录、任意强制改密、读取所有个人笔记     |
+| jobs            | 导入、导出、必要的汇总重建、账号删除、任务重试                   | 把大型工作放在常规 HTTP 请求内执行                   |
+| optional-ai     | 基于已发布义项的辅助解释 / 练习、配额和上游抽象                  | 修改词典事实、改变复习评级、作为核心学习的必需依赖   |
 
 模块的 HTTP handler 只做输入解析、会话获取和错误映射；应用服务拥有事务；领域函数表达业务规则；repository负责查询。模块间通过明确的应用服务接口调用，不随意直接改别的模块的表。可共享身份上下文、事务上下文、时间与ID工具，但避免建立包含所有业务的“万能服务”。
 
@@ -66,38 +66,38 @@ MVP 使用同源前后端：Fastify 处理 API 并提供构建后的前端静态
 
 ### 3.1 身份与用户中心
 
-| 实体 | 关键字段 / 约束 |
-| --- | --- |
-| 认证库用户、凭据、会话及验证记录 | 由 Better Auth 管理；所有业务 user_id 引用库用户；不在业务表另存明文密码或自行实现密码摘要 |
-| user_profiles | user_id 唯一；display_name、avatar_reference 可选、locale、created_at、updated_at |
-| user_preferences | user_id 唯一；daily_new_limit默认20、group_size默认5且限制1–20、review_limit、current_book_id、learning_goal、audio_preferences、settings_revision |
-| user_scheduler_profiles | id、user_id、目标保持率等经过校验的配置、配置版本、算法版本、created_at；历史版本不就地覆盖 |
-| account_operations | 账号导出 / 删除任务，user_id、kind、status、created_at、finished_at、结果资产引用或失败原因 |
-| admin_audit_logs | actor_user_id、action、target_type/id、最小必要的变化摘要、request_id、created_at；不存密码、token或无关个人内容 |
+| 实体                             | 关键字段 / 约束                                                                                                                                    |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 认证库用户、凭据、会话及验证记录 | 由 Better Auth 管理；所有业务 user_id 引用库用户；不在业务表另存明文密码或自行实现密码摘要                                                         |
+| user_profiles                    | user_id 唯一；display_name、avatar_reference 可选、locale、created_at、updated_at                                                                  |
+| user_preferences                 | user_id 唯一；daily_new_limit默认20、group_size默认5且限制1–20、review_limit、current_book_id、learning_goal、audio_preferences、settings_revision |
+| user_scheduler_profiles          | id、user_id、目标保持率等经过校验的配置、配置版本、算法版本、created_at；历史版本不就地覆盖                                                        |
+| account_operations               | 账号导出 / 删除任务，user_id、kind、status、created_at、finished_at、结果资产引用或失败原因                                                        |
+| admin_audit_logs                 | actor_user_id、action、target_type/id、最小必要的变化摘要、request_id、created_at；不存密码、token或无关个人内容                                   |
 
 MVP 采用邮箱和密码登录，display_name作为显示资料，不同时承担复杂的用户名登录语义。若将来增加用户名登录，再明确Unicode、大小写和唯一性规则。公开注册永远创建user，不能由请求体决定管理员角色。
 
 ### 3.2 共享内容
 
-| 实体 | 关键字段 / 约束 |
-| --- | --- |
-| content_sources | source_id、名称、来源地址、声明的授权信息、版本 / digest、获取时间；授权是否适合分发需要独立核验 |
-| content_imports | source_id、源digest、导入状态、条目数、错误报告、操作者；同源同digest唯一，避免重复导入 |
-| lexemes | id、language、headword、normalized_headword、homograph_key；检索归一化值与展示词形分开 |
-| senses | id、lexeme_id、pos、释义、排序、status、current_revision；一个词可以有多个同词性的义项 |
-| sense_revisions | id、sense_id、revision、双语释义、变更摘要、来源映射；同sense_id+revision唯一 |
-| sense_source_refs | sense_id / revision、source_id、source_entry_key、source_sense_key；保留真实来源身份，不靠释义文本hash推断语义相等 |
-| word_forms | form_normalized、lexeme_id、relation；用于屈折形查找，不改变义项身份 |
-| examples | id、sense_id、双语文本、来源、来源版本、审核状态；公开发布需满足项目的内容质量和授权规则 |
-| study_items | id、lexeme_id唯一、status；MVP每个canonical lexeme只有一个主学习对象，不按义项拆FSRS |
-| teaching_units | id、study_item_id、sense_id、教学步骤/题型、status；多个义项保留教学内容，练习不独立起FSRS状态 |
-| teaching_revisions | teaching_unit_id、revision、显示内容 / 例句引用、source_revision；为历史会话和学习记录保留内容版本 |
-| books | id、slug唯一、名称、说明、发布状态、current_version |
-| book_versions | id、book_id、version、发布时刻；已发布版本不可就地改写 |
-| book_items | book_version_id、study_item_id、推荐focus_sense_id可选、ordinal、必要的filter/rank字段；同版本同主item唯一、排序稳定 |
-| external_refs | source_namespace、source_version/data_pack_digest、external_entry_key、lexeme_id、study_item_id；外部定位组合唯一，支持并发materialize和跨版本显式映射 |
-| legacy_card_mappings | legacy_card_id唯一、study_item_id、focus_sense_id、迁移依据；旧多义项卡保留可追踪映射 |
-| content_redirects | 旧外部定位 / 旧内容ID到当前稳定对象的受控映射及原因；保留旧系统迁移依据 |
+| 实体                 | 关键字段 / 约束                                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| content_sources      | source_id、名称、来源地址、声明的授权信息、版本 / digest、获取时间；授权是否适合分发需要独立核验                                                       |
+| content_imports      | source_id、源digest、导入状态、条目数、错误报告、操作者；同源同digest唯一，避免重复导入                                                                |
+| lexemes              | id、language、headword、normalized_headword、homograph_key；检索归一化值与展示词形分开                                                                 |
+| senses               | id、lexeme_id、pos、释义、排序、status、current_revision；一个词可以有多个同词性的义项                                                                 |
+| sense_revisions      | id、sense_id、revision、双语释义、变更摘要、来源映射；同sense_id+revision唯一                                                                          |
+| sense_source_refs    | sense_id / revision、source_id、source_entry_key、source_sense_key；保留真实来源身份，不靠释义文本hash推断语义相等                                     |
+| word_forms           | form_normalized、lexeme_id、relation；用于屈折形查找，不改变义项身份                                                                                   |
+| examples             | id、sense_id、双语文本、来源、来源版本、审核状态；公开发布需满足项目的内容质量和授权规则                                                               |
+| study_items          | id、lexeme_id唯一、status；MVP每个canonical lexeme只有一个主学习对象，不按义项拆FSRS                                                                   |
+| teaching_units       | id、study_item_id、sense_id、教学步骤/题型、status；多个义项保留教学内容，练习不独立起FSRS状态                                                         |
+| teaching_revisions   | teaching_unit_id、revision、显示内容 / 例句引用、source_revision；为历史会话和学习记录保留内容版本                                                     |
+| books                | id、slug唯一、名称、说明、发布状态、current_version                                                                                                    |
+| book_versions        | id、book_id、version、发布时刻；已发布版本不可就地改写                                                                                                 |
+| book_items           | book_version_id、study_item_id、推荐focus_sense_id可选、ordinal、必要的filter/rank字段；同版本同主item唯一、排序稳定                                   |
+| external_refs        | source_namespace、source_version/data_pack_digest、external_entry_key、lexeme_id、study_item_id；外部定位组合唯一，支持并发materialize和跨版本显式映射 |
+| legacy_card_mappings | legacy_card_id唯一、study_item_id、focus_sense_id、迁移依据；旧多义项卡保留可追踪映射                                                                  |
+| content_redirects    | 旧外部定位 / 旧内容ID到当前稳定对象的受控映射及原因；保留旧系统迁移依据                                                                                |
 
 `normalized_headword`只是搜索键，不能简单设成全局唯一并把所有同形词合并。词性分段也不等于完整的语义拆分：原ECDICT按POS得到的摘要可以以“未精细拆义”的内容版本进入新系统，但不能伪称已具备逐义项人工审定。
 
@@ -109,21 +109,21 @@ materialize只是把可信查词结果变为可学习结构，不自动把它发
 
 ### 3.3 用户学习数据
 
-| 实体 | 关键字段 / 约束 |
-| --- | --- |
-| user_books | user_id、book_id、selected_version、status、started_at；user_id+book_id唯一 |
-| user_wordbook_items | user_id、study_item_id、note、favorite、source、added_at；user_id+study_item_id唯一 |
-| study_progress | user_id、study_item_id、状态、due_at、last_review_at、reps/lapses等算法所需字段、revision、scheduler_profile_id、algorithm_version；user_id+study_item_id唯一 |
-| study_sessions | id、user_id、book_version_id、mode、status、session_revision、created_at、completed_at |
-| study_session_items | id、session_id、user_id、study_item_id、focus_sense_id、teaching_revision_id、ordinal、step、status；session_id+ordinal唯一，manifest发布后身份不变；teaching_revision_id引用明确的历史内容对象 |
-| review_attempts | id、user_id、client_attempt_id、device_id、study_item_id、focus_sense_id可选、session_item_id可选、rating、occurred_at、received_at、expected_revision、result_status、applied_revision、算法/配置版本；user_id+client_attempt_id唯一 |
-| review_state_transitions | attempt_id唯一、before_state、after_state、effective_review_time；仅真正改变计划的attempt产生，供追踪与重建 |
-| exercise_attempts | user_id、client_attempt_id、session_item_id、focus_sense_id、题型、答案结果、内容版本、occurred_at；练习记录与真正的复习评级分开 |
-| activity_events | user_id、client_event_id、device_id、type、对象引用、occurred_at、received_at、经过校验的payload；user_id+client_event_id唯一 |
-| study_intervals | user_id、session_id、device_id、interval_id、start/end、validated_seconds、验证状态；用于时长计数和去重 |
-| user_daily_stats | user_id、date_key、统计口径版本、lookups/new_lexemes/reviews/exercises/study_seconds等；user_id+date_key唯一 |
-| command_receipts | user_id、command_id、command_type、payload_digest、result状态/必要响应、created_at；用于重试一致和同ID不同payload识别 |
-| outbox_events | 事务中产生的后续汇总/任务通知，id、kind、payload、processed_at；任务消费者幂等 |
+| 实体                     | 关键字段 / 约束                                                                                                                                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| user_books               | user_id、book_id、selected_version、status、started_at；user_id+book_id唯一                                                                                                                                                           |
+| user_wordbook_items      | user_id、study_item_id、note、favorite、source、added_at；user_id+study_item_id唯一                                                                                                                                                   |
+| study_progress           | user_id、study_item_id、状态、due_at、last_review_at、reps/lapses等算法所需字段、revision、scheduler_profile_id、algorithm_version；user_id+study_item_id唯一                                                                         |
+| study_sessions           | id、user_id、book_version_id、mode、status、session_revision、created_at、completed_at                                                                                                                                                |
+| study_session_items      | id、session_id、user_id、study_item_id、focus_sense_id、teaching_revision_id、ordinal、step、status；session_id+ordinal唯一，manifest发布后身份不变；teaching_revision_id引用明确的历史内容对象                                       |
+| review_attempts          | id、user_id、client_attempt_id、device_id、study_item_id、focus_sense_id可选、session_item_id可选、rating、occurred_at、received_at、expected_revision、result_status、applied_revision、算法/配置版本；user_id+client_attempt_id唯一 |
+| review_state_transitions | attempt_id唯一、before_state、after_state、effective_review_time；仅真正改变计划的attempt产生，供追踪与重建                                                                                                                           |
+| exercise_attempts        | user_id、client_attempt_id、session_item_id、focus_sense_id、题型、答案结果、内容版本、occurred_at；练习记录与真正的复习评级分开                                                                                                      |
+| activity_events          | user_id、client_event_id、device_id、type、对象引用、occurred_at、received_at、经过校验的payload；user_id+client_event_id唯一                                                                                                         |
+| study_intervals          | user_id、session_id、device_id、interval_id、start/end、validated_seconds、验证状态；用于时长计数和去重                                                                                                                               |
+| user_daily_stats         | user_id、date_key、统计口径版本、lookups/new_lexemes/reviews/exercises/study_seconds等；user_id+date_key唯一                                                                                                                          |
+| command_receipts         | user_id、command_id、command_type、payload_digest、result状态/必要响应、created_at；用于重试一致和同ID不同payload识别                                                                                                                 |
+| outbox_events            | 事务中产生的后续汇总/任务通知，id、kind、payload、processed_at；任务消费者幂等                                                                                                                                                        |
 
 `command_receipts`和`review_attempts`存在职责交叉，施工前可合并为一张通用命令日志再以外键关联领域记录；原则是每个写命令必须有唯一的幂等身份和可重放响应，不必为每个功能机械增加一张收据表。
 
@@ -190,14 +190,14 @@ MVP按canonical lexeme的主study_item调度，每用户每词一个study_progre
 
 对会影响计划的review使用明确revision；同一device离线连续做同一卡时，在本地形成依赖链。同步按每卡顺序处理，尽量小批量；跨卡不需要全局串行。
 
-| 条件 | 建议结果 |
-| --- | --- |
-| 同attempt_id、同payload已处理 | duplicate，返回原收据 / 权威结果 |
-| 同attempt_id、不同payload | rejected/idempotency_conflict，不更新计划 |
-| expected_revision符合，时间可信且不倒退 | applied，服务器更新计划和revision |
+| 条件                                                  | 建议结果                                                |
+| ----------------------------------------------------- | ------------------------------------------------------- |
+| 同attempt_id、同payload已处理                         | duplicate，返回原收据 / 权威结果                        |
+| 同attempt_id、不同payload                             | rejected/idempotency_conflict，不更新计划               |
+| expected_revision符合，时间可信且不倒退               | applied，服务器更新计划和revision                       |
 | 有更新的其他设备review，或本次有效时间早于last_review | history_only/conflict，保留学习发生事实，不覆盖较新计划 |
-| payload、卡引用或归属不合法 | rejected，明确错误 |
-| 同一卡前置命令冲突 | 后续依赖项停止应用，返回blocked_by_conflict和最新状态 |
+| payload、卡引用或归属不合法                           | rejected，明确错误                                      |
+| 同一卡前置命令冲突                                    | 后续依赖项停止应用，返回blocked_by_conflict和最新状态   |
 
 这是一个保守而可解释的MVP政策：**离线学习历史不丢，最新权威计划不被旧快照倒写。**客户端显示“记录已同步，复习计划沿用较新进度”，刷新该卡状态；不盲目重发同rating直到成功。若希望每个离线评级都参与重新排程，需要另设计按可信时间重放完整review历史的算法和用户规则，不能把这种复杂合并藏在普通PUT里。
 
@@ -219,19 +219,19 @@ MVP按canonical lexeme的主study_item调度，每用户每词一个study_progre
 
 MVP只有站点内`user`和`admin`两种公开角色。对象所有权与角色是不同问题：user只能读写当前站点自己的学习资源；admin只有该站点明确允许的管理动作，不自动获得全部个人数据读写能力。平台operator仅由部署运维CLI持有，不出现在可公开授予的角色列表，也不能由site admin赋予。
 
-| 能力 | user | admin |
-| --- | --- | --- |
-| 读取公开已发布词典 / 词书 | 允许 | 允许 |
-| 自己的批次、单词本、进度、统计 | 允许 | 仅自己的个人区 |
-| 用户中心设置、改密、注销设备 | 仅自己 | 仅自己；管理停用另走受审计接口 |
-| 导出 / 注销自己的账号 | 允许，必要的重新认证 | 允许，必要的重新认证 |
-| 查看用户列表与账号状态 | 不允许 | 允许最小必要字段 |
-| 停用 / 恢复账户、撤销其会话 | 不允许 | 允许，审计并说明原因 |
-| 发布 / 归档词书、编辑内容、管理导入 | 不允许 | 允许，版本化与审计 |
-| 查看汇总运营指标 / 任务结果 | 不允许 | 允许 |
-| 默认读取别人的笔记、答案、全部私人记录 | 不允许 | 不提供MVP权限 |
-| 模拟用户、任意强制设置密码 | 不允许 | 禁用 / 不开放项目入口 |
-| 自助提升为admin、批量抹掉用户进度 | 不允许 | 不提供日常管理入口 |
+| 能力                                   | user                 | admin                          |
+| -------------------------------------- | -------------------- | ------------------------------ |
+| 读取公开已发布词典 / 词书              | 允许                 | 允许                           |
+| 自己的批次、单词本、进度、统计         | 允许                 | 仅自己的个人区                 |
+| 用户中心设置、改密、注销设备           | 仅自己               | 仅自己；管理停用另走受审计接口 |
+| 导出 / 注销自己的账号                  | 允许，必要的重新认证 | 允许，必要的重新认证           |
+| 查看用户列表与账号状态                 | 不允许               | 允许最小必要字段               |
+| 停用 / 恢复账户、撤销其会话            | 不允许               | 允许，审计并说明原因           |
+| 发布 / 归档词书、编辑内容、管理导入    | 不允许               | 允许，版本化与审计             |
+| 查看汇总运营指标 / 任务结果            | 不允许               | 允许                           |
+| 默认读取别人的笔记、答案、全部私人记录 | 不允许               | 不提供MVP权限                  |
+| 模拟用户、任意强制设置密码             | 不允许               | 禁用 / 不开放项目入口          |
+| 自助提升为admin、批量抹掉用户进度      | 不允许               | 不提供日常管理入口             |
 
 Better Auth的admin插件不能直接按其默认能力集等价于项目RBAC。应按根任务核验的API，显式配置/拦截允许动作，关闭或不公开超出MVP的impersonate、任意set-password等能力，并对绕过业务入口调用插件路由的情况做测试。插件操作也必须限定所解析站点的realm；站点管理员不能修改其他realm、站点hosts或平台共享数据包。
 
@@ -275,18 +275,18 @@ MVP不做复杂组织、班级、教师、课程购买、社交、权限编辑�
 
 这里只建议业务边界，不要求在重构初期机械保留原路由。稳定的前端service层可逐步从旧协议迁到新协议。
 
-| 边界 | 推荐形态 |
-| --- | --- |
-| 认证 | `/api/auth/*`由Better Auth接管，项目不复制其认证合同 |
-| 当前用户 | `/api/v1/me`、`/me/preferences`、`/me/exports`、`/me/deletion` |
-| 公开内容 | `/dictionary/search`、`/lexemes/:id`、`/study-items/:id`、`/books`、`/books/:id/items` |
-| 加入学习 | 服务端materialize外部定位或复用核心study_item，再添加个人单词本；不用客户端snapshot伪造内容 |
-| 学习计划 | `/me/books`、`/study/queue` |
-| 批次 | 创建/读取`/study/sessions`，明确的item step命令 |
-| 复习 | `/review/attempts`；不提供随意PUT权威FSRS对象 |
-| 离线同步 | `/sync/commands`；逐条收据与最新revision |
-| 活动/统计 | `/activity/events`、`/activity/intervals`、`/me/stats` |
-| 管理 | `/admin/users`、`/admin/content/*`、`/admin/imports`、`/admin/jobs`、`/admin/audit` |
+| 边界      | 推荐形态                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------- |
+| 认证      | `/api/auth/*`由Better Auth接管，项目不复制其认证合同                                        |
+| 当前用户  | `/api/v1/me`、`/me/preferences`、`/me/exports`、`/me/deletion`                              |
+| 公开内容  | `/dictionary/search`、`/lexemes/:id`、`/study-items/:id`、`/books`、`/books/:id/items`      |
+| 加入学习  | 服务端materialize外部定位或复用核心study_item，再添加个人单词本；不用客户端snapshot伪造内容 |
+| 学习计划  | `/me/books`、`/study/queue`                                                                 |
+| 批次      | 创建/读取`/study/sessions`，明确的item step命令                                             |
+| 复习      | `/review/attempts`；不提供随意PUT权威FSRS对象                                               |
+| 离线同步  | `/sync/commands`；逐条收据与最新revision                                                    |
+| 活动/统计 | `/activity/events`、`/activity/intervals`、`/me/stats`                                      |
+| 管理      | `/admin/users`、`/admin/content/*`、`/admin/imports`、`/admin/jobs`、`/admin/audit`         |
 
 响应错误采用项目统一代码与request_id；分页采用稳定版本和游标。认证cookie同源、HttpOnly、生产Secure，并按库官方集成设置可信来源和CSRF相关保护。不能将跨来源CORS `*`和Cookie会话一起当作完整方案；部署域名变化时明确trusted origin配置。
 
@@ -347,14 +347,14 @@ site_memberships若保留，则只引用本站认证用户、站内role/status�
 
 ### 新增站点实体
 
-| 实体 | 关键字段 / 约束 |
-| --- | --- |
-| SiteRegistry中的sites | id、slug、status、固定database/realm配置引用；部署operator管理，秘密不经公开API读写 |
-| SiteRegistry中的site_domains | site_id、规范化host、base_path、canonical_origin；host+base_path唯一，支持明确的路径匹配优先级 |
-| site_settings | site_id、版本化主题/功能配置、默认学习目标、计划规则；只允许已定义字段，不能写认证秘密或数据库地址 |
-| site_memberships | site_id、同站库auth user_id、role=user/admin、status；与认证角色变更一致，角色作用范围固定为site |
-| site_content_overlays | site_id、seed源内容ID、版本、站点覆写内容/可见性；共享data-pack底层源不被站点编辑直接改写 |
-| 站点自有books/lexemes等 | 位于站点数据库，site_id明确；个人自定义词书再附owner_user_id；seed/overlay/个人对象可见性统一检查 |
+| 实体                         | 关键字段 / 约束                                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| SiteRegistry中的sites        | id、slug、status、固定database/realm配置引用；部署operator管理，秘密不经公开API读写                |
+| SiteRegistry中的site_domains | site_id、规范化host、base_path、canonical_origin；host+base_path唯一，支持明确的路径匹配优先级     |
+| site_settings                | site_id、版本化主题/功能配置、默认学习目标、计划规则；只允许已定义字段，不能写认证秘密或数据库地址 |
+| site_memberships             | site_id、同站库auth user_id、role=user/admin、status；与认证角色变更一致，角色作用范围固定为site   |
+| site_content_overlays        | site_id、seed源内容ID、版本、站点覆写内容/可见性；共享data-pack底层源不被站点编辑直接改写          |
+| 站点自有books/lexemes等      | 位于站点数据库，site_id明确；个人自定义词书再附owner_user_id；seed/overlay/个人对象可见性统一检查  |
 
 入口先从配置允许的Host/basepath解析site，再认证该站点realm，随后生成不可由客户端覆盖的`{site_id,user_id,role}`上下文。信任代理链和Forwarded Host的方式必须明确配置，未知host拒绝，不能从任意Header拿一个site_id。后台任务携带同样上下文；共享内容读取与overlay选择也必须知道当前站点。
 
@@ -381,12 +381,12 @@ site admin只管理本站用户/overlay/导入/设置；operator通过部署CLI�
 
 ### 新增实体
 
-| 实体 | 关键字段 / 约束 |
-| --- | --- |
-| known_word_batches | site_id、user_id、format_version、file_digest、mapping_version、status、counts、confirmed_at、revoked_at；来源和可追踪状态 |
-| known_word_import_rows | batch_id、row_number、原始必要字段、候选/确定lexeme_id、匹配状态/依据、行错误；保留预览与确认决策 |
-| known_word_claims | site_id、user_id、lexeme_id、source_type、source_id/batch_id、claimed_at、validity/revoked_at、evidence_strength；同来源同词唯一 |
-| known_word_exports | site_id、user_id、schema_version、导出范围、created_at、结果引用；受所有权校验和生命周期控制 |
+| 实体                   | 关键字段 / 约束                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| known_word_batches     | site_id、user_id、format_version、file_digest、mapping_version、status、counts、confirmed_at、revoked_at；来源和可追踪状态       |
+| known_word_import_rows | batch_id、row_number、原始必要字段、候选/确定lexeme_id、匹配状态/依据、行错误；保留预览与确认决策                                |
+| known_word_claims      | site_id、user_id、lexeme_id、source_type、source_id/batch_id、claimed_at、validity/revoked_at、evidence_strength；同来源同词唯一 |
+| known_word_exports     | site_id、user_id、schema_version、导出范围、created_at、结果引用；受所有权校验和生命周期控制                                     |
 
 导出区分claimed_known、抽样测过的verified_known和真实学过状态，并带来源、版本和时间，不把它们压成一个无解释的known=true。同站重导入可用ID准确映射；跨站把这些ID作为来源提示，目标站重新校验可见性和canonical映射。可编辑文件中的verified_known仅是来源声明，不能直接变成目标站已验证成绩；默认作为claim保留来源，可信完整进度迁移另走有明确证明的协议。熟词导出不是完整进度备份，不能用它恢复不存在的FSRS历史。
 
@@ -412,15 +412,15 @@ score_version记录两维权重、容错和是否处理选择题猜测；保留�
 
 ### 新增实体和诊断先验
 
-| 实体 | 关键字段 / 约束 |
-| --- | --- |
-| assessment_blueprints | goal、scope/book_version、strata定义、sampler/scorer版本、题型与停止规则 |
-| assessment_sessions | site_id、user_id、blueprint_id、seed、status、样本计划、created/completed_at |
-| assessment_items | session_id、lexeme/study_item、focus_sense、题目/内容版本、stratum、inclusion_probability、ordinal |
-| assessment_answers | session/item、client_attempt_id、响应、识别/拼写结果、grader_version、received_at；幂等唯一 |
-| mastery_profiles | site_id、user_id、goal/scope_version、profile_version、认知/拼写指标、各层样本、覆盖/不确定性、生成时间、有效性 |
-| mastery_evidence | site_id、user_id、lexeme_id、source/assessment item、维度结果、强度、freshness、version；解释词级先验来源 |
-| plan_versions | site_id、user_id、plan_version、目标/词书、profile/known_claim版本、策略参数、selection原因与生效时间 |
+| 实体                  | 关键字段 / 约束                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------- |
+| assessment_blueprints | goal、scope/book_version、strata定义、sampler/scorer版本、题型与停止规则                                        |
+| assessment_sessions   | site_id、user_id、blueprint_id、seed、status、样本计划、created/completed_at                                    |
+| assessment_items      | session_id、lexeme/study_item、focus_sense、题目/内容版本、stratum、inclusion_probability、ordinal              |
+| assessment_answers    | session/item、client_attempt_id、响应、识别/拼写结果、grader_version、received_at；幂等唯一                     |
+| mastery_profiles      | site_id、user_id、goal/scope_version、profile_version、认知/拼写指标、各层样本、覆盖/不确定性、生成时间、有效性 |
+| mastery_evidence      | site_id、user_id、lexeme_id、source/assessment item、维度结果、强度、freshness、version；解释词级先验来源       |
+| plan_versions         | site_id、user_id、plan_version、目标/词书、profile/known_claim版本、策略参数、selection原因与生效时间           |
 
 MasteryProfile是诊断先验，不是review历史。初版只影响新词采样权重、适合的词书层级、每日建议量和核验题，不写入虚假的reps、last_review_at或成功review点。对没有真实复习的新词，第一次真正评级按新词的服务器调度规则建立FSRS状态。
 
@@ -446,12 +446,12 @@ review点来自真实attempt/transition，记录当时预测值、评级和是�
 
 每次真实review可能重置该词状态，因此历史曲线由当时state和真实review节点分段，而不是用今天的state反推过去。服务端返回“模型预测线、真实观察点、样本/覆盖信息”，前端不能连成一条看似全部实测的平滑曲线。
 
-| 实体 | 关键字段 / 约束 |
-| --- | --- |
-| memory_curve_snapshots | site_id、user_id、scope/hash、snapshot_at、model_version、config_version、coverage、forecast_assumption、结果版本 |
-| memory_curve_snapshot_items | snapshot_id、study_item_id、progress_revision/transition引用、weight；需要历史重现时保留冻结成员 |
-| memory_curve_points | snapshot_id、horizon、预测聚合值、词间分位范围与口径；可计算或缓存，不冒充观测 |
-| review_state_transitions扩展 | review前的模型预测值、真实rating/outcome解释版本；支持校准与可追溯观察 |
+| 实体                         | 关键字段 / 约束                                                                                                   |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| memory_curve_snapshots       | site_id、user_id、scope/hash、snapshot_at、model_version、config_version、coverage、forecast_assumption、结果版本 |
+| memory_curve_snapshot_items  | snapshot_id、study_item_id、progress_revision/transition引用、weight；需要历史重现时保留冻结成员                  |
+| memory_curve_points          | snapshot_id、horizon、预测聚合值、词间分位范围与口径；可计算或缓存，不冒充观测                                    |
+| review_state_transitions扩展 | review前的模型预测值、真实rating/outcome解释版本；支持校准与可追溯观察                                            |
 
 交互查询不为每次hover保存大快照；可缓存按scope/version的有限时间网格，显式保存历史报告时再固化成员。新review或词集变化后失效/生成新版本；不改写旧报告。全部查询带site/user归属，不能按全平台词集生成一个“每人都相同”的曲线。
 

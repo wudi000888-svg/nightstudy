@@ -1,6 +1,6 @@
 name: Feature request / 功能建议
 description: 说明用户需求、使用情境与验收条件。
-title: "[Feature] "
+title: '[Feature] '
 body:
   - type: textarea
     id: problem

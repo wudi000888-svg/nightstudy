@@ -31,10 +31,10 @@ flowchart LR
 
 ### 两种站点模式都交付
 
-| 模式 | 数据/进程布局 | 域名与子路径 | 用途 |
-| --- | --- | --- | --- |
-| 独立 installation | 每个 installation 有独立 Compose project、PG 数据库/volume、密钥、备份和管理员；代码与固定镜像可复用 | 不同 domain/subdomain；同域 base path 共存仅用于同一信任域 | 各运营者独立升级、故障与管理边界 |
-| 共享 tenant | 一个 installation、多 Web/worker replica；每个 site 有独立 PG 业务 DB，含完整 Better Auth 与学习业务表；通过固定 Realm 访问 | 真租户默认不同 domain/subdomain 映射到 site/Realm | 一个运营方集中承载多个隔离站点 |
+| 模式              | 数据/进程布局                                                                                                               | 域名与子路径                                               | 用途                             |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------- |
+| 独立 installation | 每个 installation 有独立 Compose project、PG 数据库/volume、密钥、备份和管理员；代码与固定镜像可复用                        | 不同 domain/subdomain；同域 base path 共存仅用于同一信任域 | 各运营者独立升级、故障与管理边界 |
+| 共享 tenant       | 一个 installation、多 Web/worker replica；每个 site 有独立 PG 业务 DB，含完整 Better Auth 与学习业务表；通过固定 Realm 访问 | 真租户默认不同 domain/subdomain 映射到 site/Realm          | 一个运营方集中承载多个隔离站点   |
 
 两种模式采用同一数据契约；独立单站也是一条默认 site 记录，私有动作与 DTO 仍绑定 `(site_id, user_id)`，不另造无 scope 的单站捷径。默认真多站隔离是每 site 独立完整业务 DB，而非把认证表混在一个库后只加 `site_id`。跨站点部署 operator、站点管理员、普通用户分别授权，站点管理员不能创建、绑定或接管其他站点。
 
@@ -62,14 +62,14 @@ Better Auth 支持动态 allowed hosts、base path 与自定义 Cookie，但这�
 
 ## 2. 数据与代码分离
 
-| 资产 | 分发位置 | 运行时位置 | 版本与持久化 |
-| --- | --- | --- | --- |
-| 前后端源码、迁移文件、部署描述、少量测试夹具 | Git 仓库 | 编译后进入应用镜像 | Git tag、commit、镜像 digest |
-| 核心数据包：词书、12,934 学习卡、来源声明、教学包、摘要 | GitHub Release 资产 | 构建期校验；部署任务导入 Postgres | 独立数据版本；导入记录和内容版本留在 PG |
-| 可选 ECDICT SQLite：770,611 词条、188,080 词形关系 | 独立数据 Release 资产 | 镜像 `/opt/nightstudy/data-packs/` 只读目录 | 单独锁定版本、SHA-256、行数及许可声明 |
-| ECDICT CSV 等原始大文件 | 数据 Release 或来源档案 | 通常不进入生产运行镜像 | 用于重建及核验，不塞入源码 Git |
-| 用户、会话、生词、FSRS、事件、设置、管理修改、审计日志 | 不公开分发 | Postgres | 事务持久化与独立备份 |
-| 雨夜背景、雨声、公开音频 | 已确认可分发的静态资源或可选 media provider | 默认镜像静态资产；扩展资源使用 provider | 分别保留来源与权利摘要 |
+| 资产                                                    | 分发位置                                    | 运行时位置                                  | 版本与持久化                            |
+| ------------------------------------------------------- | ------------------------------------------- | ------------------------------------------- | --------------------------------------- |
+| 前后端源码、迁移文件、部署描述、少量测试夹具            | Git 仓库                                    | 编译后进入应用镜像                          | Git tag、commit、镜像 digest            |
+| 核心数据包：词书、12,934 学习卡、来源声明、教学包、摘要 | GitHub Release 资产                         | 构建期校验；部署任务导入 Postgres           | 独立数据版本；导入记录和内容版本留在 PG |
+| 可选 ECDICT SQLite：770,611 词条、188,080 词形关系      | 独立数据 Release 资产                       | 镜像 `/opt/nightstudy/data-packs/` 只读目录 | 单独锁定版本、SHA-256、行数及许可声明   |
+| ECDICT CSV 等原始大文件                                 | 数据 Release 或来源档案                     | 通常不进入生产运行镜像                      | 用于重建及核验，不塞入源码 Git          |
+| 用户、会话、生词、FSRS、事件、设置、管理修改、审计日志  | 不公开分发                                  | Postgres                                    | 事务持久化与独立备份                    |
+| 雨夜背景、雨声、公开音频                                | 已确认可分发的静态资源或可选 media provider | 默认镜像静态资产；扩展资源使用 provider     | 分别保留来源与权利摘要                  |
 
 GitHub Release 支持附加二进制资产，官方当前规定单文件小于 2 GiB。当前约 146 MiB 的 SQLite 可作为 Release 资产分发，无需把它写入 Git 历史或让安装者先配置 Git LFS。[GitHub：About releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)
 
@@ -89,23 +89,23 @@ GitHub Release 支持附加二进制资产，官方当前规定单文件小于 2
 
 以下是要写进部署描述的字段设计，不是已经生成或通过平台验证的 YAML：
 
-| 资源/字段 | 设计值与理由 |
-| --- | --- |
-| Web 服务 | `type: web`、`runtime: docker`；构建仓库根 Dockerfile |
-| Web 自动部署 | `autoDeployTrigger: off`；用户 fork 后可自行改为 `checksPass` |
-| Web 规格 | minimal 初始单实例至少 512 MiB；当前 plan 名可用 `0.5c-512mb`；scale 根据压测调整规格与 replica 数，不把此最低规格称为高并发容量 |
-| Postgres 规格 | 生产模板使用付费 plan；当前可选择 `0.5c-1g`，初始 `diskSizeGB: 5`，根据人数、事件量和预算调整 |
-| 区域 | Web 与 PG 同一区域；发行模板可默认 `singapore`，使用者在创建前选择 |
-| PG 主版本 | 施工时固定 Render 与自托管共同支持的主版本；镜像、CI 和备份客户端使用同一版本线 |
-| PG 公网访问 | `ipAllowList: []`，应用通过内部网络连接；运维需要临时受限访问或从内部运行备份任务 |
-| 首站连接串 | `DATABASE_URL` 由 `fromDatabase` 引用首站数据库 `connectionString`；作为默认 Realm |
-| 认证密钥 | `BETTER_AUTH_SECRET` 使用 `generateValue: true`；不在仓库写值 |
-| 初始管理员设置 | `BOOTSTRAP_TOKEN` 使用平台生成随机值；数据库记录一次性消费状态 |
-| 迁移与核心导入 | `preDeployCommand` 调用统一的发布前任务，先迁移，再幂等导入该发行版核心包 |
-| 健康检查 | `healthCheckPath: /health/ready`，确认 PG/schema/core 数据集已就绪 |
-| 应用磁盘 | 默认不挂载 persistent disk；所有用户与后台修改在 PG 中 |
-| 高并发扩展 | 同镜像 Web 多 replica、独立 background worker、可选共享 Redis 与连接池；由额外 Blueprint 配置档启用 |
-| 站点初始化 | 创建默认 site/host/base path；新增站点由 operator 准备新 DB 连接并登记，不由按钮自动无限创建 |
+| 资源/字段      | 设计值与理由                                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Web 服务       | `type: web`、`runtime: docker`；构建仓库根 Dockerfile                                                                            |
+| Web 自动部署   | `autoDeployTrigger: off`；用户 fork 后可自行改为 `checksPass`                                                                    |
+| Web 规格       | minimal 初始单实例至少 512 MiB；当前 plan 名可用 `0.5c-512mb`；scale 根据压测调整规格与 replica 数，不把此最低规格称为高并发容量 |
+| Postgres 规格  | 生产模板使用付费 plan；当前可选择 `0.5c-1g`，初始 `diskSizeGB: 5`，根据人数、事件量和预算调整                                    |
+| 区域           | Web 与 PG 同一区域；发行模板可默认 `singapore`，使用者在创建前选择                                                               |
+| PG 主版本      | 施工时固定 Render 与自托管共同支持的主版本；镜像、CI 和备份客户端使用同一版本线                                                  |
+| PG 公网访问    | `ipAllowList: []`，应用通过内部网络连接；运维需要临时受限访问或从内部运行备份任务                                                |
+| 首站连接串     | `DATABASE_URL` 由 `fromDatabase` 引用首站数据库 `connectionString`；作为默认 Realm                                               |
+| 认证密钥       | `BETTER_AUTH_SECRET` 使用 `generateValue: true`；不在仓库写值                                                                    |
+| 初始管理员设置 | `BOOTSTRAP_TOKEN` 使用平台生成随机值；数据库记录一次性消费状态                                                                   |
+| 迁移与核心导入 | `preDeployCommand` 调用统一的发布前任务，先迁移，再幂等导入该发行版核心包                                                        |
+| 健康检查       | `healthCheckPath: /health/ready`，确认 PG/schema/core 数据集已就绪                                                               |
+| 应用磁盘       | 默认不挂载 persistent disk；所有用户与后台修改在 PG 中                                                                           |
+| 高并发扩展     | 同镜像 Web 多 replica、独立 background worker、可选共享 Redis 与连接池；由额外 Blueprint 配置档启用                              |
+| 站点初始化     | 创建默认 site/host/base path；新增站点由 operator 准备新 DB 连接并登记，不由按钮自动无限创建                                     |
 
 上述 plan、环境引用、健康检查和部署字段均来自当前 Blueprint 规范。规范使用 `autoDeployTrigger`，旧 `autoDeploy` 已废弃；正式模板不要混用新旧字段或假定旧 starter/basic 别名长期有效。Blueprint 不支持变量插值，URL 的默认推导应由应用配置层完成。[Render：Blueprint YAML Reference](https://render.com/docs/blueprint-spec)
 
@@ -135,11 +135,11 @@ Better Auth 密钥和 base URL 按官方配置使用；Fastify 集成负责保�
 
 Compose 是必须实现与验收的交付，不只提供示意。规划 minimal、scale 两套可复用配置以及 ops job profile；应用镜像相同，通过 `web`、`worker`、`job` entrypoint 区分角色。PG 主版本固定，独立 installations 使用不同 Compose project 名和独立数据资源。
 
-| 配置档 | 拓扑与职责 |
-| --- | --- |
-| minimal | `app + postgres + init/job`；init/job 独立进程负责迁移、建默认 site、核心导入及明确运行的运维任务，结束后退出；基本学习请求不需要 Redis |
-| scale | `edge + app replicas + worker replicas + postgres cluster`；每 site 独立 DB；加入可选 `pgbouncer` 与 `redis/queue` 或连接到等价共享 provider |
-| ops | 使用同镜像独立 job 运行备份、恢复、站点创建、数据包导入、迁移预览；不让每个 Web replica 自行执行 |
+| 配置档  | 拓扑与职责                                                                                                                                   |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| minimal | `app + postgres + init/job`；init/job 独立进程负责迁移、建默认 site、核心导入及明确运行的运维任务，结束后退出；基本学习请求不需要 Redis      |
+| scale   | `edge + app replicas + worker replicas + postgres cluster`；每 site 独立 DB；加入可选 `pgbouncer` 与 `redis/queue` 或连接到等价共享 provider |
+| ops     | 使用同镜像独立 job 运行备份、恢复、站点创建、数据包导入、迁移预览；不让每个 Web replica 自行执行                                             |
 
 minimal 的 app 可只映射主机 localhost 端口，公网通过已有 HTTPS 入口或可选 edge 接入。scale 中只有 edge 发布 80/443，app/worker/PG/PgBouncer/Redis 均留在内部网络。后台导入、导出、批量内容检查由独立 job/worker 执行；Web 负责校验、提交和查询状态，不能在请求线程等待大型任务完成。
 
@@ -191,12 +191,12 @@ minimal 用 PG 持久任务记录和有界领取执行器即可；scale 可启�
 
 设立以下命令契约，名称可在施工时调整：
 
-| 契约 | 责任 |
-| --- | --- |
-| `db:deploy` | 应用已提交、已审阅的数据库迁移；不在生产临时生成 schema |
-| `data:import-core` | 向明确站点独立 DB 校验并导入 dataset/version；有断点/幂等检查，不覆盖用户或管理员修订 |
-| `site:init` | operator 准备/验证独立 DB/role、固定 Realm 与默认 site；登记 host/base path、发放 site setup token |
-| `legacy:import` | 单独读取旧 store 或浏览器导出，dry-run 后迁移到新实例；不在每次部署自动执行 |
+| 契约               | 责任                                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------------------- |
+| `db:deploy`        | 应用已提交、已审阅的数据库迁移；不在生产临时生成 schema                                            |
+| `data:import-core` | 向明确站点独立 DB 校验并导入 dataset/version；有断点/幂等检查，不覆盖用户或管理员修订              |
+| `site:init`        | operator 准备/验证独立 DB/role、固定 Realm 与默认 site；登记 host/base path、发放 site setup token |
+| `legacy:import`    | 单独读取旧 store 或浏览器导出，dry-run 后迁移到新实例；不在每次部署自动执行                        |
 
 施工时固定 Prisma 主版本及依赖锁。官方当前新版文档使用 `prisma db migrate`，而 ORM 7 使用 `prisma migrate deploy`；版本差异应封装在统一契约内，不把某个 CLI 拼法散落到所有平台配置。Better Auth ORM schema 也必须通过已提交的迁移统一管理，而不是在应用启动时调用不固定版本的 CLI。[Prisma：Applying a migration](https://www.prisma.io/docs/orm/migrations/applying-a-migration)
 

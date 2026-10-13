@@ -1,0 +1,16 @@
+# Local alpha ingress. Production HTTPS belongs to the operator's trusted edge.
+{
+    auto_https off
+}
+
+:8080 {
+    reverse_proxy {
+        dynamic a app 3000 {
+            refresh 5s
+            resolvers 127.0.0.11
+        }
+        lb_policy random
+        fail_duration 10s
+        max_fails 1
+    }
+}

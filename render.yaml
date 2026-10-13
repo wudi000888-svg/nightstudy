@@ -1,0 +1,47 @@
+# Alpha deployment descriptor: creates one site, not an unlimited tenant platform.
+# Review Render charges before creating resources. No resources are created by this file alone.
+services:
+  - type: web
+    name: nightstudy
+    runtime: docker
+    region: singapore
+    plan: 0.5c-512mb
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeployTrigger: off
+    preDeployCommand: pnpm db:prepare
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: '3000'
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nightstudy-db
+          property: connectionString
+      - key: PUBLIC_URL
+        fromService:
+          name: nightstudy
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: BOOTSTRAP_TOKEN
+        generateValue: true
+      - key: REGISTRATION_OPEN
+        value: 'true'
+      - key: CLIENT_IP_PROFILE
+        value: render-public
+
+databases:
+  - name: nightstudy-db
+    region: singapore
+    plan: 0.5c-1g
+    diskSizeGB: 5
+    postgresMajorVersion: '17'
+    databaseName: nightstudy
+    user: nightstudy
+    ipAllowList: []

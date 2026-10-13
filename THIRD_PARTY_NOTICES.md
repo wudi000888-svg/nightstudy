@@ -4,17 +4,22 @@
 
 ## 依赖清单
 
-本工程规划使用 React、TypeScript、Vite、Fastify、Prisma、Better Auth 与 FSRS 实现。最终安装版本以 pnpm 锁文件为准；构建发行时应从锁定包生成依赖及许可清单，并保留包内 LICENSE/NOTICE。开发工具、生产运行依赖和可选基础设施分别列明。
+本工程直接使用 React、TypeScript、Vite、Fastify、Prisma、Better Auth 与 ts-fsrs 实现。安装版本以 pnpm 锁文件为准；构建发行时应从锁定包生成依赖及许可清单，并保留包内 LICENSE/NOTICE。开发工具、生产运行依赖和可选基础设施分别列明。
 
-| 项目 | 上游许可入口 |
-| --- | --- |
-| React | [facebook/react LICENSE](https://github.com/facebook/react/blob/main/LICENSE) |
-| TypeScript | [microsoft/TypeScript LICENSE](https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt) |
-| Vite | [vitejs/vite LICENSE](https://github.com/vitejs/vite/blob/main/LICENSE) |
-| Fastify | [fastify/fastify LICENSE](https://github.com/fastify/fastify/blob/main/LICENSE) |
-| Prisma | [prisma/prisma LICENSE](https://github.com/prisma/prisma/blob/main/LICENSE) |
-| Better Auth | [better-auth/better-auth LICENSE](https://github.com/better-auth/better-auth/blob/main/LICENSE) |
-| ts-fsrs（如实际采用） | [open-spaced-repetition/ts-fsrs LICENSE](https://github.com/open-spaced-repetition/ts-fsrs/blob/main/LICENSE) |
+| 项目           | 上游许可入口                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------- |
+| React          | [facebook/react LICENSE](https://github.com/facebook/react/blob/main/LICENSE)                                 |
+| TypeScript     | [microsoft/TypeScript LICENSE](https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt)                 |
+| Vite           | [vitejs/vite LICENSE](https://github.com/vitejs/vite/blob/main/LICENSE)                                       |
+| Fastify        | [fastify/fastify LICENSE](https://github.com/fastify/fastify/blob/main/LICENSE)                               |
+| Prisma         | [prisma/prisma LICENSE](https://github.com/prisma/prisma/blob/main/LICENSE)                                   |
+| Better Auth    | [better-auth/better-auth LICENSE.md](https://github.com/better-auth/better-auth/blob/main/LICENSE.md)         |
+| ts-fsrs        | [open-spaced-repetition/ts-fsrs LICENSE](https://github.com/open-spaced-repetition/ts-fsrs/blob/main/LICENSE) |
+| React Router   | [remix-run/react-router LICENSE.md](https://github.com/remix-run/react-router/blob/main/LICENSE.md)           |
+| TanStack Query | [TanStack/query LICENSE](https://github.com/TanStack/query/blob/main/LICENSE)                                 |
+| Lucide icons   | [lucide-icons/lucide LICENSE](https://github.com/lucide-icons/lucide/blob/main/LICENSE)                       |
+| Zod            | [colinhacks/zod LICENSE](https://github.com/colinhacks/zod/blob/main/LICENSE)                                 |
+| node-postgres  | [brianc/node-postgres LICENSE](https://github.com/brianc/node-postgres/blob/master/LICENSE)                   |
 
 这些链接用于来源追溯，不替代锁定发行版本的许可清单。可选 Redis、PgBouncer、Postgres、代理入口及容器基础镜像也应按实际发行版本保留对应声明。
 

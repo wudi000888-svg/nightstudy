@@ -1,0 +1,72 @@
+# Alpha scale scaffold: PG remains the rate-limit/job authority.
+# Redis infrastructure is optional; enabling it does not switch the alpha providers.
+services:
+  app:
+    ports: !reset []
+    expose: ['3000']
+    environment:
+      TRUST_PROXY_CIDRS: ${TRUST_PROXY_CIDRS:-${NIGHTSTUDY_SCALE_SUBNET:-172.31.27.0/24}}
+    deploy:
+      replicas: 2
+
+  edge:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${NIGHTSTUDY_HTTP_PORT:-5198}:8080'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    networks: [backend]
+
+  worker:
+    image: ${NIGHTSTUDY_IMAGE:-nightstudy:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    env_file: [.env]
+    command: [pnpm, worker]
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-nightstudy}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-nightstudy}}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in .env}
+      BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:?Set BOOTSTRAP_TOKEN in .env}
+      PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:5198}
+      REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
+      CLIENT_IP_PROFILE: ${CLIENT_IP_PROFILE:-socket}
+      SITES_FILE: ${SITES_FILE:-}
+      BASE_PATH: ${BASE_PATH:-}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      MAX_ACTIVE_SITES: ${MAX_ACTIVE_SITES:-20}
+    volumes:
+      - ./.local/sites:/run/nightstudy/sites:ro
+    healthcheck:
+      disable: true
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    deploy:
+      replicas: 2
+    networks: [backend]
+
+  redis:
+    image: redis:8
+    profiles: [redis]
+    restart: unless-stopped
+    command: [redis-server, --appendonly, 'yes', --maxmemory-policy, noeviction]
+    volumes:
+      - redis-data:/data
+    networks: [backend]
+
+volumes:
+  redis-data:
+
+networks:
+  backend:
+    ipam:
+      config:
+        - subnet: ${NIGHTSTUDY_SCALE_SUBNET:-172.31.27.0/24}

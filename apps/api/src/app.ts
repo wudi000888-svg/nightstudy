@@ -202,7 +202,7 @@ export async function buildApp(config: AppConfig, logging = true) {
     const site = registry.resolve(request);
     const pathname = new URL(request.url, 'http://internal.invalid').pathname;
     if (
-      request.method !== 'GET' ||
+      !['GET', 'HEAD'].includes(request.method) ||
       pathname.startsWith(`${site.basePath}/api/`) ||
       pathname.includes('/assets/')
     )
@@ -224,7 +224,10 @@ export async function buildApp(config: AppConfig, logging = true) {
         `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'`,
       )
       .header('Cache-Control', 'no-store');
-    return reply.type('text/html; charset=utf-8').send(html);
+    reply.type('text/html; charset=utf-8');
+    if (request.method === 'HEAD')
+      return reply.header('Content-Length', Buffer.byteLength(html)).send();
+    return reply.send(html);
   });
 
   app.setErrorHandler((error, request, reply) => {

@@ -33,6 +33,8 @@ suite('PostgreSQL API and isolation', () => {
     path.join(webRoot, 'index.html'),
     '<html><head></head><body><div id="root"></div></body></html>',
   );
+  fs.mkdirSync(path.join(webRoot, 'assets'));
+  fs.writeFileSync(path.join(webRoot, 'assets', 'probe.js'), 'console.log("static probe");');
   const config: AppConfig = {
     sites: [
       {
@@ -56,7 +58,7 @@ suite('PostgreSQL API and isolation', () => {
     maxSites: 20,
   };
   const request = (
-    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    method: 'GET' | 'HEAD' | 'POST' | 'PATCH' | 'DELETE',
     route: string,
     body?: unknown,
     session = cookie,
@@ -162,6 +164,64 @@ suite('PostgreSQL API and isolation', () => {
       ).statusCode,
     ).toBe(403);
     expect((await request('GET', '/api/v2/study/plan', undefined, '')).statusCode).toBe(401);
+  });
+  it('serves GET and HEAD SPA pages without masking missing APIs, assets, or writes', async () => {
+    const mounted = await buildApp(
+      {
+        ...config,
+        sites: config.sites.map((site) => ({
+          ...site,
+          publicUrl: 'http://alpha.test/learn',
+          basePath: '/learn',
+        })),
+      },
+      false,
+    );
+    try {
+      for (const [basePath, instance] of [
+        ['', app],
+        ['/learn', mounted.app],
+      ] as const) {
+        for (const route of ['/', '/lookup']) {
+          const get = await request('GET', `${basePath}${route}`, undefined, '', instance);
+          const head = await request('HEAD', `${basePath}${route}`, undefined, '', instance);
+          expect(get.statusCode, get.body).toBe(200);
+          expect(get.headers['content-type']).toBe('text/html; charset=utf-8');
+          expect(get.body).toContain(`<base href="${basePath}/">`);
+          expect(head.statusCode, head.body).toBe(200);
+          expect(head.body).toBe('');
+          expect(head.headers['content-type']).toBe(get.headers['content-type']);
+          expect(head.headers['content-length']).toBe(get.headers['content-length']);
+          expect(head.headers['cache-control']).toBe('no-store');
+          expect(head.headers['content-security-policy']).toContain("script-src 'self' 'nonce-");
+        }
+        const asset = await request('GET', `${basePath}/assets/probe.js`, undefined, '', instance);
+        const assetHead = await request(
+          'HEAD',
+          `${basePath}/assets/probe.js`,
+          undefined,
+          '',
+          instance,
+        );
+        expect(asset.statusCode, asset.body).toBe(200);
+        expect(asset.body).toBe('console.log("static probe");');
+        expect(assetHead.statusCode).toBe(200);
+        expect(assetHead.body).toBe('');
+        expect(assetHead.headers['content-length']).toBe(asset.headers['content-length']);
+        for (const route of ['/api/v2/missing-route', '/assets/missing.js']) {
+          for (const method of ['GET', 'HEAD'] as const) {
+            const missing = await request(method, `${basePath}${route}`, undefined, '', instance);
+            expect(missing.statusCode, missing.body).toBe(404);
+            expect(missing.headers['content-type']).toBe('application/json; charset=utf-8');
+          }
+        }
+        const post = await request('POST', `${basePath}/lookup`, {}, '', instance);
+        expect(post.statusCode, post.body).toBe(404);
+        expect(post.json().code).toBe('not_found');
+      }
+    } finally {
+      await mounted.app.close();
+    }
   });
   it('returns empty curve without fabricating memory evidence', async () => {
     const response = await request('GET', '/api/v2/memory/curve');

@@ -1,6 +1,6 @@
 # Alpha 运行与部署
 
-本文件对应 Node 24、pnpm 11.25、Prisma 7 与目标 Postgres 17 的新工程。本机 PG18.4 的28项测试、格式/类型与浏览器核心流程已通过，见 [验证记录](../README.md#本机验证与待验收项)。PG17、容器与 Compose 将由 GitHub CI 验证，当前结果 pending；本机没有 Docker。Render 实际创建/部署/恢复未执行，本项目没有创建付费平台资源。
+本文件对应 Node 24、pnpm 11.25、Prisma 7 与目标 Postgres 17 的新工程。本机 PG18.4 的28项测试、格式/类型与浏览器核心流程已通过，见 [验证记录](../README.md#本机验证与待验收项)。PG17、镜像构建与 Compose 启动已在 [GitHub CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38452093122) 通过，验证源码 commit 为 `a2d8e7d`；本机没有 Docker。Render 实际创建/部署/恢复未执行，本项目没有创建付费平台资源。
 
 ## Docker Compose minimal
 

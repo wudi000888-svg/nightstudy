@@ -9,7 +9,7 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前状态：`0.1.0-alpha.1` 首版 alpha 已在本机运行验证，尚未正式发行容器。** 原创演示词表的核心学习、账户与管理流程可运行；PG17/Docker/Compose 验收将由 GitHub CI 执行，当前结果待定。Render 实际部署尚未执行，高并发容量尚未测量。具体代码变化见 [CHANGELOG](CHANGELOG.md)。
+**当前状态：`0.1.0-alpha.1` 首版 alpha 已在本机运行验证，尚未正式发行容器。** 原创演示词表的核心学习、账户与管理流程可运行；PG17/Docker/Compose 已在 [GitHub CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38452093122) 通过验证。Render 实际部署尚未执行，高并发容量尚未测量。具体代码变化见 [CHANGELOG](CHANGELOG.md)。
 
 ## 产品与边界
 
@@ -63,11 +63,11 @@ Web 开发地址 `http://127.0.0.1:5173`，API 开发地址 `http://127.0.0.1:51
 | 桌面浏览器实测        | 注册、管理员/普通用户、两组学习与拼写、刷新恢复、复习、生词本、熟词批次、目标测试报告/计划、个人曲线完成                                        |
 | 手机尺寸实测          | 390 × 844 布局与学习流程完成                                                                                                                    |
 | 断网恢复实测          | 揭晓动作本地暂存后恢复，PG 确认回执恰好 1 条，无 Review；只验证该场景                                                                           |
-| PG17 / 容器 / Compose | 由 GitHub CI 执行，结果 pending；本机没有 Docker                                                                                                |
+| PG17 / 容器 / Compose | [CI 通过](https://github.com/wudi000888-svg/nightstudy/actions/runs/38452093122)：双独立 PG17、28 项测试、镜像构建与 Compose 启动               |
 | Render                | Blueprint 已准备，实际创建/部署/恢复未执行                                                                                                      |
 | 容量与正式镜像        | 尚无高并发基准与正式发行容器                                                                                                                    |
 
-后续进展见公开 [Issues](https://github.com/wudi000888-svg/nightstudy/issues) 与 [Milestones](https://github.com/wudi000888-svg/nightstudy/milestones)。CI 运行结果将按对应源码 commit 更新，不把规划或描述文件视为已部署。
+后续进展见公开 [Issues](https://github.com/wudi000888-svg/nightstudy/issues) 与 [Milestones](https://github.com/wudi000888-svg/nightstudy/milestones)。上述 CI 对应源码 commit `a2d8e7d`；Render 与高并发容量仍按路线逐项验收。
 
 ## 内容与许可
 

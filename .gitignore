@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.local/
+work/
+prisma/generated/
+*.log
+*.sqlite*
+*.db
+*.dump
+*.backup
+.DS_Store

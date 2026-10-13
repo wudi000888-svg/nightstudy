@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security policy / 安全问题
+    url: https://github.com/wudi000888-svg/nightstudy/security/policy
+    about: 敏感漏洞请私下报告，不要附在公开 issue 中。

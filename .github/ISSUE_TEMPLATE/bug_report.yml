@@ -1,0 +1,44 @@
+name: Bug report / 故障报告
+description: 报告可复现的非敏感故障；漏洞请使用私密安全入口。
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: 请只使用合成数据，不附凭据、真实用户信息或数据库导出。当前为 alpha 工程。
+  - type: input
+    id: version
+    attributes:
+      label: 版本或 commit
+      placeholder: commit SHA / alpha tag
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: 运行模式
+      options:
+        - 本地开发
+        - Docker Compose minimal
+        - Docker Compose scale
+        - Render
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请注明单站/多站、domain/base path 与浏览器版本，替换实际域名及敏感值。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期与实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏日志或截图
+      description: 去除 Cookie、token、连接串、账号和个人数据。

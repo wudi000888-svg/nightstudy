@@ -9,7 +9,7 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前状态：`0.1.0-alpha.1` 首版 alpha 已在本机运行验证，尚未正式发行容器。** 原创演示词表的核心学习、账户与管理流程可运行；PG17/Docker/Compose 已在 [GitHub CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38452093122) 通过验证。Render 实际部署尚未执行，高并发容量尚未测量。具体代码变化见 [CHANGELOG](CHANGELOG.md)。
+**当前状态：`0.2.0-alpha.1`，已在本机完整导入 770,611 条 ECDICT 词典数据。** 中文释义、多词义详情、独立英美音标数据、设备语音朗读与在线翻译面板已实现。上一版 PG17/Docker/Compose [CI 已通过](https://github.com/wudi000888-svg/nightstudy/actions/runs/38452093122)；本版完整内容安装与网关容器由新 CI 验收，结果见上方 CI。Render、目标 VPS 实际部署和高并发容量尚未验证。具体变化见 [CHANGELOG](CHANGELOG.md)。
 
 ## 产品与边界
 
@@ -21,7 +21,13 @@
 - 同一份源码可独立部署多站，也可由共享后端按可信 host 选择每站独立 Postgres/认证 Realm。
 - 真租户默认使用独立域名或子域名。同域子路径只用于同一信任域内的共存，不能作为浏览器强隔离。
 
-统一技术栈：React + TypeScript + Vite、Fastify、Prisma 7、Better Auth、Postgres 17、Node.js 24 与 pnpm 11 workspace。同一 Node 容器提供 Web/API；默认学习体验无需付费 AI、OAuth 或对象存储。内置 **40 个原创演示词、五个目标演示词书**，测试结论只覆盖演示内容，不能当作完整考试词汇量。
+统一技术栈：React + TypeScript + Vite、Fastify、Prisma 7、Better Auth、Postgres 17、Node.js 24 与 pnpm 11 workspace。同一 Node 容器提供 Web/API；默认学习体验无需付费 AI、OAuth 或对象存储。
+
+完整初次安装下载固定版本的独立内容包，校验 SHA-256，再在各站数据库事务内发布。词典有 770,611 条词目、768,739 条上游中文释义和 160,884 条英文释义；现代美音 IPA 匹配 83,424 个词，英音匹配 64,321 个词，至少一种匹配 104,261 个词。原音标保真保留，未覆盖词不伪造 IPA。发音使用设备真实可用的英美语音，当前无真人录音库。数据没有提供的例句保持为空。
+
+五本新词书：常用英语 3,277 词、高考方向 3,677 词、四级方向 3,849 词、六级方向 5,407 词、雅思方向 5,040 词。它们完整导入固定源的对应频率规则或标签，不宣称等于当前官方考试大纲。原 40 词演示书保留，已有用户进度与词 ID 不变。来源、授权、音标局限见 [内容包](docs/CONTENT.md) 与 [发音数据](docs/PHONETICS.md)。
+
+在线翻译面板可经私密 VPS 网关访问 Google 网页兼容接口，原文不写数据库。该接口非官方、可能限流，错误会显示给用户并提供 Google 官方网页入口；Google 网页不支持直接 iframe。本机目前实际遇到上游 429，不能把网关代码可运行当成目标 VPS 已连通或已加速。部署和验收见 [在线翻译](docs/TRANSLATION.md)。
 
 ## 构建与部署
 
@@ -32,10 +38,10 @@ cp .env.example .env
 mkdir -p .local/sites
 # 编辑 .env：POSTGRES_PASSWORD、BETTER_AUTH_SECRET、BOOTSTRAP_TOKEN
 docker compose config --quiet
-docker compose up --build --detach --wait app
+docker compose up --build --detach --wait --wait-timeout 600 app
 ```
 
-访问 `http://127.0.0.1:5198`，通过首次初始化页面，用本站初始化口令创建管理员，然后登录。`init` 独立任务负责迁移和版本种子；PG 数据在 named volume。完整变量、HTTPS、备份、多站与 scale 扩展见 [部署文档](docs/DEPLOYMENT.md)。不要对需要保留数据的安装使用 `down --volumes`。
+访问 `http://127.0.0.1:5198`，通过首次初始化页面，用本站初始化口令创建管理员，然后登录。`init` 独立任务负责迁移、种子和完整内容安装；PG 与内容源缓存各在 named volume。首次下载约 71 MB，数据库还需要词条、词义和索引的空间；安装耗时取决于 VPS。`CONTENT_PACK=demo` 可显式选择 40 词最小体验。完整变量、HTTPS、备份、多站与 scale 扩展见 [部署文档](docs/DEPLOYMENT.md)。不要对需要保留数据的安装使用 `down --volumes`。
 
 Native 开发使用 Node 24 与 pnpm 11.25.0，并自行准备可访问的 PG 数据库。在 `.env` 填入真实 DATABASE_URL 与两个随机密钥后：
 
@@ -50,28 +56,30 @@ Web 开发地址 `http://127.0.0.1:5173`，API 开发地址 `http://127.0.0.1:51
 
 [在 Render 审阅部署配置](https://render.com/deploy?repo=https://github.com/wudi000888-svg/nightstudy) 使用仓库 `render.yaml`，只创建首站 Web/PG 描述，采用付费资源规格；自行审阅费用与构建结果。默认无额外付费维护 worker；显式 render-public IP profile 仅适用于 Render 受控公网入口，私网/自托管使用 socket 模式。此入口尚未做平台实测，不自动创建无限租户。
 
-架构与后续施工约定见 [架构](docs/architecture/ARCHITECTURE.md)、[多站与并发方案](docs/architecture/MULTISITE_AND_SCALING.md)。完整词典 pack、媒体 provider、PgBouncer、Redis provider 和实测高并发容量仍待实现/验收。当前 API 契约见 [API.md](docs/API.md)。
+架构约定见 [架构](docs/architecture/ARCHITECTURE.md)、[多站与并发方案](docs/architecture/MULTISITE_AND_SCALING.md)。真人录音、PgBouncer、Redis provider、跨主机 HA 和实测高并发容量仍待实现/验收。当前 API 契约见 [API.md](docs/API.md)。词典/词书分页和学习选词不再被前 500/1,000 词截断；熟词导出以游标分批流式输出全部记录。
 
 ## 本机验证与待验收项
 
-以下记录对应 2026-10-14 首版源码验证，使用合成账户与原创演示内容；不能据此推断生产容量。
+以下记录对应 2026-10-14 本机验证，使用合成账户。完整词库导入与测试 fixture 分开验收，不能据此推断生产容量。
 
-| 验证项                | 结果与范围                                                                                                                                      |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| 格式与类型            | format:check、typecheck 全部通过，包含 API 测试与工具脚本                                                                                       |
-| 真实数据库测试        | PG18.4，3 个文件、28 项测试全部通过；含双站 DB/Cookie、初始化/角色保护、FSRS 幂等、熟词撤销、测试与 Review 分离、目标中途降低及同书并发预约限额 |
-| 桌面浏览器实测        | 注册、管理员/普通用户、两组学习与拼写、刷新恢复、复习、生词本、熟词批次、目标测试报告/计划、个人曲线完成                                        |
-| 手机尺寸实测          | 390 × 844 布局与学习流程完成                                                                                                                    |
-| 断网恢复实测          | 揭晓动作本地暂存后恢复，PG 确认回执恰好 1 条，无 Review；只验证该场景                                                                           |
-| PG17 / 容器 / Compose | [CI 通过](https://github.com/wudi000888-svg/nightstudy/actions/runs/38452093122)：双独立 PG17、28 项测试、镜像构建与 Compose 启动               |
-| Render                | Blueprint 已准备，实际创建/部署/恢复未执行                                                                                                      |
-| 容量与正式镜像        | 尚无高并发基准与正式发行容器                                                                                                                    |
+| 验证项                | 结果与范围                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 格式与类型            | format:check、typecheck 全部通过，包含 API 测试与工具脚本                                                          |
+| 真实数据库与 provider | PG18.4 核心集成、provider、网关和内容 parser 检查；包括 11,001 条熟词完整导出、学习跨过首 1,000 词、鉴权及错误处理 |
+| 完整内容              | 实际安装 770,611 词、1,113,723 条新增源词义、五本源词书及独立英美音标包；原 40 词 ID 和学习历史保留                |
+| 桌面浏览器实测        | 注册、管理员/普通用户、两组学习与拼写、刷新恢复、复习、生词本、熟词批次、目标测试报告/计划、个人曲线完成           |
+| 手机尺寸实测          | 390 × 844 布局与学习流程完成                                                                                       |
+| 断网恢复实测          | 揭晓动作本地暂存后恢复，PG 确认回执恰好 1 条，无 Review；只验证该场景                                              |
+| PG17 / 容器 / Compose | 上一版已通过；本版 CI 包含完整字典与英美音标安装、catalog 数量校验、闭合网关容器鉴权 smoke                         |
+| Google / VPS          | 首次公共接口返回真实结果，之后本机 Node 和 curl 实测均被 Google 限流；目标 VPS 未提供连接信息                      |
+| Render                | Blueprint 已准备，实际创建/部署/恢复未执行                                                                         |
+| 容量与正式镜像        | 尚无高并发基准与正式发行容器                                                                                       |
 
-后续进展见公开 [Issues](https://github.com/wudi000888-svg/nightstudy/issues) 与 [Milestones](https://github.com/wudi000888-svg/nightstudy/milestones)。上述 CI 对应源码 commit `a2d8e7d`；Render 与高并发容量仍按路线逐项验收。
+后续进展见公开 [Issues](https://github.com/wudi000888-svg/nightstudy/issues) 与 [Milestones](https://github.com/wudi000888-svg/nightstudy/milestones)。上一版 CI 对应源码 commit `a2d8e7d`；本版证据以新 run 为准，Render 与高并发容量仍按路线逐项验收。
 
 ## 内容与许可
 
-本仓库只公开新工程、原创演示内容和可确认来源的资源。原部署的完整服务端快照、编译产物、真实词库、账户库、密钥与运行数据不在公开仓库中。大型词典可在后续版本作为独立、带来源和校验摘要的数据包选择安装，不能默认把缺失资产当作完整词典。
+本仓库公开新工程、原创演示内容，以及外部内容包的固定版本清单、校验与安装工具。大型词典、音标源和各自许可证作为独立数据下载，不复制原部署词库或打进应用镜像。原服务端快照、编译产物、账户库、密钥与运行数据不在公开仓库中。应用代码 MIT 不会改变英美音标等数据的原有许可。
 
 新写代码采用 [MIT License](LICENSE)。第三方依赖、内容、媒体与数据保留各自许可，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 

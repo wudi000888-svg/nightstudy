@@ -28,6 +28,15 @@ export interface Me {
   user: User | null;
   siteId: string;
 }
+export interface ContentAttribution {
+  kind: 'dictionary' | 'original-demo' | 'site-authored' | 'unknown';
+  reference: string;
+  packId: string | null;
+  license: string | null;
+  sourceUrl: string | null;
+  wordHasSiteEdits: boolean;
+  siteEditVersion: string | null;
+}
 export interface Sense {
   id: string;
   pos?: string;
@@ -35,18 +44,47 @@ export interface Sense {
   definitionEn?: string;
   exampleEn?: string;
   exampleZh?: string;
+  sourceRef?: string;
+  source?: ContentAttribution;
+  exampleSource?: ContentAttribution | null;
 }
 export interface Word {
   id: string;
   status?: string;
   lemma: string;
   phonetic?: string;
+  phoneticUs?: string;
+  phoneticUk?: string;
+  phoneticSource?: string;
+  phonetics?: {
+    text: string;
+    ipa?: string;
+    region: 'US' | 'UK' | 'unspecified';
+    notation: 'ipa' | 'source-transcription';
+    sourceRef?: string;
+  }[];
   audioUrl?: string;
   difficulty?: number;
   goalTags?: string[];
   contentVersion?: string;
   sourceRef?: string;
+  source?: {
+    reference: string;
+    packId: string | null;
+    license: string | null;
+    sourceUrl: string | null;
+    wordHasSiteEdits?: boolean;
+    siteEditVersion?: string | null;
+  } | null;
+  sources?: { id: string; version: string; license: string; sourceUrl: string }[];
   senses?: Sense[];
+  senseCount?: number;
+  detailAvailable?: boolean;
+}
+export interface PageInfo {
+  nextCursor: string | null;
+  hasMore: boolean;
+  total: number;
 }
 export interface Book {
   id: string;

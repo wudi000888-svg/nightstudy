@@ -1,0 +1,69 @@
+{
+  "formatVersion": 1,
+  "id": "ecdict-bc015ed2e24a7",
+  "version": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+  "name": "ECDICT base CSV",
+  "repository": "https://github.com/skywind3000/ECDICT",
+  "sourceUrl": "https://raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv",
+  "sourcePage": "https://github.com/skywind3000/ECDICT/blob/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv",
+  "fileName": "ecdict-bc015ed2e24a7.csv",
+  "bytes": 65933428,
+  "sha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+  "gitBlobSha1": "c4ade63ea08cf39d9c3475e96929036d64d94c94",
+  "license": "MIT",
+  "licenseUrl": "https://github.com/skywind3000/ECDICT/blob/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/LICENSE",
+  "licenseFile": "content-ecdict.LICENSE.txt",
+  "copyright": "Copyright (c) 2025 Linwei",
+  "permissionEvidence": {
+    "questionUrl": "https://github.com/skywind3000/ECDICT/issues/134#issuecomment-5847668998",
+    "questionSummary": "Whether the dictionary data may be used in a commercial app, bundled for offline lookup, and whether anything beyond the MIT notice is required.",
+    "replyUrl": "https://github.com/skywind3000/ECDICT/issues/134#issuecomment-5902723743",
+    "author": "skywind3000",
+    "authorAssociation": "OWNER",
+    "createdAt": "2026-09-30T02:13:36Z",
+    "reply": "可以用，没有",
+    "verifiedAt": "2026-10-14"
+  },
+  "statistics": {
+    "entryCount": 770611,
+    "normalizedUniqueCount": 770611,
+    "duplicateCount": 0,
+    "phoneticCount": 218065,
+    "definitionZhCount": 768739,
+    "definitionEnCount": 160884,
+    "usableExampleCount": 0,
+    "audioCount": 0,
+    "tagCounts": {
+      "zk": 1603,
+      "gk": 3677,
+      "cet4": 3849,
+      "cet6": 5407,
+      "ky": 4801,
+      "toefl": 6974,
+      "gre": 7504,
+      "ielts": 5040
+    },
+    "bookCounts": {
+      "daily": 3277,
+      "high-school": 3677,
+      "cet4": 3849,
+      "cet6": 5407,
+      "ielts": 5040
+    }
+  },
+  "bookRules": {
+    "daily": "Positive frq <= 3000 OR positive bnc <= 3000, with a nonempty Chinese definition. This is a frequency-rule book, not a CEFR or official examination list.",
+    "high-school": "Upstream gk tag, with a nonempty Chinese definition.",
+    "cet4": "Upstream cet4 tag, with a nonempty Chinese definition.",
+    "cet6": "Upstream cet6 tag, with a nonempty Chinese definition.",
+    "ielts": "Upstream ielts tag, with a nonempty Chinese definition."
+  },
+  "limitations": [
+    "The complete pinned base CSV is not every English word or the separate 3.4-million-entry ECDICT release.",
+    "Phonetic values preserve upstream transcription, including older conventions; they are not asserted to be modern regional IPA.",
+    "English and Chinese definition lines are not assumed to align by ordinal.",
+    "No usable examples or audio are supplied by this CSV.",
+    "Exam tags are upstream classifications, not a verified complete current official examination syllabus.",
+    "Upstream README describes mixed historical sources; maintainer distribution permission does not constitute a per-entry third-party rights audit."
+  ]
+}

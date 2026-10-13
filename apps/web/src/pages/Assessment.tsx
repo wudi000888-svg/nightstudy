@@ -167,7 +167,7 @@ export function AssessmentPage() {
               <strong>{report.verifiedWordIds.length}</strong>
             </div>
           </div>
-          <Notice>这是原创演示样本的有限基线，不是完整考试水平或全词表掌握证明。</Notice>
+          <Notice>这是本次抽样的有限基线，不是完整考试水平或全词表掌握证明。</Notice>
           <p>
             建议每天 {report.suggestedPlan.dailyNewLimit} 个新词、每组{' '}
             {report.suggestedPlan.groupSize} 词。熟词降低额外曝光，仍保留抽查。
@@ -281,7 +281,7 @@ export function AssessmentPage() {
             <Sparkles size={28} />
           </span>
           <h2>从目标开始，了解一点自己的熟悉度。</h2>
-          <p>当前 Alpha 使用少量原创演示词汇与题目，先测拼写再识义，避免答案提示影响判断。</p>
+          <p>按目标词汇范围抽样，先测拼写再识义，避免答案提示影响判断。</p>
           <div className="form-columns">
             <label className="field">
               这次的目标

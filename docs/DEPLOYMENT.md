@@ -1,6 +1,6 @@
 # Alpha 运行与部署
 
-本文件对应 Node 24、pnpm 11.25、Prisma 7 与目标 Postgres 17 的新工程。本机 PG18.4 的28项测试、格式/类型与浏览器核心流程已通过，见 [验证记录](../README.md#本机验证与待验收项)。PG17、镜像构建与 Compose 启动已在 [GitHub CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38452093122) 通过，验证源码 commit 为 `a2d8e7d`；本机没有 Docker。Render 实际创建/部署/恢复未执行，本项目没有创建付费平台资源。
+本文件对应 `0.2.0-alpha.1`、Node24、pnpm11.25、Prisma7与目标Postgres17。本机真实PG18.4完整内容安装成功，7个文件的54项测试通过；浏览器核心流程与验证范围见 [验证记录](../README.md#本机验证与待验收项)。上一版PG17、镜像与Compose已在 [GitHub CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38452093122) 通过，对应源码commit `a2d8e7d`；**本版完整字典、英美音标和网关容器的新CI尚待执行**，不能沿用上一版结果当作已验收。本机没有Docker。Render及目标VPS实际部署/恢复未执行，没有创建付费平台资源，也没有高并发容量基准。
 
 ## Docker Compose minimal
 
@@ -17,12 +17,16 @@ mkdir -p .local/sites
 
 ```sh
 docker compose config --quiet
-docker compose up --build --detach --wait app
+docker compose up --build --detach --wait --wait-timeout 600 app
 ```
 
-`init` 是独立迁移任务，运行 `pnpm db:prepare`（生成客户端、全站迁移与版本种子），成功后 app 才启动。应用请求进程不重复执行迁移。访问 `http://127.0.0.1:5198`；通过应用首次初始化流程，使用自己保管的 BOOTSTRAP_TOKEN 创建首位管理员。示例库是新编写的教学演示内容，不是 12,934 卡或全量 ECDICT。
+`init` 是独立准备任务，运行 `pnpm db:prepare`：generate、全站迁移、原创版本seed，再按CONTENT_PACK安装内容。默认ecdict会下载并校验固定版完整ECDICT及独立英美IPA，在各站事务内安装；成功后app才启动。应用请求进程不重复迁移/安装。访问 `http://127.0.0.1:5198`，通过首次初始化流程，使用自己保管的BOOTSTRAP_TOKEN创建首位管理员。`CONTENT_PACK=demo` 可显式选择40词最小演示；CI单元/集成库使用该模式。没有使用原ZIP词库或旧服务器快照。
 
-检查 `/health/live` 与 `/health/ready`，查看 `docker compose logs init app`。日志只用于自己实例排障；分享前移除凭据与个人数据。`docker compose down` 停止服务但保留 named volume；`down --volumes` 会删除本站数据库，仅用于可丢弃测试安装。
+PG业务数据与内容源缓存分别保存在postgres-data、content-cache named volume；源缓存挂载 `/app/.local/content`，不塞入Git或应用镜像。首次源下载约71MB，安装耗时取决于网络与机器。等待600秒是CI smoke等待上限，不是承诺安装时间；超时先检查init日志再决定增加等待。重复准备验证缓存与已安装pack，保留历史和管理编辑；摘要失败停止安装。离线内容导入、来源许可与目标书规则见 [CONTENT.md](CONTENT.md)，独立音标见 [PHONETICS.md](PHONETICS.md)。
+
+本机全量库实测Word770,611、追加源Sense1,113,723、5本新目标词书，原40词ID和历史保留。US IPA匹配83,424词、UK匹配64,321词，至少一种现代IPA匹配104,261词；含原始音标的任一种音标覆盖256,047词。该安装数据库约974,468,799字节（约975MB）；这是一次本机数据体量记录，不能推断最小磁盘、内存或并发容量。各站各存一份核心词义和进度，另需预算WAL、索引、备份及升级空间。
+
+检查 `/health/live` 与 `/health/ready`，再查询 `/api/v2/dictionary/stats` 核对installedDictionary、pack摘要与declaredEntryCount=770611；子路径安装给API添加basePath。ready检查配置站点的DB/SiteState身份，不能代替内容数量验收。查看 `docker compose logs init app`，日志分享前移除凭据与个人数据。`docker compose down` 停止服务但保留named volume；`down --volumes` 删除本站数据库和内容缓存，仅用于可丢弃测试安装。
 
 默认 app 监听启动后及每 60 秒执行有界 PG lease 维护，清理过期限流/session/verification与旧任务；先核验本站 DB 绑定，同一任务由 lease 竞争执行。重试耗尽标记 failed，各表每次清理有批次上限。minimal 与 Render 无需额外维护 worker；scale/独立 worker 可复用同一维护入口，不重复消费同一个有效 lease。它仍只是维护任务入口，未实现大型内容异步导入。
 
@@ -58,7 +62,7 @@ docker compose up --build --detach --wait app
 ]
 ```
 
-相应环境变量写在私有 `.env`，Compose 传给 init/app/worker。每站 DB 和密钥单独准备；新增站点不是一个按钮自动创建数据库。`pnpm db:deploy` 按配置串行迁移每个目标 DB，`pnpm db:seed` 按配置写各站版本种子，`pnpm db:prepare` 顺序执行 generate/deploy/seed；不能只准备一站就上线整个 registry。再核对 `pnpm sites:check`。站点管理员不修改全局 host 或数据库映射。
+相应环境变量写在私有 `.env`，Compose传给init/app/worker。每站DB和密钥单独准备；新增站点不是一个按钮自动创建数据库。`pnpm db:deploy` 按配置串行迁移各DB，`pnpm db:seed` 写各站原创版本种子，`pnpm db:prepare` 顺序执行generate/deploy/seed与所选内容安装；默认完整词典/音标逐站安装，共享校验后的源缓存，站点私有编辑与学习数据保存在各自DB。不能只准备一站就上线整个registry。再核对 `pnpm sites:check`。站点管理员不修改全局host或数据库映射。
 
 `basePath` 使用空字符串或 `/school-a` 等规范路径，无尾斜杠；`publicUrl` 路径与其一致。配置站点数不得超过 MAX_ACTIVE_SITES，超出会启动失败；每站池也有硬上限。当前没有自动 LRU 淘汰。`/health/ready` 位于固定根路径并检查所有配置站点，因此也支持只有子路径的安装，但任一站 DB 异常会使整个副本 unready。总连接预算计算所有 Web/worker 副本的全部配置站点池，并预留迁移/运维连接。子路径认证、跨站点隔离及生产代理要按当前测试证据验收。
 
@@ -79,7 +83,7 @@ PgBouncer、完整分布式队列、活动 Realm LRU、公平调度及高并发�
 
 根 `render.yaml` 描述一个 Docker Web 与一个 PG17 首站数据库，使用付费资源规格、内部 DB URL、随机认证/初始化密钥、`pnpm db:prepare` pre-deploy 和 ready 检查。默认 `autoDeployTrigger: off`，不因上游 push 自动升级所有使用者实例。
 
-该文件不会自行创建云资源。部署者在 Render 审阅费用、创建资源并检查首次构建/ready；PUBLIC_URL 从官方 RENDER_EXTERNAL_URL 引用，自定义域名须验证后更新配置。没有挂载 runtime 持久盘，业务持久化在 PG，当前不支持会丢失的本地媒体上传。[Render Blueprint 规范](https://render.com/docs/blueprint-spec)、[Docker 部署](https://render.com/docs/docker)
+该文件不会自行创建云资源。部署者在Render审阅费用、创建资源并检查首次构建/ready与catalog；PUBLIC_URL从RENDER_EXTERNAL_URL引用，自定义域名验证后更新配置。pre-deploy默认安装完整内容；没有runtime持久盘，临时源缓存可能在重新部署时重新下载，已提交的词典和业务数据保存在PG。当前不提供本地媒体上传。Render首次完整安装耗时、内存及恢复仍需平台实测。[Render Blueprint规范](https://render.com/docs/blueprint-spec)、[Docker部署](https://render.com/docs/docker)
 
 新增站点由 operator 准备另一独立 DB/连接，再登记 Realm；不承诺免费数据库长期保存、无限租户或生产 SLA。Render 平台实际创建与恢复尚未验证，不展示已可一键使用的成功徽章。
 
@@ -87,25 +91,35 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 
 此模式不能用于 Render 私网服务、直连容器或自托管入口；不要手动伪装 `RENDER=true` 来启用。那些部署使用默认 `socket` profile，按受控代理 CIDR 处理真实 IP。上线前通过实际公网入口核验两个客户端不会聚合限流，并检查伪造 XFF/内部 IP 头不能改变计数。[Render 公网/私网客户端 IP 说明](https://render.com/articles/host-pocketbase-on-render)
 
+## 翻译网关与目标VPS
+
+默认Google官方网页入口不需要网关；网页不支持本站iframe。站内结果由私密VPS网关请求Google网页兼容接口，该接口非官方，本机真实请求已经遇到429，不能保证可用性或加速。生产配置、同机Compose override与独立网关入口见 [TRANSLATION.md](TRANSLATION.md)。应用默认不保存翻译历史，网关ready仅表示进程就绪；必须用真实鉴权请求检查上游链路。
+
+目标VPS已只读核验域名A记录与SSH端口可达；仍缺SSH用户/认证信息，尚未执行安装、TLS、反代变更或重启恢复。因此本文不将DNS/端口连通写为VPS部署完成。
+
 ## 环境变量
 
-| 变量                                 | 用途                                                                               |
-| ------------------------------------ | ---------------------------------------------------------------------------------- |
-| DATABASE_URL                         | 默认 site 的 PG URL；Compose 空值时使用内网 postgres，native 开发必须设真实 URL    |
-| BETTER_AUTH_SECRET / BOOTSTRAP_TOKEN | 认证 secret 至少32字符，bootstrap token 32–256字符；每个 Realm 使用自己的随机值    |
-| PUBLIC_URL / BASE_PATH               | 规范公开地址与挂载路径；root basePath 是空字符串                                   |
-| REGISTRATION_OPEN                    | `true` / `false`；false 关闭普通注册，不代替初始化管理员                           |
-| HOST / PORT                          | 进程监听；容器使用 `0.0.0.0:3000`，主机映射由 Compose 配置                         |
-| TRUST_PROXY_CIDRS                    | socket模式的明确可信代理IP/CIDR，逗号分隔、默认空；不用于Realm Host选站            |
-| CLIENT_IP_PROFILE                    | 默认socket；render-public仅在Render受控公网Web入口启用，health例外，私网服务不适用 |
-| SITES_FILE                           | operator 的私有站点数组文件，路径不是用户可控路由参数                              |
-| DB_POOL_SIZE / MAX_ACTIVE_SITES      | 每 Realm 池上限和活动 Realm 上限；副本增加时审核全 cluster 预算                    |
-| NIGHTSTUDY_HTTP_PORT                 | Compose 主机回环端口，默认 5198                                                    |
-| NIGHTSTUDY_IMAGE                     | 可选已核验发行镜像；空值从当前 checkout 构建本地镜像                               |
+| 变量                                                 | 用途                                                                               |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| DATABASE_URL                                         | 默认 site 的 PG URL；Compose 空值时使用内网 postgres，native 开发必须设真实 URL    |
+| BETTER_AUTH_SECRET / BOOTSTRAP_TOKEN                 | 认证 secret 至少32字符，bootstrap token 32–256字符；每个 Realm 使用自己的随机值    |
+| PUBLIC_URL / BASE_PATH                               | 规范公开地址与挂载路径；root basePath 是空字符串                                   |
+| REGISTRATION_OPEN                                    | `true` / `false`；false 关闭普通注册，不代替初始化管理员                           |
+| HOST / PORT                                          | 进程监听；容器使用 `0.0.0.0:3000`，主机映射由 Compose 配置                         |
+| TRUST_PROXY_CIDRS                                    | socket模式的明确可信代理IP/CIDR，逗号分隔、默认空；不用于Realm Host选站            |
+| CLIENT_IP_PROFILE                                    | 默认socket；render-public仅在Render受控公网Web入口启用，health例外，私网服务不适用 |
+| SITES_FILE                                           | operator 的私有站点数组文件，路径不是用户可控路由参数                              |
+| DB_POOL_SIZE / MAX_ACTIVE_SITES                      | 每 Realm 池上限和活动 Realm 上限；副本增加时审核全 cluster 预算                    |
+| NIGHTSTUDY_HTTP_PORT                                 | Compose 主机回环端口，默认 5198                                                    |
+| NIGHTSTUDY_IMAGE                                     | 可选已核验发行镜像；空值从当前 checkout 构建本地镜像                               |
+| CONTENT_PACK                                         | 默认ecdict完整内容；demo显式跳过完整词典/音标，仅保留40词演示                      |
+| CONTENT_FILE                                         | operator的本地ECDICT源文件；必须匹配固定大小/SHA256，缺失时不自动换源              |
+| TRANSLATION_MODE                                     | 默认website-official；gateway用于生产站内结果，direct仅本机开发                    |
+| TRANSLATION_GATEWAY_URL / TRANSLATION_GATEWAY_SECRET | 固定网关地址与独立私密token，不返回浏览器；详细约束见TRANSLATION.md                |
 
 ## 备份与升级
 
-各站 DB 分别做一致性逻辑备份，另保留 registry/密钥与映射；不要只复制正在写的 PG volume。恢复到新 DB 核验身份、进度和统计后再切换。`pg_dump/pg_restore` 与固定 PG 版本匹配，备份移到另一机器并定期恢复演练。[Postgres 备份](https://www.postgresql.org/docs/current/backup-dump.html)
+各站DB分别做一致性逻辑备份，含核心词典、管理编辑与学习记录；另保留registry/密钥与映射。不要只复制正在写的PG volume。内容源缓存可按固定摘要重新下载，不替代业务DB备份。恢复到新DB核验身份、内容pack、进度和统计后再切换。`pg_dump/pg_restore` 与固定PG版本匹配，备份移到另一机器并定期恢复演练。[Postgres备份](https://www.postgresql.org/docs/current/backup-dump.html)
 
 默认单站 Compose 的逻辑备份示例，在本地私有目录保留 dump：
 
@@ -128,6 +142,8 @@ docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exi
 
 ## CI 与镜像发行
 
-CI 对 PR/main 运行锁文件安装、格式检查、独立双 PG17 migration/seed、类型检查、构建、测试、Compose 配置和镜像启动检查；结果以该 commit 的实际 run 为准。没有本地 Docker 时不能把 YAML 解析当成镜像启动通过。
+CI对PR/main运行锁文件安装、格式、双PG17 migration/seed、sites/typecheck/build与一次 `pnpm test`。测试库显式CONTENT_PACK=demo，CONTENT_TEST_DATABASE_URL启用源码内合成内容PG fixture；不重复执行独立CLI夹具。随后验证基础/scale/翻译Compose描述，构建镜像，并在隔离Compose默认ecdict安装完整字典及英美音标，等待最多600秒，核对ready和catalog声明770,611；另启动闭合网关容器，验证无鉴权请求返回401，不依赖真实Google可用性。清理只针对CI隔离project的卷。
 
-`release.yml` 仅在维护者发布 GitHub Release 时触发，版本 tag 须为 `v0.1.0-alpha.1` 等格式；先复用完整 CI，通过后使用仓库 GITHUB_TOKEN 推送 GHCR（当前目标 linux/amd64），保留版本、commit、provenance 与 SBOM。初次发布后维护者须核对 package visibility，公开仓库不意味着镜像自动公开。当前未创建 Release 或发布发行镜像。部署使用 CI 输出的 `ghcr.io/...@sha256:...` 固定摘要，不依赖浮动 latest。[GitHub 官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
+本版这些完整Compose/网关步骤尚待新CI实际执行，结果以该commit的run为准；上一版成功不等于本版通过。没有本地Docker时，YAML静态解析不能当作镜像启动成功。
+
+`release.yml` 仅在维护者发布GitHub Release时触发，版本tag须为 `v0.2.0-alpha.1` 等格式；先复用完整CI，通过后使用仓库GITHUB_TOKEN推送GHCR（当前目标linux/amd64），保留版本、commit、provenance与SBOM。初次发布后维护者须核对package visibility，公开仓库不意味着镜像自动公开。当前未创建Release或发布发行镜像。部署使用CI输出的 `ghcr.io/...@sha256:...` 固定摘要，不依赖浮动latest。[GitHub官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)

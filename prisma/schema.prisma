@@ -87,6 +87,22 @@ model SiteState {
   contentVersion String    @default("demo-2026-10-14")
 }
 
+model ContentPack {
+  id                String   @id
+  version           String
+  status            String   @default("ready")
+  sourceUrl         String
+  sha256            String
+  license           String
+  entryCount        Int
+  phoneticCount     Int
+  definitionZhCount Int
+  definitionEnCount Int
+  tagCounts         Json
+  installedAt       DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
 model UserSettings {
   userId        String   @id
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -104,6 +120,9 @@ model Word {
   lemma           String
   normalizedLemma String           @unique
   phonetic        String           @default("")
+  phoneticUs      String           @default("")
+  phoneticUk      String           @default("")
+  phoneticSource  String           @default("")
   goalTags        String[]
   difficulty      Int              @default(1)
   status          String           @default("published")

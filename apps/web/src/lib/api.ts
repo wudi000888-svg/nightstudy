@@ -63,6 +63,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       book_slug_exists: '这个词书短名已经使用，请换一个。',
       INVALID_EMAIL_OR_PASSWORD: '邮箱或密码不正确，请核对后重试。',
       USER_ALREADY_EXISTS: '这个邮箱已经在本站注册。',
+      translation_not_configured: '本站暂未启用站内翻译，请使用下方Google官方网页入口。',
+      translation_rate_limit: '翻译请求较多，请稍后再试。',
+      translation_upstream_limited: 'Google翻译暂时限制了请求，请稍后再试或打开官方网页。',
+      translation_timeout: '翻译服务响应超时，请重试或打开Google官方网页。',
+      translation_gateway_failed: '本站暂时未能连接翻译服务，请重试或打开Google官方网页。',
+      translation_response_invalid: '翻译服务没有返回有效译文，请重试或打开Google官方网页。',
     };
     const message =
       messages[code] ??

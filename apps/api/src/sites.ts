@@ -75,6 +75,7 @@ export class SiteRegistry {
       siteId: runtime.config.id,
       basePath: runtime.config.basePath,
       publicUrl: runtime.config.publicUrl,
+      translation: runtime.config.translation,
       prisma: runtime.prisma,
       user:
         user && !user.disabled

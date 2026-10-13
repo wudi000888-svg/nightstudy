@@ -3,7 +3,7 @@ import { Plus, Save } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp, useRemote } from '../AppContext';
 import { post } from '../lib/api';
-import { goalLabels, goalNames, type Goal, type Word } from '../lib/types';
+import { goalLabels, goalNames, type Goal, type PageInfo, type Word } from '../lib/types';
 import { Dialog, Empty, ErrorNotice, Loading, Notice, Panel } from './UI';
 interface ManagedBook {
   id: string;
@@ -26,7 +26,13 @@ export function AdminBooks() {
   const { scope } = useApp();
   const client = useQueryClient();
   const books = useRemote<{ items: ManagedBook[] }>('admin-books', 'admin/books');
-  const words = useRemote<{ items: Word[] }>('admin-book-candidates', 'admin/words');
+  const [search, setSearch] = useState('');
+  const [activeSearch, setActiveSearch] = useState('');
+  const [cursor, setCursor] = useState('');
+  const words = useRemote<{ items: Word[]; page: PageInfo }>(
+    'admin-book-candidates',
+    `admin/words?q=${encodeURIComponent(activeSearch)}&limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+  );
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ManagedBook | null>(null);
   const [draft, setDraft] = useState<Draft>(fresh);
@@ -212,6 +218,32 @@ export function AdminBooks() {
           {!editing && (
             <div>
               <span className="field-label">选择词成员 · {wordIds.length} 词</span>
+              <div className="candidate-search">
+                <input
+                  aria-label="词书候选词前缀"
+                  placeholder="按单词前缀查找词成员"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      setActiveSearch(search.trim());
+                      setCursor('');
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="button ghost"
+                  onClick={() => {
+                    setActiveSearch(search.trim());
+                    setCursor('');
+                  }}
+                >
+                  查找
+                </button>
+              </div>
+              {words.isPending && <Loading text="正在读取词成员候选…" />}
               <div className="word-selector">
                 {words.data?.items
                   .filter((word) => word.status !== 'archived')
@@ -229,11 +261,33 @@ export function AdminBooks() {
                         }
                       />
                       <strong>{word.lemma}</strong>
-                      <small>{word.senses?.[0]?.definitionZh}</small>
+                      <small>
+                        {word.senses?.find((item) => item.definitionZh?.trim())?.definitionZh ||
+                          '暂无中文释义'}
+                      </small>
                     </label>
                   ))}
               </div>
               <ErrorNotice error={words.error} />
+              <div className="pagination-actions">
+                <span className="fine-print">
+                  {words.data?.page.total ?? '—'} 个匹配 · 跨页保留已选词
+                </span>
+                {cursor && (
+                  <button type="button" className="button quiet" onClick={() => setCursor('')}>
+                    返回首屏
+                  </button>
+                )}
+                {words.data?.page.hasMore && (
+                  <button
+                    type="button"
+                    className="button ghost"
+                    onClick={() => setCursor(words.data!.page.nextCursor!)}
+                  >
+                    更多候选词
+                  </button>
+                )}
+              </div>
             </div>
           )}
           {editing && <p className="fine-print">本次保留现有词成员，更新信息或发布状态。</p>}

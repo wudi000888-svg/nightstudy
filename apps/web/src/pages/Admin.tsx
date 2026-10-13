@@ -3,7 +3,7 @@ import { BookOpen, ShieldCheck, Users, FileText, Search, Save, MessageSquare } f
 import { AdminBooks } from '../components/AdminBooks';
 import { useApp, useRemote } from '../AppContext';
 import { post } from '../lib/api';
-import type { Word, Sense } from '../lib/types';
+import type { PageInfo, Word, Sense } from '../lib/types';
 import {
   Dialog,
   Empty,
@@ -34,6 +34,7 @@ export function AdminPage() {
   const [tab, setTab] = useState('overview');
   const [search, setSearch] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
+  const [wordCursor, setWordCursor] = useState('');
   const overview = useRemote<{
     users: number;
     words: number;
@@ -42,9 +43,9 @@ export function AdminPage() {
     imports: number;
   }>('admin-overview', 'admin/overview', isAdmin);
   const users = useRemote<{ items: AdminUser[] }>('admin-users', 'admin/users', isAdmin);
-  const words = useRemote<{ items: Word[] }>(
+  const words = useRemote<{ items: Word[]; page: PageInfo }>(
     'admin-words',
-    `admin/words?q=${encodeURIComponent(activeSearch)}`,
+    `admin/words?q=${encodeURIComponent(activeSearch)}&limit=50${wordCursor ? `&cursor=${encodeURIComponent(wordCursor)}` : ''}`,
     isAdmin,
   );
   const announcements = useRemote<{ items: Announcement[] }>(
@@ -197,7 +198,7 @@ export function AdminPage() {
           <Panel>
             <h2>当前 Alpha 内容范围</h2>
             <p>
-              内置词书与题目为原创演示，提供真实账户、学习任务、评价和测验闭环。它们不代表完整考试词库。
+              词书及词条保留各自来源与许可。学习与测验使用本站已发布内容，学习任务保留签发时的内容快照。
             </p>
             <p className="fine-print">
               已记录 {overview.data?.imports ?? '—'} 个熟词导入批次 · 站点版本 {site.version}
@@ -250,17 +251,20 @@ export function AdminPage() {
             onSubmit={(event) => {
               event.preventDefault();
               setActiveSearch(search);
+              setWordCursor('');
             }}
           >
             <Search size={18} />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="搜索词形"
+              placeholder="按英文单词前缀搜索"
+              aria-label="管理词条前缀"
             />
             <button className="button ghost">查询</button>
           </form>
           <ErrorNotice error={words.error} />
+          {words.isPending && <Loading text="正在读取这一页词条…" />}
           <div className="table-scroll">
             <table>
               <thead>
@@ -277,14 +281,21 @@ export function AdminPage() {
                     <td>
                       <strong>{value.lemma}</strong>
                     </td>
-                    <td>{value.senses?.[0]?.definitionZh}</td>
+                    <td>
+                      {value.senses?.find((item) => item.definitionZh?.trim())?.definitionZh ||
+                        '暂无中文释义'}
+                    </td>
                     <td>{value.sourceRef}</td>
                     <td>
                       <button
                         className="button quiet"
                         onClick={() => {
                           setEditing(value);
-                          setSense(value.senses?.[0] ?? null);
+                          setSense(
+                            value.senses?.find((item) => item.definitionZh?.trim()) ??
+                              value.senses?.[0] ??
+                              null,
+                          );
                         }}
                       >
                         编辑
@@ -294,6 +305,24 @@ export function AdminPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="pagination-actions">
+            <span className="fine-print">
+              {words.data?.page.total ?? '—'} 个匹配词条 · 每页最多50条
+            </span>
+            {wordCursor && (
+              <button className="button ghost" onClick={() => setWordCursor('')}>
+                返回首屏
+              </button>
+            )}
+            {words.data?.page.hasMore && (
+              <button
+                className="button ghost"
+                onClick={() => setWordCursor(words.data!.page.nextCursor!)}
+              >
+                下一页词条
+              </button>
+            )}
           </div>
         </Panel>
       )}

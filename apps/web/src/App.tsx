@@ -9,6 +9,7 @@ import { AssessmentPage } from './pages/Assessment';
 import { MemoryPage } from './pages/Memory';
 import { AuthPage, ProfilePage, SetupPage } from './pages/Account';
 import { AdminPage } from './pages/Admin';
+import { TranslationPage } from './components/Translation';
 
 export function App() {
   return (
@@ -18,8 +19,9 @@ export function App() {
         <Route path="books" element={<BooksPage />} />
         <Route path="learn" element={<StudyPage key="learn" mode="learn" />} />
         <Route path="review" element={<StudyPage key="review" mode="review" />} />
-        <Route path="lookup" element={<LookupPage />} />
-        <Route path="wordbook" element={<LookupPage />} />
+        <Route path="lookup" element={<LookupPage key="lookup" />} />
+        <Route path="wordbook" element={<LookupPage key="wordbook" initialTab="wordbook" />} />
+        <Route path="translate" element={<TranslationPage />} />
         <Route path="known" element={<KnownPage />} />
         <Route path="assessment" element={<AssessmentPage />} />
         <Route path="memory" element={<MemoryPage />} />

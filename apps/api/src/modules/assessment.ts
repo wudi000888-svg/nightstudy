@@ -89,45 +89,70 @@ export async function registerAssessment(app: FastifyInstance, getContext: Conte
         z.object({ goal, size: z.number().int().min(1).max(20).default(12) }).strict(),
         req.body,
       );
-    const candidates = await ctx.prisma.word.findMany({
-      where: { status: 'published', goalTags: { has: input.goal } },
+    const strata = await ctx.prisma.$queryRaw<{ difficulty: number; population: number }[]>`
+      SELECT w."difficulty", COUNT(*)::int AS population FROM "Word" w
+      WHERE w."status" = 'published' AND w."goalTags" @> ARRAY[${input.goal}]::text[]
+      AND EXISTS (SELECT 1 FROM "Sense" s WHERE s."wordId"=w."id" AND btrim(s."definitionZh", E' \\t\\r\\n') <> '')
+      GROUP BY w."difficulty"
+    `;
+    if (!strata.length)
+      throw new HttpError(409, 'assessment_content_unavailable', '该目标尚无可用题目');
+    const seed = crypto.randomUUID();
+    const sampledIds = (
+      await Promise.all(
+        strata.map(
+          (stratum) =>
+            ctx.prisma.$queryRaw<{ id: string; difficulty: number }[]>`
+        SELECT w."id", w."difficulty" FROM "Word" w
+        WHERE w."status" = 'published' AND w."goalTags" @> ARRAY[${input.goal}]::text[]
+        AND w."difficulty" = ${stratum.difficulty}
+        AND EXISTS (SELECT 1 FROM "Sense" s WHERE s."wordId" = w."id" AND btrim(s."definitionZh", E' \\t\\r\\n') <> '')
+        ORDER BY md5(w."id" || ${seed}) LIMIT ${input.size}
+      `,
+        ),
+      )
+    ).flat();
+    const eligible = await ctx.prisma.word.findMany({
+      where: { id: { in: sampledIds.map((word) => word.id) } },
       include: wordInclude,
-      orderBy: { normalizedLemma: 'asc' },
-      take: 1000,
     });
-    const eligible = candidates.filter((w) => w.senses[0]?.definitionZh);
-    if (!eligible.length)
-      throw new HttpError(409, 'assessment_content_unavailable', '该目标尚无可用演示题目');
-    const seed = crypto.randomUUID(),
-      selected = stratifiedSample(eligible, Math.min(input.size, eligible.length), seed);
-    const population = Object.fromEntries(
-      [...new Set(eligible.map((w) => String(w.difficulty)))].map((stratum) => [
-        stratum,
-        eligible.filter((w) => String(w.difficulty) === stratum).length,
-      ]),
+    const usable = eligible.filter((word) =>
+      word.senses.some((sense) => sense.definitionZh.trim()),
     );
-    const distractors = await ctx.prisma.word.findMany({
-      where: { status: 'published' },
-      include: wordInclude,
-      take: 1000,
-    });
+    const selected = stratifiedSample(usable, Math.min(input.size, usable.length), seed);
+    if (!selected.length) throw new HttpError(409, 'assessment_content_unavailable');
+    const population = Object.fromEntries(strata.map((s) => [String(s.difficulty), s.population]));
+    const distractors =
+      eligible.length >= 4
+        ? eligible
+        : await ctx.prisma.word.findMany({
+            where: { status: 'published', senses: { some: { definitionZh: { not: '' } } } },
+            include: wordInclude,
+            orderBy: { normalizedLemma: 'asc' },
+            take: 50,
+          });
+    const scopeVersions = await ctx.prisma.$queryRaw<{ contentVersion: string }[]>`
+      SELECT DISTINCT w."contentVersion" FROM "Word" w
+      WHERE w."status" = 'published' AND w."goalTags" @> ARRAY[${input.goal}]::text[]
+      AND EXISTS (SELECT 1 FROM "Sense" s WHERE s."wordId"=w."id" AND btrim(s."definitionZh", E' \\t\\r\\n') <> '')
+    `;
     const items = selected.map((word, ordinal) => ({
       wordId: word.id,
       type: 'spelling',
       stratum: String(word.difficulty),
       ordinal,
       questionJson: json({
-        prompt: `请拼写对应的英文词：${word.senses[0]!.definitionZh}`,
+        prompt: `请拼写对应的英文词：${word.senses.find((sense) => sense.definitionZh.trim())!.definitionZh}`,
         answer: word.lemma,
         wordVersion: word.contentVersion,
       }),
     }));
     for (const [index, word] of selected.entries()) {
-      const correct = word.senses[0]!,
+      const correct = word.senses.find((sense) => sense.definitionZh.trim())!,
         seen = new Set([correct.definitionZh]);
       const wrong = distractors
         .filter((w) => w.id !== word.id)
-        .map((w) => w.senses[0])
+        .map((w) => w.senses.find((sense) => sense.definitionZh.trim()))
         .filter(
           (sense): sense is NonNullable<typeof sense> =>
             !!sense && !seen.has(sense.definitionZh) && !!seen.add(sense.definitionZh),
@@ -137,7 +162,7 @@ export async function registerAssessment(app: FastifyInstance, getContext: Conte
         .map((s) => ({ id: s.id, text: s.definitionZh }))
         .sort((a, b) => digest(`${seed}:${a.id}`).localeCompare(digest(`${seed}:${b.id}`)));
       if (options.length < 2)
-        throw new HttpError(409, 'assessment_content_unavailable', '演示题库不足以生成认知题');
+        throw new HttpError(409, 'assessment_content_unavailable', '题库不足以生成认知题');
       items.push({
         wordId: word.id,
         type: 'recognition',
@@ -155,10 +180,12 @@ export async function registerAssessment(app: FastifyInstance, getContext: Conte
       data: {
         userId: user.id,
         goal: input.goal,
+        blueprintVersion: 'stratified-goal-v2',
         seed: JSON.stringify({
           random: seed,
           population,
-          scopeVersion: eligible
+          demo: scopeVersions.every((w) => w.contentVersion.startsWith('demo-')),
+          scopeVersion: scopeVersions
             .map((w) => w.contentVersion)
             .sort()
             .join('|'),
@@ -301,13 +328,20 @@ export async function registerAssessment(app: FastifyInstance, getContext: Conte
         totalCandidates,
         coveredPopulation,
         accuracy,
-        confidence: 'limited_demo',
+        confidence: metadata.demo === false ? 'limited_sample' : 'limited_demo',
         estimateScope:
-          coveredPopulation === totalCandidates ? 'demo_goal_range' : 'sampled_strata_only',
+          coveredPopulation === totalCandidates
+            ? metadata.demo === false
+              ? 'goal_word_range'
+              : 'demo_goal_range'
+            : 'sampled_strata_only',
         verifiedWordIds,
         byStratum,
         suggestedPlan: plan,
-        disclaimer: '原创演示词表诊断，不是完整词汇量或考试能力评估。未测试词不会被标为掌握。',
+        disclaimer:
+          metadata.demo === false
+            ? '基于已安装目标词表的小样本诊断，不是标准化考试能力评估。未测试词不会被标为掌握。'
+            : '原创演示词表诊断，不是完整词汇量或考试能力评估。未测试词不会被标为掌握。',
       };
       const old = await tx.masteryProfile.findUnique({
         where: { userId_goal: { userId: user.id, goal: assessment.goal } },

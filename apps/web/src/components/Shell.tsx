@@ -12,8 +12,9 @@ import {
   X,
   GraduationCap,
   CheckCheck,
+  Languages,
 } from 'lucide-react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { ActivityTimer } from './ActivityTimer';
 import { useApp } from '../AppContext';
@@ -24,12 +25,18 @@ const links = [
   { path: '/learn', label: '今晚学习', icon: GraduationCap },
   { path: '/review', label: '到期复习', icon: RotateCcw },
   { path: '/lookup', label: '查词与生词本', icon: Search },
+  { path: '/translate', label: '网页翻译', icon: Languages },
   { path: '/known', label: '熟词管理', icon: CheckCheck },
   { path: '/memory', label: '个人记忆', icon: ChartNoAxesCombined },
 ];
 export function Shell() {
   const { site, user, pending, sync, syncNote } = useApp();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const location = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    setMobileOpen(false);
+  }, [location.pathname]);
   useEffect(() => {
     if (!mobileOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {

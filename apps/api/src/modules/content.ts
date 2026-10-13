@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import crypto from 'node:crypto';
+import { Prisma, type ContentPack } from '@prisma/client';
 import { HttpError, requireUser, requireAdmin, type ContextResolver } from '../context.js';
 import {
   parse,
@@ -14,40 +15,204 @@ import {
   obj,
   transact,
   audit,
+  type Db,
+  type WordWithSenses,
 } from './shared.js';
+import { decodeCursor, pageInfo } from './pagination.js';
+
+const pageQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+  cursor: z.string().max(1200).optional(),
+});
+async function readyPacks(db: Db) {
+  return db.contentPack.findMany({ where: { status: 'ready' }, orderBy: { installedAt: 'desc' } });
+}
+function packDto(pack: ContentPack) {
+  return {
+    id: pack.id,
+    version: pack.version,
+    sourceUrl: pack.sourceUrl,
+    sha256: pack.sha256,
+    license: pack.license,
+    entryCount: pack.entryCount,
+    phoneticCount: pack.phoneticCount,
+    definitionZhCount: pack.definitionZhCount,
+    definitionEnCount: pack.definitionEnCount,
+    tagCounts: pack.tagCounts,
+    installedAt: pack.installedAt.toISOString(),
+  };
+}
+export function catalogWordDto(word: WordWithSenses, packs: ContentPack[] = [], summary = false) {
+  const dto = wordDto(word);
+  const sourcePack = packs.find((pack) => word.sourceRef === `pack:${pack.id}`);
+  const wordHasSiteEdits = /^(?:edit|authored)-/.test(word.contentVersion);
+  const dictionaryPack = packs.find((pack) => pack.id.startsWith('ecdict-'));
+  const senses = dto.senses.map((sense) => {
+    const dictionary = sense.id.startsWith('content-ecdict-');
+    const originalDemo = /^demo-word-\d+-sense-/.test(sense.id);
+    const pack = dictionary ? dictionaryPack : sourcePack;
+    const source = {
+      kind: dictionary
+        ? 'dictionary'
+        : originalDemo
+          ? 'original-demo'
+          : wordHasSiteEdits
+            ? 'site-authored'
+            : 'unknown',
+      reference: dictionary
+        ? `pack:${pack?.id ?? 'ecdict'}`
+        : originalDemo
+          ? 'NightStudy original demo'
+          : word.sourceRef,
+      packId: pack?.id ?? null,
+      license: dictionary
+        ? (pack?.license ?? null)
+        : originalDemo
+          ? 'MIT'
+          : (pack?.license ?? null),
+      sourceUrl: pack?.sourceUrl ?? null,
+      wordHasSiteEdits,
+      siteEditVersion: wordHasSiteEdits ? word.contentVersion : null,
+    };
+    return {
+      ...sense,
+      source,
+      exampleSource:
+        !sense.exampleEn && !sense.exampleZh
+          ? null
+          : dictionary
+            ? {
+                kind: 'site-authored',
+                reference: 'Site-authored example',
+                packId: null,
+                license: null,
+                sourceUrl: null,
+                wordHasSiteEdits,
+                siteEditVersion: wordHasSiteEdits ? word.contentVersion : null,
+              }
+            : source,
+    };
+  });
+  const sources = packs.filter(
+    (pack) =>
+      pack === sourcePack ||
+      (pack.id.startsWith('ecdict-') &&
+        word.senses.some((sense) => sense.id.startsWith('content-ecdict-'))) ||
+      word.phoneticSource.includes(pack.id),
+  );
+  return {
+    ...dto,
+    senses: summary ? senses.slice(0, 3) : senses,
+    senseCount: word.senses.length,
+    detailAvailable: true,
+    phonetics: [
+      ...(word.phoneticUs
+        ? [
+            {
+              text: word.phoneticUs,
+              ipa: word.phoneticUs,
+              region: 'US',
+              notation: 'ipa',
+              sourceRef: word.phoneticSource,
+            },
+          ]
+        : []),
+      ...(word.phoneticUk
+        ? [
+            {
+              text: word.phoneticUk,
+              ipa: word.phoneticUk,
+              region: 'UK',
+              notation: 'ipa',
+              sourceRef: word.phoneticSource,
+            },
+          ]
+        : []),
+      ...(word.phonetic
+        ? [
+            {
+              text: word.phonetic,
+              ipa: word.phonetic,
+              region: 'unspecified',
+              notation: 'source-transcription',
+              sourceRef: word.sourceRef,
+            },
+          ]
+        : []),
+    ],
+    source: {
+      reference: word.sourceRef,
+      packId: sourcePack?.id ?? null,
+      license:
+        sourcePack?.license ?? (word.sourceRef === 'NightStudy original demo' ? 'MIT' : null),
+      sourceUrl: sourcePack?.sourceUrl ?? null,
+      wordHasSiteEdits,
+    },
+    sources: sources.map(packDto),
+  };
+}
 
 export async function registerContent(app: FastifyInstance, getContext: ContextResolver) {
   app.get('/books', async (req) => {
     const ctx = await getContext(req);
     const books = await ctx.prisma.book.findMany({
       where: { status: 'published' },
-      include: { items: { select: { wordId: true } } },
       orderBy: { title: 'asc' },
     });
-    const progress = ctx.user
-      ? await ctx.prisma.studyProgress.findMany({
-          where: { userId: ctx.user.id, firstLearnedAt: { not: null } },
-          select: { wordId: true },
-        })
-      : [];
-    const claims = ctx.user
-      ? await ctx.prisma.knownClaim.findMany({
-          where: { userId: ctx.user.id, import: { status: 'confirmed' } },
-          select: { wordId: true },
-        })
-      : [];
     const profiles = ctx.user
       ? await ctx.prisma.masteryProfile.findMany({ where: { userId: ctx.user.id } })
       : [];
-    const learned = new Set(progress.map((x) => x.wordId)),
-      known = new Set(claims.map((x) => x.wordId));
-    const verified = new Set(
-      profiles.flatMap((p) =>
-        Array.isArray(obj(p.evidenceJson).verifiedWordIds)
-          ? (obj(p.evidenceJson).verifiedWordIds as string[])
-          : [],
+    const verified = [
+      ...new Set(
+        profiles.flatMap((p) =>
+          Array.isArray(obj(p.evidenceJson).verifiedWordIds)
+            ? (obj(p.evidenceJson).verifiedWordIds as string[])
+            : [],
+        ),
       ),
-    );
+    ];
+    const baseWhere: Prisma.BookItemWhereInput = {
+      bookId: { in: books.map((book) => book.id) },
+      word: { status: 'published' },
+    };
+    const counts = (where: Prisma.BookItemWhereInput) =>
+      ctx.prisma.bookItem.groupBy({ by: ['bookId'], where, _count: { _all: true } });
+    const [totals, learned, covered, known] = await Promise.all([
+      counts(baseWhere),
+      ctx.user
+        ? counts({
+            ...baseWhere,
+            word: {
+              status: 'published',
+              progress: { some: { userId: ctx.user.id, firstLearnedAt: { not: null } } },
+            },
+          })
+        : [],
+      ctx.user
+        ? counts({
+            ...baseWhere,
+            OR: [
+              {
+                word: {
+                  progress: { some: { userId: ctx.user.id, firstLearnedAt: { not: null } } },
+                },
+              },
+              { wordId: { in: verified } },
+            ],
+          })
+        : [],
+      ctx.user
+        ? counts({
+            ...baseWhere,
+            word: {
+              status: 'published',
+              claims: { some: { userId: ctx.user.id, import: { status: 'confirmed' } } },
+            },
+          })
+        : [],
+    ]);
+    const count = (rows: typeof totals, bookId: string) =>
+      rows.find((row) => row.bookId === bookId)?._count._all ?? 0;
     return {
       items: books.map((b) => ({
         id: b.id,
@@ -56,10 +221,10 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         description: b.description,
         goal: b.goal,
         version: b.version,
-        wordCount: b.items.length,
-        learnedCount: b.items.filter((x) => learned.has(x.wordId)).length,
-        coveredCount: b.items.filter((x) => learned.has(x.wordId) || verified.has(x.wordId)).length,
-        claimedKnownCount: b.items.filter((x) => known.has(x.wordId)).length,
+        wordCount: count(totals, b.id),
+        learnedCount: count(learned, b.id),
+        coveredCount: count(covered, b.id),
+        claimedKnownCount: count(known, b.id),
         isDemo: b.version.startsWith('demo-'),
       })),
     };
@@ -67,17 +232,25 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
   app.get('/books/:id', async (req) => {
     const ctx = await getContext(req),
       params = parse(z.object({ id }), req.params);
+    const query = parse(pageQuery, req.query);
+    const scope = `book:${params.id}`,
+      after = decodeCursor(scope, query.cursor, 'number');
     const book = await ctx.prisma.book.findFirst({
       where: { id: params.id, status: 'published' },
-      include: {
-        items: {
-          include: { word: { include: wordInclude } },
-          orderBy: { ordinal: 'asc' },
-          take: 500,
-        },
-      },
     });
     if (!book) throw new HttpError(404, 'book_not_found');
+    const where: Prisma.BookItemWhereInput = { bookId: book.id, word: { status: 'published' } };
+    const [rows, total, packs] = await Promise.all([
+      ctx.prisma.bookItem.findMany({
+        where: { ...where, ...(after !== null ? { ordinal: { gt: after } } : {}) },
+        include: { word: { include: wordInclude } },
+        orderBy: { ordinal: 'asc' },
+        take: query.limit + 1,
+      }),
+      ctx.prisma.bookItem.count({ where }),
+      readyPacks(ctx.prisma),
+    ]);
+    const pagination = pageInfo(rows, query.limit, total, scope, (row) => row.ordinal);
     return {
       book: {
         id: book.id,
@@ -86,7 +259,8 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         description: book.description,
         version: book.version,
       },
-      items: book.items.map((i) => wordDto(i.word)),
+      items: pagination.items.map((i) => catalogWordDto(i.word, packs, true)),
+      page: pagination.page,
     };
   });
   app.post('/books/:id/select', async (req) => {
@@ -108,19 +282,56 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         z.object({
           q: z.string().max(160).default(''),
           limit: z.coerce.number().int().min(1).max(50).default(20),
+          cursor: z.string().max(1200).optional(),
         }),
         req.query,
       );
     const term = normalize(query.q);
-    if (!term) return { items: [], source: 'original-demo', completeDictionary: false };
-    const words = await ctx.prisma.word.findMany({
-      where: { status: 'published', normalizedLemma: { startsWith: term } },
-      include: wordInclude,
-      orderBy: { normalizedLemma: 'asc' },
-      take: query.limit,
-    });
-    words.sort((a, b) => Number(b.normalizedLemma === term) - Number(a.normalizedLemma === term));
-    return { items: words.map(wordDto), source: 'original-demo', completeDictionary: false };
+    const scope = `dictionary:${term}`,
+      after = decodeCursor(scope, query.cursor, 'string');
+    const packs = await readyPacks(ctx.prisma);
+    const catalog = {
+      source: 'postgres-catalog',
+      completeDictionary: packs.some((pack) => pack.id.startsWith('ecdict-')),
+      sources: packs.map(packDto),
+    };
+    if (!term)
+      return { items: [], page: { total: 0, hasMore: false, nextCursor: null }, ...catalog };
+    const where: Prisma.WordWhereInput = {
+      status: 'published',
+      normalizedLemma: { startsWith: term },
+    };
+    const [rows, total] = await Promise.all([
+      ctx.prisma.word.findMany({
+        where: {
+          ...where,
+          normalizedLemma: { startsWith: term, ...(after !== null ? { gt: after } : {}) },
+        },
+        include: wordInclude,
+        orderBy: { normalizedLemma: 'asc' },
+        take: query.limit + 1,
+      }),
+      ctx.prisma.word.count({ where }),
+    ]);
+    const pagination = pageInfo(rows, query.limit, total, scope, (row) => row.normalizedLemma);
+    return {
+      items: pagination.items.map((word) => catalogWordDto(word, packs, true)),
+      page: pagination.page,
+      ...catalog,
+    };
+  });
+  app.get('/dictionary/stats', async (req) => {
+    const ctx = await getContext(req),
+      packs = await readyPacks(ctx.prisma);
+    return {
+      source: 'postgres-catalog',
+      installedDictionary: packs.some((pack) => pack.id.startsWith('ecdict-')),
+      countBasis: 'installed-pack-metadata',
+      declaredEntryCount: packs
+        .filter((pack) => obj(pack.tagCounts).kind !== 'phonetics')
+        .reduce((sum, pack) => sum + pack.entryCount, 0),
+      packs: packs.map(packDto),
+    };
   });
   app.get('/words/:id', async (req) => {
     const ctx = await getContext(req),
@@ -130,7 +341,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
       include: wordInclude,
     });
     if (!word) throw new HttpError(404, 'word_not_found');
-    return { word: wordDto(word) };
+    return { word: catalogWordDto(word, await readyPacks(ctx.prisma)) };
   });
   app.get('/me/settings', async (req) => {
     const ctx = await getContext(req);
@@ -423,16 +634,33 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
   app.get('/admin/words', async (req) => {
     const ctx = await getContext(req);
     requireAdmin(ctx);
-    const query = parse(z.object({ q: z.string().max(160).default('') }), req.query);
+    const query = parse(
+      z.object({
+        q: z.string().max(160).default(''),
+        limit: z.coerce.number().int().min(1).max(100).default(50),
+        cursor: z.string().max(1200).optional(),
+      }),
+      req.query,
+    );
+    const term = normalize(query.q),
+      scope = `admin-words:${term}`,
+      after = decodeCursor(scope, query.cursor, 'string');
+    const where: Prisma.WordWhereInput = { normalizedLemma: { startsWith: term } };
+    const [rows, total, packs] = await Promise.all([
+      ctx.prisma.word.findMany({
+        where: { normalizedLemma: { startsWith: term, ...(after !== null ? { gt: after } : {}) } },
+        include: wordInclude,
+        take: query.limit + 1,
+        orderBy: { normalizedLemma: 'asc' },
+      }),
+      ctx.prisma.word.count({ where }),
+      readyPacks(ctx.prisma),
+    ]);
+    const pagination = pageInfo(rows, query.limit, total, scope, (row) => row.normalizedLemma);
     return {
-      items: (
-        await ctx.prisma.word.findMany({
-          where: { normalizedLemma: { contains: normalize(query.q) } },
-          include: wordInclude,
-          take: 100,
-          orderBy: { normalizedLemma: 'asc' },
-        })
-      ).map(wordDto),
+      items: pagination.items.map((word) => catalogWordDto(word, packs, true)),
+      page: pagination.page,
+      matchMode: 'prefix',
     };
   });
   app.patch('/admin/words/:id', async (req) => {
@@ -444,8 +672,8 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         .object({
           status: z.enum(['published', 'archived']).optional(),
           senseId: id.optional(),
-          definitionZh: z.string().min(1).max(4000).optional(),
-          definitionEn: z.string().max(4000).optional(),
+          definitionZh: z.string().trim().min(1).max(4000).optional(),
+          definitionEn: z.string().trim().max(4000).optional(),
           exampleEn: z.string().max(2000).optional(),
           exampleZh: z.string().max(2000).optional(),
         })

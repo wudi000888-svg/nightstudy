@@ -19,6 +19,7 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 # The alpha image also serves the independent migration/seed/worker roles.
 # Prisma CLI and tsx are retained for those roles; no secrets or runtime DBs are copied.
 COPY --from=build --chown=node:node /app /app
+RUN mkdir -p /app/.local/content && chown -R node:node /app/.local
 USER node
 EXPOSE 3000
 LABEL org.opencontainers.image.title="NightStudy" \

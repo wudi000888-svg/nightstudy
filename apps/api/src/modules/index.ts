@@ -5,6 +5,8 @@ import { registerStudy } from './study.js';
 import { registerKnown } from './known.js';
 import { registerAssessment } from './assessment.js';
 import { registerAnalytics } from './analytics.js';
+import { registerTranslation } from './translation.js';
+import { registerPronunciation } from './pronunciation.js';
 
 export async function registerModules(
   app: FastifyInstance,
@@ -15,4 +17,6 @@ export async function registerModules(
   await registerKnown(app, getContext);
   await registerAssessment(app, getContext);
   await registerAnalytics(app, getContext);
+  await registerTranslation(app, getContext);
+  await registerPronunciation(app, getContext);
 }

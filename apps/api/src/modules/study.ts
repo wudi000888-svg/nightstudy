@@ -28,7 +28,10 @@ export const sessionInclude = { items: { orderBy: { ordinal: 'asc' as const } } 
 type FullSession = Prisma.StudySessionGetPayload<{ include: typeof sessionInclude }>;
 
 export function spellingQuestion(word: ReturnType<typeof wordDto>, focusSenseId?: string | null) {
-  const sense = word.senses.find((x) => x.id === focusSenseId) ?? word.senses[0];
+  const sense =
+    word.senses.find((x) => x.id === focusSenseId && x.definitionZh.trim()) ??
+    word.senses.find((x) => x.definitionZh.trim()) ??
+    word.senses[0];
   return {
     type: 'spelling',
     prompt: `请拼写对应单词：${sense?.definitionZh ?? ''}`,
@@ -54,7 +57,14 @@ export function sessionDto(session: FullSession, progress: StudyProgress[] = [])
       progressRevision: latest?.revision ?? item.progressRevision,
       word: visible
         ? snapshot
-        : { id: item.wordId, lemma: snapshot.lemma, phonetic: snapshot.phonetic },
+        : {
+            id: item.wordId,
+            lemma: snapshot.lemma,
+            phonetic: snapshot.phonetic,
+            phoneticUs: snapshot.phoneticUs,
+            phoneticUk: snapshot.phoneticUk,
+            phoneticSource: snapshot.phoneticSource,
+          },
       ...(session.phase === 'practice'
         ? { question: { id: `spelling-${item.id}`, type: 'spelling', prompt: question.prompt } }
         : {}),
@@ -131,20 +141,24 @@ async function dailyAdmission(db: Db, userId: string, timeZone: string, limit: n
   const now = new Date(),
     today = isoDay(now, timeZone);
   const since = new Date(now.getTime() - 48 * 3600000);
-  const [logs, progress, pending] = await Promise.all([
+  const [logs, pending] = await Promise.all([
     db.reviewLog.findMany({
       where: { userId, wasNew: true, reviewedAt: { gte: since } },
       select: { reviewedAt: true, wordId: true },
-    }),
-    db.studyProgress.findMany({
-      where: { userId, firstLearnedAt: { not: null } },
-      select: { wordId: true },
     }),
     db.studySession.findMany({
       where: { userId, mode: 'learn', status: 'in_progress', createdAt: { gte: since } },
       select: { bookId: true, createdAt: true, items: { select: { wordId: true, rated: true } } },
     }),
   ]);
+  const progress = await db.studyProgress.findMany({
+    where: {
+      userId,
+      firstLearnedAt: { not: null },
+      wordId: { in: pending.flatMap((session) => session.items.map((item) => item.wordId)) },
+    },
+    select: { wordId: true },
+  });
   const learnedToday = new Set(
     logs.filter((log) => isoDay(log.reviewedAt, timeZone) === today).map((log) => log.wordId),
   ).size;
@@ -231,15 +245,6 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
       const prefs = await tx.userSettings.findUniqueOrThrow({ where: { userId: user.id } });
       const admission = await dailyAdmission(tx, user.id, prefs.timeZone, prefs.dailyNewLimit);
       const size = input.size ?? prefs.groupSize;
-      const progress = await tx.studyProgress.findMany({ where: { userId: user.id } });
-      const paused = new Set(
-        (
-          await tx.userWord.findMany({
-            where: { userId: user.id, paused: true },
-            select: { wordId: true },
-          })
-        ).map((x) => x.wordId),
-      );
       let chosen: {
         word: Prisma.WordGetPayload<{ include: typeof wordInclude }>;
         focusSenseId: string | null;
@@ -257,7 +262,10 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
           orderBy: { dueAt: 'asc' },
           take: size,
         });
-        chosen = due.map((p) => ({ word: p.word, focusSenseId: p.word.senses[0]?.id ?? null }));
+        chosen = due.map((p) => ({
+          word: p.word,
+          focusSenseId: p.word.senses.find((sense) => sense.definitionZh.trim())?.id ?? null,
+        }));
         selectedBookId = null;
       } else {
         const book = await tx.book.findFirst({
@@ -265,30 +273,15 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
             ...(selectedBookId ? { id: selectedBookId } : { goal: prefs.goal }),
             status: 'published',
           },
-          include: {
-            items: {
-              include: { word: { include: wordInclude } },
-              orderBy: { ordinal: 'asc' },
-              take: 1000,
-            },
-          },
           orderBy: { title: 'asc' },
         });
         if (!book) throw new HttpError(404, 'book_not_found');
         selectedBookId = book.id;
-        const learned = new Set(progress.filter((p) => p.firstLearnedAt).map((p) => p.wordId));
-        const claims = await tx.knownClaim.findMany({
-          where: { userId: user.id, import: { status: 'confirmed' } },
-          select: { wordId: true },
-        });
         const profile = await tx.masteryProfile.findUnique({
           where: { userId_goal: { userId: user.id, goal: book.goal } },
         });
         const verified = obj(profile?.evidenceJson).verifiedWordIds;
-        const familiar = new Set([
-          ...claims.map((c) => c.wordId),
-          ...(Array.isArray(verified) ? verified.map(String) : []),
-        ]);
+        const familiar = new Set([...(Array.isArray(verified) ? verified.map(String) : [])]);
         const reservedInThisBook = new Set(
           admission.pending
             .filter((session) => session.bookId === book.id)
@@ -296,35 +289,89 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
             .filter((item) => admission.reserved.has(item.wordId))
             .map((item) => item.wordId),
         );
-        const candidates = book.items.filter(
-          (i) =>
-            i.word.status === 'published' &&
-            !learned.has(i.wordId) &&
-            !paused.has(i.wordId) &&
-            !reservedInThisBook.has(i.wordId),
-        );
-        const ordinary = candidates.filter((i) => !familiar.has(i.wordId));
-        const known = candidates.filter((i) => familiar.has(i.wordId));
+        const base: Prisma.BookItemWhereInput = {
+          bookId: book.id,
+          wordId: {
+            notIn: [...reservedInThisBook],
+            ...(admission.newRemaining === 0 ? { in: [...admission.reserved] } : {}),
+          },
+          word: {
+            status: 'published',
+            progress: { none: { userId: user.id, firstLearnedAt: { not: null } } },
+            userWords: { none: { userId: user.id, paused: true } },
+            senses: { some: { definitionZh: { not: '' } } },
+          },
+        };
+        // Filter in PostgreSQL before taking a group. A completed first 1,000 words
+        // must never hide the remainder of an installed full-length word book.
+        const candidateQuery = {
+          include: { word: { include: wordInclude } },
+          orderBy: { ordinal: 'asc' as const },
+          take: size + admission.reserved.size,
+        };
+        const ordinary = await tx.bookItem.findMany({
+          ...candidateQuery,
+          where: {
+            AND: [
+              base,
+              {
+                word: {
+                  id: { notIn: [...familiar] },
+                  claims: { none: { userId: user.id, import: { status: 'confirmed' } } },
+                },
+              },
+            ],
+          },
+        });
+        const known = await tx.bookItem.findMany({
+          ...candidateQuery,
+          where: {
+            AND: [
+              base,
+              {
+                word: {
+                  OR: [
+                    { id: { in: [...familiar] } },
+                    { claims: { some: { userId: user.id, import: { status: 'confirmed' } } } },
+                  ],
+                },
+              },
+            ],
+          },
+        });
         const day = isoDay(new Date(), prefs.timeZone);
         known.sort((a, b) =>
           digest(`${day}:${a.wordId}`).localeCompare(digest(`${day}:${b.wordId}`)),
         );
         const normal = admitReservedCandidates(
-          ordinary,
+          ordinary.filter((item) => item.word.senses.some((sense) => sense.definitionZh.trim())),
           size,
+          admission.reserved,
+          admission.newRemaining,
+        );
+        const admitted = admission.learnedToday + admission.reserved.size;
+        const probeBudget = ordinary.length
+          ? Math.floor((admitted + size) / 5) - Math.floor(admitted / 5)
+          : Math.max(1, Math.floor(size / 5));
+        const probe = admitReservedCandidates(
+          known.filter((item) => item.word.senses.some((sense) => sense.definitionZh.trim())),
+          Math.min(size, probeBudget),
           admission.reserved,
           admission.newRemaining,
         );
         const remainingSlots =
           admission.newRemaining -
-          normal.filter((item) => !admission.reserved.has(item.wordId)).length;
-        const probe = admitReservedCandidates(
-          known,
-          Math.min(size - normal.length, Math.max(1, Math.floor(size * 0.2))),
+          probe.filter((item) => !admission.reserved.has(item.wordId)).length;
+        const ordinaryGroup = admitReservedCandidates(
+          normal,
+          size - probe.length,
           admission.reserved,
           remainingSlots,
         );
-        chosen = [...normal, ...probe].map((i) => ({ word: i.word, focusSenseId: i.focusSenseId }));
+        chosen = [...ordinaryGroup, ...probe].map((i) => ({
+          word: i.word,
+          focusSenseId: i.focusSenseId,
+        }));
       }
       if (!chosen.length)
         return {
@@ -336,6 +383,9 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
                 ? 'daily_goal_complete'
                 : 'no_new_words',
         };
+      const progress = await tx.studyProgress.findMany({
+        where: { userId: user.id, wordId: { in: chosen.map((item) => item.word.id) } },
+      });
       const session = await tx.studySession.create({
         data: {
           userId: user.id,

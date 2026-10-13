@@ -1,8 +1,11 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { AlertCircle, ArrowRight, LoaderCircle, Volume2, X, MoonStar } from 'lucide-react';
+import { type ReactNode, useEffect, useRef } from 'react';
+import { AlertCircle, ArrowRight, LoaderCircle, X, MoonStar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { errorText } from '../lib/api';
 import type { Word } from '../lib/types';
+import { AudioButton } from './Pronunciation';
+import { dictionaryText } from '../lib/dictionary';
+export { AudioButton } from './Pronunciation';
 
 export function Heading({
   eyebrow,
@@ -86,57 +89,46 @@ export function LoginPrompt() {
     />
   );
 }
-export function AudioButton({ word }: { word: Word }) {
-  const [status, setStatus] = useState('');
-  const available = !!word.audioUrl || 'speechSynthesis' in window;
-  return (
-    <div className="audio-control">
-      <button
-        className="audio-button"
-        disabled={!available}
-        title={available ? undefined : '当前设备不支持合成发音'}
-        aria-label={`播放 ${word.lemma} 发音`}
-        onClick={() => {
-          if (word.audioUrl) {
-            const audio = new Audio(word.audioUrl);
-            void audio
-              .play()
-              .then(() => setStatus('来源音频播放中'))
-              .catch(() => {
-                speak(word.lemma);
-                setStatus('音频不可用，使用设备发音');
-              });
-          } else {
-            speak(word.lemma);
-            setStatus('使用设备合成发音');
-          }
-        }}
-      >
-        <Volume2 size={18} />
-        <span>{word.audioUrl ? '来源发音' : '设备发音'}</span>
-      </button>
-      {status && <small role="status">{status}</small>}
-    </div>
-  );
-}
-function speak(lemma: string) {
-  if ('speechSynthesis' in window) {
-    speechSynthesis.cancel();
-    const voice = new SpeechSynthesisUtterance(lemma);
-    voice.lang = 'en-US';
-    speechSynthesis.speak(voice);
-  }
-}
 export function WordView({ word, focusSenseId }: { word: Word; focusSenseId?: string }) {
-  const senses = [...(word.senses ?? [])].sort(
-    (a, b) => Number(b.id === focusSenseId) - Number(a.id === focusSenseId),
-  );
+  const senses = [...(word.senses ?? [])]
+    .filter((sense) => (sense.definitionZh ?? '').trim() || sense.definitionEn?.trim())
+    .sort((a, b) => Number(b.id === focusSenseId) - Number(a.id === focusSenseId));
   return (
     <div className="word-content">
       <div className="word-title-row">
         <div>
           <h2 className="word-title">{word.lemma}</h2>
-          <div className="phonetic">{word.phonetic || '音标待补充'}</div>
+          <div className="phonetic">
+            {word.phoneticUs || word.phoneticUk ? (
+              <>
+                {word.phoneticUs && (
+                  <span>
+                    <small>美式</small> {word.phoneticUs}
+                  </span>
+                )}
+                {word.phoneticUk && (
+                  <span>
+                    <small>英式</small> {word.phoneticUk}
+                  </span>
+                )}
+              </>
+            ) : word.phonetics?.length ? (
+              word.phonetics.map((value) => (
+                <span key={value.text} title="词库读音标注，未区分英美">
+                  {value.text}
+                </span>
+              ))
+            ) : (
+              word.phonetic || '来源暂未提供音标'
+            )}
+          </div>
+          {word.phoneticUs || word.phoneticUk
+            ? word.phoneticSource && (
+                <span className="phonetic-caption">音标来源 · {word.phoneticSource}</span>
+              )
+            : !!word.phonetics?.length && (
+                <span className="phonetic-caption">词库音标 · 来源未分型</span>
+              )}
         </div>
         <AudioButton word={word} />
       </div>
@@ -146,23 +138,100 @@ export function WordView({ word, focusSenseId }: { word: Word; focusSenseId?: st
             <div className="sense" key={sense.id}>
               <span className="tiny-label">
                 {sense.pos || '词义'}
-                {index === 0 ? ' · 当前重点' : ''}
+                {sense.id === focusSenseId ? ' · 当前重点' : ` · 释义 ${index + 1}`}
               </span>
-              <p className="meaning-zh">{sense.definitionZh}</p>
-              {sense.definitionEn && <p className="meaning-en">{sense.definitionEn}</p>}
-              {sense.exampleEn && (
+              {dictionaryText(sense.definitionZh) && (
+                <p className="meaning-zh">{dictionaryText(sense.definitionZh)}</p>
+              )}
+              {dictionaryText(sense.definitionEn) && (
+                <p className="meaning-en">{dictionaryText(sense.definitionEn)}</p>
+              )}
+              {sense.exampleEn?.trim() && (
                 <blockquote>
-                  <p>{sense.exampleEn}</p>
-                  {sense.exampleZh && <small>{sense.exampleZh}</small>}
+                  <p>{dictionaryText(sense.exampleEn)}</p>
+                  {dictionaryText(sense.exampleZh) && (
+                    <small>{dictionaryText(sense.exampleZh)}</small>
+                  )}
+                  {sense.exampleSource && (
+                    <small className="source-line">
+                      语境来源 · {sense.exampleSource.reference}
+                      {sense.exampleSource.license ? ` · ${sense.exampleSource.license}` : ''}
+                    </small>
+                  )}
                 </blockquote>
+              )}
+              {(sense.source || sense.sourceRef) && (
+                <p className="source-line">
+                  释义来源 · {sense.source?.reference || sense.sourceRef}
+                  {sense.source?.license ? ` · ${sense.source.license}` : ''}
+                </p>
               )}
             </div>
           ))}
         </div>
       )}
-      {word.sourceRef && <p className="source-line">内容来源 · {word.sourceRef}</p>}
+      {word.senses && senses.length === 0 && (
+        <p className="fine-print">该词条来源暂未提供可展示的释义。</p>
+      )}
+      {(word.source?.reference || word.sourceRef) && (
+        <div className="word-source-detail">
+          <p className="source-line">内容来源 · {word.source?.reference || word.sourceRef}</p>
+          {word.source?.license && (
+            <p className="source-line">主来源许可 · {word.source.license}</p>
+          )}
+          {word.source?.wordHasSiteEdits && (
+            <p className="source-line">
+              本站编辑记录 · {word.source.siteEditVersion || word.contentVersion}（词条级记录）
+            </p>
+          )}
+          {sourceLink(word.source?.sourceUrl) && (
+            <a
+              className="text-link"
+              href={sourceLink(word.source?.sourceUrl)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              查看来源信息 ↗
+            </a>
+          )}
+          {!!word.sources?.length && (
+            <details className="dictionary-pack-details">
+              <summary>查看来源与许可 · {word.sources.length} 个数据包</summary>
+              {word.sources.map((source) => (
+                <div className="dictionary-pack" key={source.id}>
+                  <strong>{source.id}</strong>
+                  <span>
+                    版本 {source.version} · 许可 {source.license}
+                  </span>
+                  {sourceLink(source.sourceUrl) && (
+                    <a
+                      className="text-link"
+                      href={sourceLink(source.sourceUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      数据包来源 ↗
+                    </a>
+                  )}
+                </div>
+              ))}
+            </details>
+          )}
+        </div>
+      )}
     </div>
   );
+}
+function sourceLink(value: string | null | undefined) {
+  if (!value) return undefined;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password
+      ? parsed.toString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 export function Dialog({
   open,

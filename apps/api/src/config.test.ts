@@ -40,6 +40,30 @@ const b = {
   bootstrapTokenEnv: 'TEST_BOOT_B',
 };
 describe('operator site configuration', () => {
+  it('keeps VPS secrets private and rejects insecure remote gateways or direct production translation', () => {
+    process.env.TRANSLATION_TEST_SECRET = 't'.repeat(40);
+    sites([
+      {
+        ...a,
+        translationMode: 'gateway',
+        translationGatewayUrl: 'https://translate.example/translate',
+        translationGatewaySecretEnv: 'TRANSLATION_TEST_SECRET',
+      },
+    ]);
+    expect(readConfig().sites[0]?.translation?.mode).toBe('gateway');
+    sites([
+      {
+        ...a,
+        translationMode: 'gateway',
+        translationGatewayUrl: 'http://translate.example/translate',
+        translationGatewaySecretEnv: 'TRANSLATION_TEST_SECRET',
+      },
+    ]);
+    expect(() => readConfig()).toThrow('gateway requires HTTPS');
+    sites([{ ...a, translationMode: 'direct' }]);
+    process.env.NODE_ENV = 'production';
+    expect(() => readConfig()).toThrow('authenticated VPS gateway');
+  });
   it('parses a closed registration flag and rejects spelling mistakes', () => {
     sites([a]);
     delete process.env.SITES_FILE;

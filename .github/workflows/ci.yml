@@ -32,6 +32,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://nightstudy:ci-only-do-not-use@127.0.0.1:5432/nightstudy_test
       TEST_DATABASE_URL: postgresql://nightstudy:ci-only-do-not-use@127.0.0.1:5432/nightstudy_test
+      CONTENT_TEST_DATABASE_URL: postgresql://nightstudy:ci-only-do-not-use@127.0.0.1:5432/nightstudy_test
       TEST_DATABASE_URL_B: postgresql://nightstudy:ci-only-do-not-use@127.0.0.1:5432/nightstudy_b_test
       POSTGRES_DB: nightstudy_test
       POSTGRES_PASSWORD: ci-only-do-not-use
@@ -40,6 +41,8 @@ jobs:
       PUBLIC_URL: http://127.0.0.1:3000
       REGISTRATION_OPEN: 'true'
       NODE_ENV: test
+      CONTENT_PACK: demo
+      TRANSLATION_GATEWAY_SECRET: ci-only-gateway-token-not-a-production-secret-2026
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -66,6 +69,8 @@ jobs:
           cp .env.example .env
           docker compose config --quiet
           docker compose -f compose.yaml -f compose.scale.yaml config --quiet
+          docker compose -f compose.yaml -f compose.translation.yaml config --quiet
+          docker compose -f deploy/translation-gateway/compose.yaml config --quiet
       - name: Build alpha container
         run: docker build --tag nightstudy:ci .
       - name: Smoke-test isolated Compose installation
@@ -75,9 +80,21 @@ jobs:
           DATABASE_URL: ''
           PUBLIC_URL: http://127.0.0.1:5198
           NODE_ENV: production
+          CONTENT_PACK: ecdict
         run: |
-          docker compose up --detach --no-build --wait --wait-timeout 180 app
+          docker compose up --detach --no-build --wait --wait-timeout 600 app
           curl --fail --silent http://127.0.0.1:5198/health/ready
+          curl --fail --silent http://127.0.0.1:5198/api/v2/dictionary/stats > /tmp/nightstudy-catalog.json
+          node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-catalog.json','utf8'));if(!j.installedDictionary||j.declaredEntryCount!==770611)process.exit(1)"
+      - name: Smoke-test closed translation gateway container
+        env:
+          COMPOSE_PROJECT_NAME: nightstudy-ci-${{ github.run_id }}
+          NIGHTSTUDY_IMAGE: nightstudy:ci
+          DATABASE_URL: ''
+          PUBLIC_URL: http://127.0.0.1:5198
+        run: |
+          docker compose -f compose.yaml -f compose.translation.yaml up --detach --no-build --wait translation-gateway
+          docker compose -f compose.yaml -f compose.translation.yaml exec -T translation-gateway node --input-type=module -e "const r=await fetch('http://127.0.0.1:3099/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'rain'})});if(r.status!==401)process.exit(1)"
       - name: Stop isolated Compose installation
         if: always()
         env:
@@ -86,5 +103,5 @@ jobs:
           PUBLIC_URL: http://127.0.0.1:5198
         run: |
           if [ -f .env ]; then
-            docker compose down --volumes --remove-orphans
+            docker compose -f compose.yaml -f compose.translation.yaml down --volumes --remove-orphans
           fi

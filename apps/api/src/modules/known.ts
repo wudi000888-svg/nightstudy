@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { KnownImport } from '@prisma/client';
+import { Readable } from 'node:stream';
 import { HttpError, requireUser, type ContextResolver } from '../context.js';
 import { parse, id, normalize, obj, json, transact } from './shared.js';
 
@@ -223,47 +224,56 @@ export async function registerKnown(app: FastifyInstance, getContext: ContextRes
     const ctx = await getContext(req),
       user = requireUser(ctx),
       query = parse(z.object({ format: z.enum(['json', 'csv']).default('json') }), req.query);
-    const claims = await ctx.prisma.knownClaim.findMany({
-      where: { userId: user.id, import: { status: 'confirmed' } },
-      include: { word: true },
-      take: 10000,
-      orderBy: { createdAt: 'asc' },
-    });
-    const distinct = new Map(
-      claims.map((c) => [
-        c.wordId,
-        {
-          wordId: c.wordId,
-          lemma: c.word.lemma,
-          language: 'en',
-          familiarity: 'claimed_known',
-          source: 'user_claim',
-          claimedAt: c.createdAt.toISOString(),
-        },
-      ]),
-    );
-    const rows = [...distinct.values()];
     reply
       .header(
         'Content-Disposition',
         `attachment; filename="nightstudy-known-words.${query.format}"`,
       )
       .header('Cache-Control', 'private, no-store');
-    if (query.format === 'csv')
-      return reply
-        .type('text/csv; charset=utf-8')
-        .send(
-          '\uFEFFwordId,lemma,language,familiarity\r\n' +
-            rows
-              .map((r) => [r.wordId, r.lemma, r.language, r.familiarity].map(csvCell).join(','))
-              .join('\r\n'),
-        );
-    return {
+    const metadata = {
       formatVersion: 1,
       kind: 'known-words',
       sourceSiteId: ctx.siteId,
       exportedAt: new Date().toISOString(),
-      rows,
+      consistency: 'cursor_export',
     };
+    async function* exportRows() {
+      let cursor = '',
+        count = 0;
+      yield query.format === 'csv'
+        ? '\uFEFFwordId,lemma,language,familiarity\r\n'
+        : JSON.stringify(metadata).slice(0, -1) + ',"rows":[';
+      for (;;) {
+        const page = await ctx.prisma.$queryRaw<
+          { wordId: string; lemma: string; claimedAt: Date }[]
+        >`
+          SELECT c."wordId", w."lemma", MAX(c."createdAt") AS "claimedAt"
+          FROM "KnownClaim" c JOIN "KnownImport" i ON i."id" = c."importId"
+          JOIN "Word" w ON w."id" = c."wordId"
+          WHERE c."userId" = ${user.id} AND i."status" = 'confirmed' AND c."wordId" > ${cursor}
+          GROUP BY c."wordId", w."lemma" ORDER BY c."wordId" ASC LIMIT 1000
+        `;
+        for (const entry of page) {
+          const row = {
+            wordId: entry.wordId,
+            lemma: entry.lemma,
+            language: 'en',
+            familiarity: 'claimed_known',
+            source: 'user_claim',
+            claimedAt: entry.claimedAt.toISOString(),
+          };
+          yield query.format === 'csv'
+            ? [row.wordId, row.lemma, row.language, row.familiarity].map(csvCell).join(',') + '\r\n'
+            : (count ? ',' : '') + JSON.stringify(row);
+          count++;
+        }
+        if (page.length < 1000) break;
+        cursor = page.at(-1)!.wordId;
+      }
+      if (query.format === 'json') yield `],"rowCount":${count}}`;
+    }
+    return reply
+      .type(query.format === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8')
+      .send(Readable.from(exportRows(), { objectMode: false }));
   });
 }

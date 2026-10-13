@@ -2,7 +2,7 @@
 
 Build the product described in docs/architecture/ARCHITECTURE.md. The user has authorized implementation and publication in the public GitHub repository. Keep the original deployment extraction and local runtime data outside this new repository.
 
-Preserve the rain-night, warm black, amber and glass-panel design language. Use newly authored code and redistributable demo content. Do not copy the original compiled bundle, unidentified wallpaper, commercial dictionary text, or proprietary audio into this repository.
+Preserve the rain-night, warm black, amber and glass-panel design language. Use newly authored code, original demo content and separately licensed, pinned external content packs with provenance and checksums. Do not copy the original compiled bundle, unidentified wallpaper, unlicensed commercial dictionary text, or proprietary audio into this repository.
 
 The API uses Fastify/TypeScript, Prisma 7, PostgreSQL and Better Auth. Site context selects a fixed, isolated database/auth realm. Never fall back to an in-memory production store when PostgreSQL is unavailable. Only authenticated server context determines site/user/role; request fields cannot choose another database or account.
 

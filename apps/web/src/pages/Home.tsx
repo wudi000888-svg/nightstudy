@@ -220,7 +220,9 @@ export function HomePage() {
         </div>
       </div>
       <p className="content-caption">
-        Alpha 内置词书是原创演示内容，用于体验完整学习流程，并非完整考试词库。
+        {books.data?.items.every((book) => book.isDemo)
+          ? '原创演示词书用于体验学习流程，并非完整考试词库。'
+          : '词书按本站词库组织。释义与音标以各词条来源提供的内容为准。'}
       </p>
       <ErrorNotice error={books.error} onRetry={() => void books.refetch()} />
       {books.isPending ? (
@@ -306,7 +308,9 @@ export function BooksPage() {
         ))}
       </div>
       <p className="content-caption">
-        内置原创演示内容仅用于 Alpha 功能体验，不代表完整考试词库或真实考试难度。
+        {books.data?.items.every((book) => book.isDemo)
+          ? '原创演示词书用于体验学习流程，不代表完整考试词库或真实考试难度。'
+          : '词书词数和覆盖进度来自本站记录。同词跨书共享学习进度，词条保留来源与许可。'}
       </p>
       <ErrorNotice error={error || books.error} />
       {books.isPending ? (

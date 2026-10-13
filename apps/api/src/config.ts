@@ -21,8 +21,19 @@ const siteInput = z.object({
   authSecretEnv: z.string().regex(/^[A-Z][A-Z0-9_]*$/),
   bootstrapTokenEnv: z.string().regex(/^[A-Z][A-Z0-9_]*$/),
   registrationOpen: z.boolean().default(true),
+  translationMode: z.enum(['website-official', 'direct', 'gateway']).default('website-official'),
+  translationGatewayUrl: z.url().optional(),
+  translationGatewaySecretEnv: z
+    .string()
+    .regex(/^[A-Z][A-Z0-9_]*$/)
+    .optional(),
 });
 
+export interface TranslationConfig {
+  mode: 'website-official' | 'direct' | 'gateway';
+  gatewayUrl?: string;
+  gatewaySecret?: string;
+}
 export interface SiteConfig {
   id: string;
   title: string;
@@ -33,6 +44,7 @@ export interface SiteConfig {
   authSecret: string;
   bootstrapToken: string;
   registrationOpen: boolean;
+  translation?: TranslationConfig;
 }
 export interface AppConfig {
   sites: SiteConfig[];
@@ -82,6 +94,9 @@ export function readConfig(): AppConfig {
           z
             .enum(['true', 'false'])
             .parse((process.env.REGISTRATION_OPEN || 'true').trim().toLowerCase()) === 'true',
+        translationMode: process.env.TRANSLATION_MODE || 'website-official',
+        translationGatewayUrl: process.env.TRANSLATION_GATEWAY_URL || undefined,
+        translationGatewaySecretEnv: 'TRANSLATION_GATEWAY_SECRET',
       }),
     ];
   }
@@ -110,6 +125,26 @@ export function readConfig(): AppConfig {
         ? ['127.0.0.1', 'localhost']
         : []),
     ];
+    if (production && input.translationMode === 'direct')
+      throw new Error('Production translation requires the authenticated VPS gateway');
+    const translation: TranslationConfig = { mode: input.translationMode };
+    if (input.translationMode === 'gateway') {
+      if (!input.translationGatewayUrl || !input.translationGatewaySecretEnv)
+        throw new Error(`Site ${input.id}: gateway URL and secret environment name required`);
+      const gateway = new URL(input.translationGatewayUrl);
+      if (
+        !['http:', 'https:'].includes(gateway.protocol) ||
+        gateway.username ||
+        gateway.password ||
+        gateway.search ||
+        gateway.hash ||
+        (gateway.protocol === 'http:' &&
+          !['localhost', '127.0.0.1', 'translation-gateway'].includes(gateway.hostname))
+      )
+        throw new Error(`Site ${input.id}: gateway requires HTTPS or the internal Compose gateway`);
+      translation.gatewayUrl = gateway.href;
+      translation.gatewaySecret = envSecret(input.translationGatewaySecretEnv, 256);
+    }
     return {
       id: input.id,
       title: input.title,
@@ -120,6 +155,7 @@ export function readConfig(): AppConfig {
       authSecret: envSecret(input.authSecretEnv),
       bootstrapToken: envSecret(input.bootstrapTokenEnv, 256),
       registrationOpen: input.registrationOpen,
+      translation,
     };
   });
   if (new Set(sites.map((site) => site.id)).size !== sites.length)

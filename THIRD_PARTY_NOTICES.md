@@ -25,9 +25,23 @@
 
 ## 演示内容与大数据包
 
-公开仓库使用新编写的演示内容，不包含原部署的编译产物、完整服务端快照、真实词库或账户数据。演示例句应标记为原创教学内容；结构校验与自动规则检查不等于人工语义审核。
+公开Git包含新源码、原创演示/测试内容、固定来源manifest与许可声明；大型源CSV通过工具下载到忽略目录。原部署的编译产物、完整服务端快照、旧ZIP词库、账户数据和密钥没有作为公开资产或完整内容输入。演示例句标记为原创教学内容；结构校验与自动规则检查不等于人工语义审核。
 
-后续安装的大词典或媒体包必须提供独立版本、来源、许可/署名、摘要和文件校验；其许可与代码分开列明。未完成来源核验的资产不应出现在公开 Git、发行镜像或 Release 中。
+词典或媒体包提供独立版本、来源、许可/署名、摘要和文件校验；其许可与代码分开列明。未完成来源核验的资产不应出现在公开 Git、发行镜像或 Release 中。
+
+## ECDICT 完整基础词典
+
+采用 [skywind3000/ECDICT](https://github.com/skywind3000/ECDICT) 固定commit `bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b` 的基础CSV。源大小65,933,428字节，SHA256与覆盖率见 [manifest](data/content-ecdict.manifest.json) 和 [CONTENT.md](docs/CONTENT.md)。保留 Copyright (c) 2025 Linwei 与 [原MIT许可全文](data/content-ecdict.LICENSE.txt)。新代码的MIT不作为推断所有数据授权的唯一依据。
+
+上游关于商业APP/随包离线词库分发的直接问题，在2026-09-30得到仓库OWNER `skywind3000` [明确许可使用且无额外要求的回复](https://github.com/skywind3000/ECDICT/issues/134#issuecomment-5902723743)。该授权关联和链接随manifest保存。[源README](https://github.com/skywind3000/ECDICT/blob/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/README.md) 披露 EDictAZ、cdict、WordNet、爬取资料及网友贡献等混合历史来源，本项目未承诺逐条完成第三方原始资料清权。
+
+数据处理包括规范词形、拆分原始义项、识别明示词性及相同内容去重；未生成不存在的释义、音标、例句或录音。上游考试标签保持来源名称，不宣称完整当前官方考试大纲。原始音标有旧式写法，现代区域IPA属于下述独立数据许可。
+
+## 独立区域 IPA 数据
+
+美式IPA采用 [open-dict-data/ipa-dict固定版本](https://github.com/open-dict-data/ipa-dict/tree/43c3570eb3553bdd19fccd2bd0091534889af023) 的en_US.txt，保留ipa-dict（dohliam）、cmudict-ipa（Lingliang Zhang）的MIT通知与CMUdict BSD-style通知；ContentPack许可为 `MIT AND BSD-2-Clause`。英式en_UK.txt派生自ipacards（源仓库现为melissaboiko/ipacards），依据上游credits保留 `GPL-3.0-only` 独立数据许可，应用代码MIT不重新许可该数据。
+
+音标工具在 `.local/content/phonetics` 分别保留source.tsv、固定SHA256 manifest、NOTICE及原许可全文，大源文件不进入Git或应用镜像。音标自动/半自动处理可能有误，不包含商业原声录音。数据来源、修改与再分发说明见 [PHONETICS.md](docs/PHONETICS.md)。
 
 ## 设计参考
 

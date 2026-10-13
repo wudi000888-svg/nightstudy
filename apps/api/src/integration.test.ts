@@ -495,6 +495,171 @@ suite('PostgreSQL API and isolation', () => {
       401,
     );
   });
+  it('reaches words after the first thousand and exports more than ten thousand known words', async () => {
+    const fixture = `large-${runId}`;
+    const total = 11001;
+    const words = Array.from({ length: total }, (_, index) => ({
+      id: `${fixture}-${String(index).padStart(5, '0')}`,
+      lemma: `largefixture${String(index).padStart(5, '0')}`,
+      normalizedLemma: `${fixture}-${String(index).padStart(5, '0')}`,
+      goalTags: [] as string[],
+      contentVersion: 'integration-fixture',
+    }));
+    const finalWord = words.at(-1)!;
+    const prefs = await prisma.userSettings.findUniqueOrThrow({ where: { userId } });
+    try {
+      for (let offset = 0; offset < total; offset += 1000)
+        await prisma.word.createMany({ data: words.slice(offset, offset + 1000) });
+      await prisma.sense.create({
+        data: { id: `${fixture}-sense`, wordId: finalWord.id, pos: 'n.', definitionZh: '最后一项' },
+      });
+      await prisma.book.create({
+        data: {
+          id: fixture,
+          slug: fixture,
+          title: 'Large regression fixture',
+          description: 'Integration only',
+          goal: 'daily',
+          version: 'integration-fixture',
+        },
+      });
+      await prisma.knownImport.create({
+        data: { id: fixture, userId, status: 'confirmed', rowsJson: [], countsJson: {} },
+      });
+      for (let offset = 0; offset < total; offset += 1000) {
+        const batch = words.slice(offset, offset + 1000);
+        await prisma.bookItem.createMany({
+          data: batch.map((word, index) => ({
+            bookId: fixture,
+            wordId: word.id,
+            ordinal: offset + index,
+          })),
+        });
+        await prisma.knownClaim.createMany({
+          data: batch.map((word) => ({ importId: fixture, userId, wordId: word.id })),
+        });
+        await prisma.userWord.createMany({
+          data: batch
+            .filter((word) => word.id !== finalWord.id)
+            .map((word) => ({ userId, wordId: word.id, paused: true })),
+        });
+      }
+      await prisma.userSettings.update({ where: { userId }, data: { dailyNewLimit: 100 } });
+      const learned = await request('POST', '/api/v2/study/sessions', {
+        bookId: fixture,
+        mode: 'learn',
+        size: 1,
+      });
+      expect(learned.statusCode, learned.body).toBe(200);
+      expect(learned.json().session.items[0].wordId).toBe(finalWord.id);
+      const exported = await request('GET', '/api/v2/known-words/exports?format=json');
+      expect(exported.statusCode).toBe(200);
+      const exportedRows = exported
+        .json()
+        .rows.filter((row: { wordId: string }) => row.wordId.startsWith(fixture));
+      expect(exportedRows).toHaveLength(total);
+      expect(exportedRows.some((row: { wordId: string }) => row.wordId === finalWord.id)).toBe(
+        true,
+      );
+      const first = await request('GET', `/api/v2/books/${fixture}?limit=50`);
+      expect(first.json().page.total).toBe(total);
+      expect(first.json().page.nextCursor).not.toBeNull();
+    } finally {
+      await prisma.studySession.deleteMany({ where: { userId, bookId: fixture } });
+      await prisma.book.deleteMany({ where: { id: fixture } });
+      await prisma.knownImport.deleteMany({ where: { id: fixture } });
+      await prisma.userWord.deleteMany({ where: { userId, wordId: { startsWith: fixture } } });
+      await prisma.word.deleteMany({ where: { id: { startsWith: fixture } } });
+      await prisma.userSettings.update({
+        where: { userId },
+        data: { dailyNewLimit: prefs.dailyNewLimit },
+      });
+    }
+  }, 60000);
+  it('mixes a familiar probe into a five-word group and rejects blank assessment meanings', async () => {
+    const fixture = `probe-${runId}`;
+    const fixtureWords = Array.from({ length: 6 }, (_, i) => `${fixture}-${i}`);
+    const prefs = await prisma.userSettings.findUniqueOrThrow({ where: { userId } });
+    let assessmentId = '';
+    try {
+      for (const [i, wordId] of fixtureWords.entries())
+        await prisma.word.create({
+          data: {
+            id: wordId,
+            lemma: `probefixture${i}`,
+            normalizedLemma: wordId,
+            goalTags: [],
+            senses: { create: { id: `${wordId}-sense`, pos: 'n.', definitionZh: `夹具含义${i}` } },
+          },
+        });
+      await prisma.book.create({
+        data: {
+          id: fixture,
+          slug: fixture,
+          title: 'Familiar probe fixture',
+          description: 'Integration only',
+          goal: 'daily',
+          items: { create: fixtureWords.map((wordId, ordinal) => ({ wordId, ordinal })) },
+        },
+      });
+      await prisma.knownImport.create({
+        data: {
+          id: fixture,
+          userId,
+          status: 'confirmed',
+          rowsJson: [],
+          countsJson: {},
+          claims: { create: { userId, wordId: fixtureWords[5]! } },
+        },
+      });
+      await prisma.userSettings.update({ where: { userId }, data: { dailyNewLimit: 100 } });
+      const group = await request('POST', '/api/v2/study/sessions', {
+        mode: 'learn',
+        bookId: fixture,
+        size: 5,
+      });
+      expect(group.statusCode, group.body).toBe(200);
+      expect(group.json().session.items).toHaveLength(5);
+      expect(
+        group
+          .json()
+          .session.items.filter((item: { wordId: string }) => item.wordId === fixtureWords[5]),
+      ).toHaveLength(1);
+      const blankId = `${fixture}-blank`;
+      await prisma.word.create({
+        data: {
+          id: blankId,
+          lemma: 'blankfixture',
+          normalizedLemma: blankId,
+          goalTags: ['ielts'],
+          senses: { create: { id: `${blankId}-sense`, pos: 'n.', definitionZh: ' \t\n ' } },
+        },
+      });
+      const blankEdit = await request(
+        'PATCH',
+        `/api/v2/admin/words/${blankId}`,
+        { definitionZh: ' \t\n ', senseId: `${blankId}-sense` },
+        adminCookie,
+      );
+      expect(blankEdit.statusCode).toBe(400);
+      const assessment = await request('POST', '/api/v2/assessments', { goal: 'ielts', size: 20 });
+      expect(assessment.statusCode, assessment.body).toBe(200);
+      assessmentId = assessment.json().assessment.id;
+      expect(await prisma.assessmentItem.count({ where: { assessmentId, wordId: blankId } })).toBe(
+        0,
+      );
+    } finally {
+      if (assessmentId) await prisma.assessment.deleteMany({ where: { id: assessmentId } });
+      await prisma.studySession.deleteMany({ where: { userId, bookId: fixture } });
+      await prisma.book.deleteMany({ where: { id: fixture } });
+      await prisma.knownImport.deleteMany({ where: { id: fixture } });
+      await prisma.word.deleteMany({ where: { id: { startsWith: fixture } } });
+      await prisma.userSettings.update({
+        where: { userId },
+        data: { dailyNewLimit: prefs.dailyNewLimit },
+      });
+    }
+  });
   it.skipIf(!process.env.TEST_DATABASE_URL_B)(
     'isolates databases and cookies on domain aliases and a subpath',
     async () => {

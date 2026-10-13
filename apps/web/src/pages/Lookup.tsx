@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { Bookmark, Search, Trash2, Pause, Play, Pencil, ArrowRight } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Bookmark, Search, Trash2, Pause, Play, Pencil, ArrowRight, Languages } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp, useRemote } from '../AppContext';
 import { api, post } from '../lib/api';
-import type { Word, WordbookItem } from '../lib/types';
+import type { PageInfo, Word, WordbookItem } from '../lib/types';
+import { TranslationPanel } from '../components/Translation';
+import { dictionaryText } from '../lib/dictionary';
 import {
   Dialog,
   Empty,
@@ -16,13 +18,19 @@ import {
   formatDate,
 } from '../components/UI';
 
-export function LookupPage() {
+export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 'wordbook' }) {
   const { user, scope } = useApp();
   const client = useQueryClient();
-  const [tab, setTab] = useState('lookup');
+  const [tab, setTab] = useState<'lookup' | 'wordbook' | 'translation'>(initialTab);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Word[]>([]);
   const [selected, setSelected] = useState<Word | null>(null);
+  const [page, setPage] = useState<PageInfo | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [detailBusy, setDetailBusy] = useState(false);
+  const [detailError, setDetailError] = useState<unknown>(null);
+  const selection = useRef(0);
+  const [translationText, setTranslationText] = useState('');
   const [busy, setBusy] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -30,20 +38,62 @@ export function LookupPage() {
   const [editing, setEditing] = useState<WordbookItem | null>(null);
   const [note, setNote] = useState('');
   const wordbook = useRemote<{ items: WordbookItem[] }>('wordbook', 'wordbook', !!user);
-  async function search() {
-    if (!query.trim()) return;
+  const dictionary = useRemote<{
+    installedDictionary: boolean;
+    declaredEntryCount: number;
+    packs: {
+      id: string;
+      version: string;
+      license: string;
+      entryCount: number;
+      phoneticCount: number;
+      definitionZhCount: number;
+      definitionEnCount: number;
+    }[];
+  }>('dictionary-stats', 'dictionary/stats');
+  async function choose(word: Word) {
+    const request = ++selection.current;
+    setSelected(word);
+    setDetailBusy(true);
+    setDetailError(null);
+    try {
+      const result = await api<{ word: Word }>(`words/${encodeURIComponent(word.id)}`);
+      if (request === selection.current) setSelected(result.word);
+    } catch (value) {
+      if (request === selection.current) setDetailError(value);
+    } finally {
+      if (request === selection.current) setDetailBusy(false);
+    }
+  }
+  async function search(more = false) {
+    const term = more ? searchQuery : query.trim();
+    if (!term || busy || (more && !page?.nextCursor)) return;
     setBusy(true);
     setError(null);
     setNotice('');
     try {
-      const data = await api<{ items: Word[]; completeDictionary: boolean }>(
-        `dictionary?q=${encodeURIComponent(query.trim())}`,
+      const data = await api<{ items: Word[]; page: PageInfo }>(
+        `dictionary?q=${encodeURIComponent(term)}&limit=20${more ? `&cursor=${encodeURIComponent(page!.nextCursor!)}` : ''}`,
       );
-      setResults(data.items);
-      setSelected(data.items[0] ?? null);
+      setResults((current) =>
+        more
+          ? [...new Map([...current, ...data.items].map((word) => [word.id, word])).values()]
+          : data.items,
+      );
+      setPage(data.page);
+      setSearchQuery(term);
       setSearched(true);
-      if (!data.items.length)
-        setNotice('演示内容中暂时没有查到这个词，可以试试 rain、quiet 或 learn。');
+      if (!more) {
+        selection.current++;
+        if (data.items[0]) void choose(data.items[0]);
+        else {
+          setSelected(null);
+          setDetailError(null);
+          setDetailBusy(false);
+        }
+      }
+      if (!data.items.length && !more)
+        setNotice('本站词库中暂时没有匹配到这个单词前缀。请检查拼写，或在网页翻译中查询语境。');
     } catch (value) {
       setError(value);
     } finally {
@@ -90,7 +140,7 @@ export function LookupPage() {
             把一个词，<em>读到有语境。</em>
           </>
         }
-        description="Alpha 查询当前已发布的原创演示内容，完整扩展词典会在后续数据包中接入。"
+        description="查询本站词库，查看来源音标、已有中文释义和英文解释，再用可用的设备英语语音读一遍。"
       />
       <div className="tab-row">
         <button className={tab === 'lookup' ? 'active' : ''} onClick={() => setTab('lookup')}>
@@ -99,11 +149,53 @@ export function LookupPage() {
         <button className={tab === 'wordbook' ? 'active' : ''} onClick={() => setTab('wordbook')}>
           <Bookmark size={16} /> 我的生词本
         </button>
+        <button
+          className={tab === 'translation' ? 'active' : ''}
+          onClick={() => setTab('translation')}
+        >
+          <Languages size={16} /> 网页翻译
+        </button>
       </div>
       <ErrorNotice error={error || (tab === 'wordbook' ? wordbook.error : null)} />
       {notice && <Notice>{notice}</Notice>}
-      {tab === 'lookup' ? (
+      {tab === 'translation' ? (
+        <TranslationPanel key={translationText} initialText={translationText} />
+      ) : tab === 'lookup' ? (
         <>
+          {dictionary.data && (
+            <div className="dictionary-status">
+              <span className="soft-badge">
+                {dictionary.data.installedDictionary ? '词典数据已安装' : '本站已发布内容'}
+              </span>
+              {dictionary.data.installedDictionary && (
+                <span>
+                  安装包记录数 {dictionary.data.declaredEntryCount.toLocaleString()} ·
+                  来自数据包元数据
+                </span>
+              )}
+              <small>按英文单词或前缀查找。选择结果后读取完整释义。</small>
+              {dictionary.data.packs.length > 0 && (
+                <details className="dictionary-pack-details">
+                  <summary>查看数据覆盖与许可</summary>
+                  <p>以下来自安装包元数据，各包可能覆盖相同单词，不能直接相加为本站去重词数。</p>
+                  {dictionary.data.packs.map((pack) => (
+                    <div className="dictionary-pack" key={pack.id}>
+                      <strong>
+                        {pack.id} · {pack.version}
+                      </strong>
+                      <span>
+                        {pack.entryCount.toLocaleString()} 条记录 · 中文释义{' '}
+                        {pack.definitionZhCount.toLocaleString()} 条 · 英文释义{' '}
+                        {pack.definitionEnCount.toLocaleString()} 条 · 读音标注{' '}
+                        {pack.phoneticCount.toLocaleString()} 条
+                      </span>
+                      <small>许可：{pack.license} · 未提供的内容不会补造</small>
+                    </div>
+                  ))}
+                </details>
+              )}
+            </div>
+          )}
           <form
             className="search-bar"
             onSubmit={(event) => {
@@ -115,48 +207,96 @@ export function LookupPage() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="输入一个想读懂的词，例如 quiet"
+              placeholder="输入英文单词或开头，例如 rain"
               aria-label="查词输入"
+              maxLength={160}
+              disabled={busy}
             />
             <button type="submit" className="button primary" disabled={busy || !query.trim()}>
               {busy ? '查找中…' : '查词'}
               <ArrowRight size={15} />
             </button>
           </form>
-          {results.length > 1 && (
-            <div className="filter-row">
-              {results.map((word) => (
-                <button
-                  key={word.id}
-                  className={selected?.id === word.id ? 'active' : ''}
-                  onClick={() => setSelected(word)}
-                >
-                  {word.lemma}
-                </button>
-              ))}
+          {searched && results.length > 0 && (
+            <div className="dictionary-layout">
+              <aside className="dictionary-results" aria-label="词典搜索结果">
+                <div className="dictionary-results-heading">
+                  “{searchQuery}” · {page?.total ?? results.length} 个匹配
+                </div>
+                {results.map((word) => (
+                  <button
+                    key={word.id}
+                    className={selected?.id === word.id ? 'active' : ''}
+                    onClick={() => void choose(word)}
+                  >
+                    <strong>{word.lemma}</strong>
+                    <span>
+                      {dictionaryText(
+                        word.senses?.find((sense) => sense.definitionZh?.trim())?.definitionZh,
+                      ) ||
+                        word.senses?.find((sense) => sense.definitionEn?.trim())?.definitionEn ||
+                        '查看完整词条'}
+                    </span>
+                  </button>
+                ))}
+                {page?.hasMore && (
+                  <button
+                    className="button ghost"
+                    disabled={busy}
+                    onClick={() => void search(true)}
+                  >
+                    {busy ? '正在读取…' : '更多匹配词'}
+                  </button>
+                )}
+              </aside>
+              <div className="dictionary-detail">
+                {selected ? (
+                  <Panel className="lookup-card">
+                    <div className="section-heading">
+                      <span className="soft-badge">
+                        {detailError ? '词条摘要' : '完整词条'}
+                        {!detailBusy && selected.senseCount
+                          ? ` · ${selected.senseCount} 条释义`
+                          : ''}
+                      </span>
+                      <div className="action-row">
+                        <button
+                          className="button quiet"
+                          onClick={() => {
+                            setTranslationText(selected.lemma);
+                            setTab('translation');
+                          }}
+                        >
+                          <Languages size={16} /> 网页翻译
+                        </button>
+                        <button
+                          className="button quiet"
+                          disabled={busy}
+                          onClick={() => void collect(selected.id)}
+                        >
+                          <Bookmark size={16} /> 加入生词本
+                        </button>
+                      </div>
+                    </div>
+                    {detailBusy ? (
+                      <Loading text="正在读取完整释义…" />
+                    ) : (
+                      <>
+                        <ErrorNotice error={detailError} onRetry={() => void choose(selected)} />
+                        {detailError && <Notice>当前显示搜索摘要，完整词条尚未读取。</Notice>}
+                        <WordView word={selected} />
+                      </>
+                    )}
+                  </Panel>
+                ) : null}
+              </div>
             </div>
           )}
-          {selected ? (
-            <Panel className="lookup-card">
-              <div className="section-heading">
-                <span className="soft-badge">原创演示 · 词条</span>
-                <button
-                  className="button quiet"
-                  disabled={busy}
-                  onClick={() => void collect(selected.id)}
-                >
-                  <Bookmark size={16} /> 加入生词本
-                </button>
-              </div>
-              <WordView word={selected} />
-            </Panel>
-          ) : (
-            !searched && (
-              <Empty
-                title="从你真正遇到的一个词开始。"
-                description="查清词义，看一句语境，再决定是否把它留下。"
-              />
-            )
+          {!searched && (
+            <Empty
+              title="从你真正遇到的一个词开始。"
+              description="查清词义，看一句语境，再决定是否把它留下。"
+            />
           )}
         </>
       ) : !user ? (
@@ -177,12 +317,18 @@ export function LookupPage() {
                     className="word-link"
                     onClick={() => {
                       setTab('lookup');
-                      setSelected(item.word);
                       setResults([item.word]);
+                      setSearched(true);
+                      setSearchQuery(item.word.lemma);
+                      setPage(null);
+                      void choose(item.word);
                     }}
                   >
                     <strong>{item.word.lemma}</strong>
-                    <span>{item.word.senses?.[0]?.definitionZh}</span>
+                    <span>
+                      {item.word.senses?.find((sense) => sense.definitionZh?.trim())
+                        ?.definitionZh || '暂无中文释义'}
+                    </span>
                   </button>
                   {item.note && <p className="word-note">{item.note}</p>}
                   <small>

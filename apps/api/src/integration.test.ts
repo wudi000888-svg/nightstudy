@@ -101,6 +101,7 @@ suite('PostgreSQL API and isolation', () => {
       update: { initialized: false, initializedAt: null },
     });
     await prisma.rateBucket.deleteMany();
+    await prisma.job.deleteMany();
     app = (await buildApp(config, false)).app;
     second = (await buildApp(config, false)).app;
     const init = await request(

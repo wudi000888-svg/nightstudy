@@ -28,7 +28,7 @@ SITES_FILE= ADMIN_BOOTSTRAP=manual CONTENT_PACK=demo DATABASE_URL="$TEST_DATABAS
 
 CI使用双PG17测试库与manual/demo基线，完整suite仅执行一次；独立bootstrap与群站回归另使用合成命名空间。自动管理员需验证首次凭据可恢复、失败重试/并发、既有管理员不重置；群站需验证单次票据、scope、tuple/密文绑定、撤销/并发与SSRF，更新需区分无发布和源故障。不要在测试输出暴露真实密码、配对票据或长期凭据。
 
-0.3本轮完整测试/CI/VPS尚待验收。历史0.2代码577f48b的55项测试及 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 通过PG17/完整Compose安装，明确断言installedDictionary/declaredEntryCount=770611及网关健康/401；其VPS22项HTTP检查、容器数据保留和独立库恢复有记录。这些结果不能扩写为0.3或未执行的主机断电、手机live、跨机HA及容量。提交文档时固定实际验收的代码基线，详见 [部署文档](docs/DEPLOYMENT.md)。
+0.3代码86afefa的86项测试及 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过PG17/完整Compose安装、随机管理员密码实际登录及网关健康/401；VPS42项真实HTTPS管理员/双站检查通过并清理临时站点。本机完成桌面管理界面检查。历史0.2的55项/22项HTTP与独立库恢复证据保留。不要扩写为未执行的主机断电、新版手机、跨机HA及容量。提交文档时固定实际验收的代码基线，详见 [部署文档](docs/DEPLOYMENT.md)。
 
 内容/音标工具贡献遵循 [CONTENT.md](docs/CONTENT.md)、[PHONETICS.md](docs/PHONETICS.md) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。缺例句、IPA或录音时保持缺失；不得猜测数据覆盖、将旧式音标标为验证过的现代IPA，或把上游考试标签写成官方完整大纲。在线翻译的provider、网关与失败契约见 [TRANSLATION.md](docs/TRANSLATION.md)，不能把受控mock通过当作真实Google/VPS链路通过。
 

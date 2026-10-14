@@ -11,7 +11,13 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前源码：`0.3.0-alpha.1` 施工中，新增自动管理员、群站配对管理和版本检测；本轮完整测试、CI与VPS验收待记录。** 默认首次安装创建用户名admin和独立随机密码，私密文件交付初始凭据；既有管理员不被重置。群站使用10分钟单次配对票据与独立长期授权，可读取状态、按批准的权限管理用户/注册/公告并检测更新。版本检测只访问固定GitHub Release，不执行shell安装。线上与历史验证目前仍是0.2代码基线 `577f48b`，不能用其55项测试替代0.3验收。具体变化见 [CHANGELOG](CHANGELOG.md)。
+**当前版本：[`0.3.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.3.0-alpha.1)，已部署并通过本轮验收。** 默认首次安装创建用户名admin和独立随机密码，私密文件交付初始凭据；既有管理员不被重置。群站使用10分钟单次配对票据与独立长期授权，可读取状态、按批准的权限管理用户/注册/公告并检测更新。版本检测只访问固定GitHub Release，不执行shell安装。代码基线 `86afefa` 的86项测试和 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过，VPS完成42项真实HTTPS管理员/双站检查。具体变化见 [CHANGELOG](CHANGELOG.md)。
+
+[系统与更新预览](docs/media/admin-system-preview.png) · [群站管理预览](docs/media/admin-fleet-preview.png)
+
+系统截图采集于Release发布前，显示no-release；发布后VPS实际检测为up-to-date。
+
+本版 [公开amd64容器](https://github.com/wudi000888-svg/nightstudy/pkgs/container/nightstudy) 已完成发行CI及VPS匿名实际拉取，固定摘要部署见 [指南](docs/DEPLOYMENT.md#ci-与镜像发行)。
 
 ## 产品与边界
 
@@ -59,7 +65,11 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 
 ## 本机验证与待验收项
 
-0.3的自动管理员、群站和检测更新目前按源码描述，完整测试/CI/VPS结果待本轮验收。以下表格为0.1/0.2历史基线；0.2的代码/生产版本为577f48b，使用合成账户，不能扩写为0.3或生产容量证据。
+2026-10-14，0.3代码基线 `86afefa` 的13文件86项测试、格式/类型/生产构建通过。本机PG18.4与 [PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 分别执行真实双数据库回归，覆盖一次性票并发兑换、权限、撤销、幂等、离线解绑、本地忘记与重配、历史长昵称及更新缓存。CI另完成770,611词默认全量安装，实际用私密导出的随机密码登录admin，并验证网关健康/未鉴权401。
+
+VPS运行 `nightstudy-english:0.3.0-alpha.1-86afefa`：init退出0、app/PG/网关健康、原770,611词和3包保留；自动生成admin的私密文件权限600。42项HTTPS检查使用真实公网TLS连接临时独立子站，验证管理员登录、配对/撤销、用户启停、注册开关、分页和公告去重；临时记录、子站、数据库与入口已清理。Release发布后另验证更新检测返回up-to-date及正确发布链接。本机桌面浏览器完成新版登录、系统信息/真实更新检测与群站界面检查；未执行新版手机或生产浏览器完整流程，也未进行容量压测。
+
+以下表格为0.1/0.2历史基线，保留各版本原始验证范围。
 
 | 验证项                | 结果与范围                                                                                                           |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -80,7 +90,7 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 
 22项生产HTTP检查包括首页CSP/JS/CSS、770,611词及3包元数据、分页检索与rain完整词义/英美IPA、注册Secure/HttpOnly Cookie、客户端role字段无法提权、普通用户admin403、空曲线、词书选择/5词会话/reveal/rate、真实FSRS曲线记录、Google官方deep link及私密网关真实429错误、退出/重新登录。测试账号已清理；这份HTTP检查不等于新版手机或完整生产浏览器live验收。
 
-2026-10-14验收的代码与生产运行版本均为 `577f48b`。发布后外网HEAD首页返回200及HTML/CSP/no-store，HTTP跳转HTTPS为301，site接口的版本与公开地址正确；验收/交付时尚未初始化，管理员由部署者使用私有初始化口令自行创建。容器重建与数据保留不等于主机断电恢复或跨机HA。数据库恢复的限定证据见 [部署文档](docs/DEPLOYMENT.md#备份与升级)，后续进展见公开 [Issues](https://github.com/wudi000888-svg/nightstudy/issues) 与 [Milestones](https://github.com/wudi000888-svg/nightstudy/milestones)。
+0.2历史运行代码为 `577f48b`，当时尚未初始化；当前0.3已由首次init自动创建管理员。容器重建与数据保留不等于主机断电恢复或跨机HA。数据库恢复的限定证据见 [部署文档](docs/DEPLOYMENT.md#备份与升级)，后续进展见公开 [Issues](https://github.com/wudi000888-svg/nightstudy/issues) 与 [Milestones](https://github.com/wudi000888-svg/nightstudy/milestones)。
 
 ## 内容与许可
 

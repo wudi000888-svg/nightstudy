@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.3.0-alpha.1 — 自动管理员与群站管理（验收中）
+## 0.3.0-alpha.1 — 自动管理员与群站管理
 
-- 默认首次init创建用户名admin及本站随机初始密码；私密候选文件先落盘，再提交账号，支持失败后继续准备。既有管理员不被覆盖，manual模式保留/setup。完整初始凭据交付与恢复边界待本轮验证。
+- 默认首次init创建用户名admin及本站随机初始密码；私密候选文件先落盘，再提交账号，支持失败后继续准备。既有管理员不被覆盖，manual模式保留/setup。
 - Compose管理员凭据使用仅init挂载的独立卷，install.sh导出到服务器私密 `.local/admin/credentials.json`；Render首次密码由INITIAL_ADMIN_PASSWORD平台generateValue生成和保管。
 - 仅导出DB身份、管理员账号与自动初始化审计匹配的凭据，未确认候选隔离留痕；明文记录保存初始密码，不随之后改密更新。
 - 群站10分钟单次配对票据，事务消耗后换取独立长期grant；目标端保存hash，控制端AES-GCM加密保存，绑定实例/Realm/连接/目标地址/授权。状态、用户停用、注册开关、公告与更新检测按批准scope运行，保留审计和写动作去重。
@@ -11,7 +11,9 @@
 - 固定仓库GitHub Release检测，严格SemVer与稳定/预发布渠道；无Release显示no-release，失败保留上次结果并标错误。PG保存各Realm结果与检查冷却；不会执行shell更新、自动安装或数据库降级。
 - 参考广月的显式权限、配对与版本检测思路；NightStudy独立实现，没有复制其产品代码，证据见 [工程参考](docs/architecture/multisite-reference.md)。
 
-本轮完整测试、CI、VPS发布与浏览器结果尚待验收。下面0.2的55项测试、容器与HTTP检查是历史基线，不代表0.3已经通过。
+代码 `86afefa` 的格式/类型/构建、13文件86项测试及 [PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过，CI额外实际验证全量安装与随机admin密码登录。VPS升级成功、770,611词/3包保留、私密凭据权限600；42项真实公网HTTPS管理员/双站检查通过，临时记录与子站已清理。本机桌面浏览器验证登录、系统/更新与群站页；Release发布后VPS检测得到up-to-date及正确链接。新增认证昵称80字服务端限制、历史远程昵称截断和Prisma驱动事务冲突重试。下面0.2记录保留为历史基线，不作为新版手机、HA或容量证据。
+
+[发行流水线](https://github.com/wudi000888-svg/nightstudy/actions/runs/38492073891) 成功，公开GHCR linux/amd64镜像发布；匿名manifest访问、VPS使用空认证配置实际pull和无网络版本/私密文件检查通过。固定摘要见部署文档。
 
 ## 0.2.0-alpha.1 — 完整词典与在线翻译接入
 

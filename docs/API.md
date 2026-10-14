@@ -1,6 +1,6 @@
 # Alpha API 契约
 
-对应 `0.3.0-alpha.1` 源码契约；本轮自动管理员、群站与检测更新的完整测试/CI/VPS验收尚待记录，旧0.2结果单列于 [README](../README.md)。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。root的basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
+对应已验收的 `0.3.0-alpha.1` 代码 `86afefa`；86项测试、PG17/Compose CI及VPS42项管理员/真实双站HTTPS检查通过，范围见 [README](../README.md)。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。root的basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
 
 请求由可信 Host 与规范 basePath 选择 operator 配置的 Realm，随后只访问该站独立认证/业务 PG DB。客户端不能通过 `siteId`、`userId`、数据库 URL 参数切换身份。真正互不信任的站点使用不同 origin；同 origin 子路径属于同一信任域。
 
@@ -82,7 +82,7 @@ goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固�
 
 发音接口提供已安装音标；audio为空、recordedAudioAvailable=false。speech声明由浏览器设备语音朗读，en-US/en-GB是否可用取决于设备语音，不是真人录音库。
 
-翻译文本最多1,000个Unicode字符，sourceLanguage为auto/en/zh-CN（默认en），targetLanguage为en/zh-CN（默认zh-CN）。默认website-official仅提供官方网页入口，站内text返回503 `translation_not_configured`；生产站内结果使用带私密token的固定VPS网关，direct仅供本机开发。网页兼容provider返回 `google-web-compat` / `unofficial=true` / `bestEffort=true`，不是受支持的Google Cloud API。本机真实调用已遇到上游429；失败显示明确错误，不把离线词义冒充翻译。Google网页不能直接iframe，本站返回链接。原文会传送至配置网关/Google，不写翻译历史。配置、鉴权、超时与目标VPS待验收项见 [TRANSLATION.md](TRANSLATION.md)。
+翻译文本最多1,000个Unicode字符，sourceLanguage为auto/en/zh-CN（默认en），targetLanguage为en/zh-CN（默认zh-CN）。默认website-official仅提供官方网页入口，站内text返回503 `translation_not_configured`；生产站内结果使用带私密token的固定VPS网关，direct仅供本机开发。网页兼容provider返回 `google-web-compat` / `unofficial=true` / `bestEffort=true`，不是受支持的Google Cloud API。本机真实调用已遇到上游429；失败显示明确错误，不把离线词义冒充翻译。Google网页不能直接iframe，本站返回链接。原文会传送至配置网关/Google，不写翻译历史。配置、鉴权、超时的验证范围与尚待项见 [TRANSLATION.md](TRANSLATION.md)。
 
 ## 固定学习会话与 FSRS
 

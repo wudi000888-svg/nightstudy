@@ -1,6 +1,6 @@
 # Alpha 运行与部署
 
-本文件描述 `0.3.0-alpha.1`、Node24、pnpm11.25、Prisma7与Postgres17。自动管理员、群站与更新检测已按源码接入，本轮完整测试、CI和VPS验收尚待记录。历史0.2代码577f48b的55项 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457)、完整安装、生产HTTP和限定恢复证据见本文后段，不能当作0.3通过。Render、主机断电恢复、异机/密钥灾备、高并发容量和真人录音也未验收。
+本文件描述 `0.3.0-alpha.1`、Node24、pnpm11.25、Prisma7与Postgres17。代码86afefa的86项测试、格式/类型/生产构建及 [PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过；VPS升级与42项真实HTTPS管理员/双站检查通过。各版本范围单独记录；Render、主机断电恢复、异机/密钥灾备、高并发容量和真人录音尚未验收。
 
 ## Docker Compose minimal
 
@@ -90,9 +90,9 @@ PG业务数据与内容源缓存分别保存在postgres-data、content-cache nam
 
 受控站重装、身份变化或离线时，旧授权可能无法确认撤销。管理员明确确认远端grant可能仍存在后可本地forget：清密文、标forgotten、停止远程操作并审计，返回remoteRevocationConfirmed=false；同URL可用新票重配。它不等于远端撤销。每站最多20张活跃票据，每张10分钟有效；最多100条活跃grant，连接记录总量最多100条（含revoked/forgotten）。
 
-后台的检测更新只读取固定NightStudy GitHub Release。当前运行预发布版本选prerelease渠道，否则stable仅正式；严格SemVer排序，空发布返回no-release，不把main代码版本冒充最新Release。PG保存各Realm状态、60秒冷却和检查锁，跨进程竞争只覆盖该Realm；同进程固定上游请求合并/短时缓存。失败保留上次成功结果与错误，不刷新成功时间。功能只给发布链接，升级仍按备份/迁移/独立init程序由operator执行；目前没有公开GHCR发行镜像或自动安装入口。
+后台的检测更新只读取固定NightStudy GitHub Release。当前运行预发布版本选prerelease渠道，否则stable仅正式；严格SemVer排序，空发布返回no-release，不把main代码版本冒充最新Release。PG保存各Realm状态、60秒冷却和检查锁，跨进程竞争只覆盖该Realm；同进程固定上游请求合并/短时缓存。失败保留上次成功结果与错误，不刷新成功时间。功能只给发布链接，升级仍按备份/迁移/独立init程序由operator执行；不提供网页一键升级或shell入口。
 
-完整接口见 [API.md](API.md#群站配对与限权管理)。0.3配对、撤销、首装密码交付与更新缓存的真实测试/CI/VPS结果尚待本轮验收。
+完整接口见 [API.md](API.md#群站配对与限权管理)。0.3的并发首装、票据兑换、权限/撤销、离线解绑与重配、幂等、历史长昵称、更新冷却与失败保留通过真实双PG回归；CI完成随机初始密码实际登录。VPS另使用临时独立子站完成公网HTTPS配对、用户启停、分页、注册开关、公告去重与撤销，未注入transport；临时资源已清理。同源子路径测试不构成互不信任租户的浏览器强隔离证据。
 
 ## Scale 扩展
 
@@ -123,7 +123,9 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 
 保留Google官方网页入口和私密VPS备用网关，暂不接收费Cloud API；网页不支持本站iframe。网关请求非官方网页兼容接口，本机及目标VPS真实请求均遇到429，不能宣称站内结果已可用或实现加速。生产配置、同机Compose override与独立网关入口见 [TRANSLATION.md](TRANSLATION.md)。应用不保存翻译历史，网关ready仅表示进程就绪，鉴权401只验证入口关闭；上游可用性仍取决于真实鉴权翻译请求。
 
-以下为0.2历史验收：目标VPS的独立PG17/私密网关/内容缓存与22项HTTPS HTTP检查通过，含主页资产/CSP、770,611词/3包/完整检索、认证权限、5词学习与真实FSRS、官方翻译链接/网关429及退出/登录；临时账号已清理。本轮0.3自动管理员/群站/更新检测尚未生产验收，也未新版手机live，不说明Google上游可用。
+当前0.3运行镜像为 `nightstudy-english:0.3.0-alpha.1-86afefa`，init退出0，app/PG/网关健康，原770,611词及3个ready包保留。升级前另保存私密数据库归档与原配置；这份新归档只做catalog核验，不冒充下段早期实际恢复试验。首次auto init创建admin，初始凭据导出到VPS私密文件，权限600，应用容器不挂载凭据卷；实际用户名/随机密码HTTPS登录和已初始化setup409通过。42项真实HTTP断言涵盖管理授权、双站公网TLS、分页、用户启停、注册开关、公告去重、子站检测与撤销后本站session保持。临时主站记录、子站容器/DB/凭据卷与nginx入口均已清理；注册策略保留。Release发布后另测up-to-date及正确版本链接。本机桌面完成新版登录、系统与群站页检查，未执行新版手机或生产浏览器完整流程。
+
+以下为0.2历史验收：目标VPS的独立PG17/私密网关/内容缓存与22项HTTPS HTTP检查通过，含主页资产/CSP、770,611词/3包/完整检索、认证权限、5词学习与真实FSRS、官方翻译链接/网关429及退出/登录；临时账号已清理。这些检查不说明Google上游可用。
 
 2026-10-14生产镜像 `nightstudy-english:0.2.0-alpha.1-577f48b` 发布成功，运行代码与 [成功CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 的基线相同，包含HEAD SPA修复。app/gateway容器重建后健康，init退出0，Word770611/3个ready包及内容缓存保留。外网HEAD `/` 返回200/HTML/CSP/no-store，HTTP→HTTPS301，site接口version=0.2.0-alpha.1/publicUrl正确。验收/交付时initialized=false，尚未初始化，管理员由部署者使用私有初始化口令自行创建；生产测试账号已删除。这次发布证明容器重建与已有卷保留，未执行主机断电恢复或跨机HA验证。
 
@@ -179,6 +181,14 @@ docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exi
 
 CI对PR/main运行锁文件安装、格式、双PG17 migration/seed、sites/typecheck/build与一次 `pnpm test`。测试库显式CONTENT_PACK=demo，CONTENT_TEST_DATABASE_URL启用源码内合成内容PG fixture；不重复执行独立CLI夹具。随后验证基础/scale/翻译Compose描述，构建镜像，并在隔离Compose默认ecdict安装完整字典及英美音标，等待最多600秒，核对ready和catalog声明770,611；另启动闭合网关容器，验证无鉴权请求返回401，不依赖真实Google可用性。清理只针对CI隔离project的卷。
 
-历史0.2代码577f48b的 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 通过55项、PG17全量安装、770611声明数量断言与网关健康/401。本轮0.3尚待新代码测试/CI/VPS记录；初始密码交付、配对撤销与副本更新缓存要按新功能另行验收，不能沿用旧结果。
+0.3代码86afefa的 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过13文件86项测试、双PG17回归和Compose默认全量安装；明确断言installedDictionary/declaredEntryCount=770611，私密导出后实际登录随机admin，网关健康及无鉴权401通过。US/UK数值和3包数量由本机/VPS验证，未写成CI的独立数值断言。VPS管理员与公网双站42项断言另列，不混用测试环境与生产容量证据。
 
-`release.yml` 仅在维护者发布GitHub Release时触发，版本tag须为 `v0.2.0-alpha.1` 等格式；先复用完整CI，通过后使用仓库GITHUB_TOKEN推送GHCR（当前目标linux/amd64），保留版本、commit、provenance与SBOM。初次发布后维护者须核对package visibility，公开仓库不意味着镜像自动公开。当前未创建Release或发布发行镜像。部署使用CI输出的 `ghcr.io/...@sha256:...` 固定摘要，不依赖浮动latest。[GitHub官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
+`release.yml` 仅在维护者发布GitHub Release时触发，版本tag须为 `v0.3.0-alpha.1` 等格式；先复用完整CI，通过后使用仓库GITHUB_TOKEN推送GHCR（当前目标linux/amd64），保留版本、commit、provenance与SBOM。初次发布须核对package visibility，公开仓库不意味着镜像自动公开。[v0.3.0-alpha.1预览版](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.3.0-alpha.1) 的 [发行流水线](https://github.com/wudi000888-svg/nightstudy/actions/runs/38492073891) 已成功，完整86项/Compose检查后发布 [公开容器](https://github.com/wudi000888-svg/nightstudy/pkgs/container/nightstudy)。匿名manifest访问和VPS空Docker认证配置实际pull通过；无网络运行核对version=0.3.0-alpha.1/x64，镜像无.env或私密管理员文件。镜像含linux/amd64与attestation条目，不宣称有arm64发行。
+
+固定发行摘要：
+
+```text
+ghcr.io/wudi000888-svg/nightstudy@sha256:7721f8807bb89190188d2c340481919cafd9d2094d03870900a0b6ec1c32672e
+```
+
+已按前文准备.env、随机密钥与HTTPS入口后，可将NIGHTSTUDY_IMAGE配置为此摘要，使用 `docker compose up --detach --no-build --wait app` 从发行镜像启动。init仍负责默认首次admin、迁移与完整内容；凭据按前文私密导出。`scripts/install.sh` 是源码构建入口，使用发行摘要时不加--build。源码Compose也可自行构建；不要依赖浮动latest。[GitHub官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)

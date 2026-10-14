@@ -15,7 +15,7 @@
 
 本版代码 `b2ace74` 已通过363项测试、类型/格式/构建和完整隔离Compose安装验证：[CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38604154087)、[镜像发行](https://github.com/wudi000888-svg/nightstudy/actions/runs/38604382836)。VPS保持770,611个词条，完成25组数据保留检查、45项HTTPS/只读数据库混合检查和旧任务7组快照回读；升级前备份在独立测试库实际恢复并核对原始元数据，临时库和测试账户已清理。管理员现用密码不重置，浏览器现有会话实际验证DeepSeek设置及最新版本检测。未提供真实API密钥，本次付费推理请求为0；未进行容量压测或专家语义认证。
 
-[线上双语词卡](docs/media/bilingual-card-preview.png) · [DeepSeek 配置页面](docs/media/deepseek-preview.jpg)。IPA包覆盖统计按实测词条刷新，原始账号、词书与学习数据保持；词库完整收录不代表每个冷门词已有双语例句，五书覆盖范围及12个待核对词见内容文档。
+[线上双语词卡](docs/media/bilingual-card-preview.jpg) · [DeepSeek 配置页面](docs/media/deepseek-preview.jpg)。IPA包覆盖统计按实测词条刷新，原始账号、词书与学习数据保持；词库完整收录不代表每个冷门词已有双语例句，五书覆盖范围及12个待核对词见内容文档。
 
 **每日学习计划：** 桌面悬停英文立即打开清晰背景词卡，英美喇叭各在对应IPA前。每日计划按“复习 + 新学”的不同词总数安排：先预留到期复习，再补本书新词。选书先确认计划，支持暂停、延期、跨端继续、完成历史与七天复习负担。具体规则见 [每日任务](docs/DAILY_TASKS.md)、[个性化计划](docs/architecture/PERSONALIZATION.md) 和 [CHANGELOG](CHANGELOG.md)。0.5历史验收见 [0.5.0-alpha.2](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.5.0-alpha.2)。
 

@@ -237,6 +237,130 @@ suite('PostgreSQL private collections driven only by accepted FSRS ratings', () 
     await db.$disconnect();
     fs.rmSync(webRoot, { recursive: true, force: true });
   }, 60000);
+  it('fresh star POST is immediately visible in exact lookup and the saved list without creating known or review evidence', async () => {
+    const owner = await actor(),
+      other = await actor();
+    const posted = await request(owner, 'POST', '/wordbook', { wordId });
+    expect(posted.statusCode, posted.body).toBe(200);
+    expect(posted.json()).toMatchObject({
+      added: true,
+      alreadySaved: false,
+      item: { wordId, favorite: true, graduatedAt: null },
+    });
+    const exact = await request(owner, 'GET', `/wordbook/${wordId}`);
+    expect(exact.statusCode, exact.body).toBe(200);
+    expect(exact.json()).toMatchObject({
+      item: { wordId, favorite: true },
+      collection: { inWordbook: true, known: null },
+    });
+    const list = await request(owner, 'GET', '/wordbook');
+    expect(list.statusCode, list.body).toBe(200);
+    expect(list.json()).toMatchObject({ page: { total: 1 }, items: [{ wordId }] });
+    expect((await request(owner, 'GET', '/known-words')).json()).toMatchObject({
+      page: { total: 0 },
+      items: [],
+    });
+    expect((await request(other, 'GET', '/wordbook')).json()).toMatchObject({
+      page: { total: 0 },
+      items: [],
+    });
+    expect((await request(other, 'GET', `/wordbook/${wordId}`)).json().item).toBeNull();
+    expect(await db.reviewLog.count({ where: { userId: owner } })).toBe(0);
+    expect(await db.studyProgress.count({ where: { userId: owner } })).toBe(0);
+    expect(await db.autoKnownWord.count({ where: { userId: owner } })).toBe(0);
+  });
+  it('saving and deleting a manual known word changes only saved membership, preserving its confirmed manual source', async () => {
+    const owner = await actor();
+    const importId = await manual(owner);
+    const before = await db.knownClaim.findMany({ where: { userId: owner, wordId } });
+    const posted = await request(owner, 'POST', '/wordbook', {
+      wordId,
+      note: 'Independent bookmark',
+    });
+    expect(posted.statusCode, posted.body).toBe(200);
+    expect(posted.json()).toMatchObject({ added: true });
+    expect((await request(owner, 'GET', `/wordbook/${wordId}`)).json()).toMatchObject({
+      item: { wordId },
+      collection: { inWordbook: true, known: 'manual' },
+    });
+    expect((await request(owner, 'GET', '/wordbook')).json()).toMatchObject({
+      page: { total: 1 },
+      items: [{ wordId }],
+    });
+    expect((await request(owner, 'GET', '/known-words')).json()).toMatchObject({
+      page: { total: 1 },
+      items: [{ wordId, origin: 'manual' }],
+    });
+    expect((await request(owner, 'DELETE', `/wordbook/${wordId}`, {})).statusCode).toBe(200);
+    expect((await request(owner, 'GET', '/wordbook')).json().page.total).toBe(0);
+    expect((await request(owner, 'GET', '/known-words')).json().page.total).toBe(1);
+    expect(await db.knownClaim.findMany({ where: { userId: owner, wordId } })).toEqual(before);
+    expect((await db.knownImport.findUniqueOrThrow({ where: { id: importId } })).status).toBe(
+      'confirmed',
+    );
+    expect(await db.reviewLog.count({ where: { userId: owner } })).toBe(0);
+  });
+  it('binds active/consolidated/all cursors to status and owner while keeping graduated entries readable without writes', async () => {
+    const owner = await actor(),
+      other = await actor();
+    const stamp = new Date();
+    await db.userWord.createMany({
+      data: wordIds.map((id, index) => ({
+        userId: owner,
+        wordId: id,
+        graduatedAt: index < 2 ? stamp : null,
+        note: 'Exact collection state fixture',
+      })),
+    });
+    const before = await db.userWord.findMany({ where: { userId: owner }, orderBy: { id: 'asc' } });
+    const active = (await request(owner, 'GET', '/wordbook')).json();
+    expect(active).toMatchObject({
+      page: { total: 1 },
+      items: [{ wordId: wordIds[2], status: 'active' }],
+    });
+    const first = (await request(owner, 'GET', '/wordbook?status=consolidated&limit=1')).json();
+    expect(first.page).toMatchObject({ total: 2, hasMore: true });
+    expect(first.items[0].status).toBe('consolidated');
+    const cursor = encodeURIComponent(first.page.nextCursor);
+    const second = (
+      await request(owner, 'GET', `/wordbook?status=consolidated&limit=1&cursor=${cursor}`)
+    ).json();
+    expect(second.page).toMatchObject({ total: 2, hasMore: false });
+    expect(second.items[0].wordId).not.toBe(first.items[0].wordId);
+    for (const status of ['active', 'all'])
+      expect(
+        (await request(owner, 'GET', `/wordbook?status=${status}&cursor=${cursor}`)).statusCode,
+      ).toBe(400);
+    expect(
+      (await request(other, 'GET', `/wordbook?status=consolidated&cursor=${cursor}`)).statusCode,
+    ).toBe(400);
+    expect((await request(other, 'GET', '/wordbook?status=all')).json().page.total).toBe(0);
+    expect((await request(owner, 'GET', '/wordbook?status=all')).json().page.total).toBe(3);
+    expect((await request(owner, 'GET', '/wordbook?status=known')).statusCode).toBe(400);
+    expect(
+      await db.userWord.findMany({ where: { userId: owner }, orderBy: { id: 'asc' } }),
+    ).toEqual(before);
+  });
+  it('returns coherent saved pages during concurrent membership changes', async () => {
+    const owner = await actor();
+    await request(owner, 'POST', '/wordbook', { wordId });
+    const results = await Promise.all([
+      ...Array.from({ length: 8 }, () => request(owner, 'GET', '/wordbook')),
+      request(owner, 'DELETE', `/wordbook/${wordId}`, {}),
+      ...Array.from({ length: 8 }, () => request(owner, 'GET', '/wordbook')),
+    ]);
+    for (const response of results) {
+      expect(response.statusCode, response.body).toBe(200);
+      const value = response.json();
+      if (value.items) expect(value.items.length).toBe(value.page.total);
+    }
+    expect((await request(owner, 'GET', '/wordbook')).json().page.total).toBe(0);
+    expect((await request(owner, 'GET', `/wordbook/${wordId}`)).json()).toMatchObject({
+      item: null,
+      consolidatedItem: null,
+      collection: { inWordbook: false, wordbookStatus: null },
+    });
+  });
   it('accepts a saved word only once under concurrency and preserves its note/time; graduation reads do not mutate membership', async () => {
     const owner = await actor(),
       other = await actor();
@@ -272,13 +396,20 @@ suite('PostgreSQL private collections driven only by accepted FSRS ratings', () 
     expect((await request(owner, 'GET', '/wordbook')).json().page.total).toBe(0);
     expect((await request(owner, 'GET', `/wordbook/${wordId}`)).json()).toMatchObject({
       item: null,
-      collection: { inWordbook: false },
+      consolidatedItem: { wordId, note: 'keep this note', paused: true },
+      collection: { inWordbook: false, wordbookStatus: 'consolidated' },
     });
+    expect((await request(owner, 'GET', '/wordbook?status=consolidated')).json()).toMatchObject({
+      page: { total: 1 },
+      items: [{ wordId, status: 'consolidated', graduatedAt: before.graduatedAt?.toISOString() }],
+    });
+    expect((await request(owner, 'GET', '/wordbook?status=all')).json().page.total).toBe(1);
     expect(await db.userWord.findUniqueOrThrow({ where: { id: saved.id } })).toEqual(before);
     const readd = await request(owner, 'POST', '/wordbook', { wordId });
     expect(readd.json()).toMatchObject({
       added: true,
       item: { id: saved.id, note: 'keep this note', paused: true, graduatedAt: null },
+      collection: { inWordbook: true, wordbookStatus: 'active' },
     });
   });
   it('graduates after three real distinct review days, adds automatic known after five, and replay/practice cannot create evidence', async () => {
@@ -288,11 +419,18 @@ suite('PostgreSQL private collections driven only by accepted FSRS ratings', () 
     const three = await through(owner, 3);
     expect(three.body.collection).toEqual({
       inWordbook: false,
+      wordbookStatus: 'consolidated',
       known: null,
       transition: 'graduated',
     });
     expect(await db.reviewLog.count({ where: { userId: owner, wordId } })).toBe(4);
     expect(await db.autoKnownWord.count({ where: { userId: owner } })).toBe(0);
+    expect((await request(owner, 'GET', '/wordbook')).json().page.total).toBe(0);
+    expect((await request(owner, 'GET', '/wordbook?status=consolidated')).json()).toMatchObject({
+      page: { total: 1 },
+      items: [{ wordId, status: 'consolidated' }],
+    });
+    expect((await request(owner, 'GET', '/known-words')).json().page.total).toBe(0);
     for (let n = 0; n < 2; n++) {
       await nextDue(owner);
       await cycle(owner);
@@ -306,6 +444,36 @@ suite('PostgreSQL private collections driven only by accepted FSRS ratings', () 
       page: { total: 0 },
       items: [],
     });
+    const automaticBefore = await db.autoKnownWord.findUniqueOrThrow({
+      where: { userId_wordId: { userId: owner, wordId } },
+    });
+    const progressBefore = await db.studyProgress.findUniqueOrThrow({
+      where: { userId_wordId: { userId: owner, wordId } },
+    });
+    const readded = await request(owner, 'POST', '/wordbook', { wordId });
+    expect(readded.statusCode, readded.body).toBe(200);
+    expect(readded.json()).toMatchObject({
+      added: true,
+      collection: { inWordbook: true, wordbookStatus: 'active', known: 'automatic' },
+    });
+    expect((await request(owner, 'GET', '/wordbook')).json()).toMatchObject({
+      page: { total: 1 },
+      items: [{ wordId, status: 'active' }],
+    });
+    expect((await request(owner, 'GET', `/wordbook/${wordId}`)).json()).toMatchObject({
+      item: { wordId },
+      consolidatedItem: null,
+    });
+    expect(
+      await db.autoKnownWord.findUniqueOrThrow({
+        where: { userId_wordId: { userId: owner, wordId } },
+      }),
+    ).toEqual(automaticBefore);
+    expect(
+      await db.studyProgress.findUniqueOrThrow({
+        where: { userId_wordId: { userId: owner, wordId } },
+      }),
+    ).toEqual(progressBefore);
     const exports = (await request(owner, 'GET', '/known-words/exports?format=json')).json().rows;
     expect(exports).toHaveLength(1);
     expect(exports[0]).toMatchObject({ wordId, source: 'fsrs_reviews', origin: 'automatic' });
@@ -340,6 +508,7 @@ suite('PostgreSQL private collections driven only by accepted FSRS ratings', () 
     const again = await cycle(owner, 'again');
     expect(again.body.collection).toEqual({
       inWordbook: true,
+      wordbookStatus: 'active',
       known: null,
       transition: 'restored',
     });
@@ -364,6 +533,7 @@ suite('PostgreSQL private collections driven only by accepted FSRS ratings', () 
     const again = await cycle(owner, 'again');
     expect(again.body.collection).toEqual({
       inWordbook: true,
+      wordbookStatus: 'active',
       known: 'manual',
       transition: 'auto-known-withdrawn',
     });

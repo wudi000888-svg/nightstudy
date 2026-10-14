@@ -266,7 +266,7 @@ function AdminPageContent() {
           { id: 'announcements', label: '公告', icon: MessageSquare },
           { id: 'system', label: '系统与更新', icon: Settings2 },
           { id: 'fleet', label: '群站管理', icon: Network },
-          { id: 'ai', label: 'AI 内容辅助', icon: Sparkles },
+          { id: 'ai', label: 'AI 设置', icon: Sparkles },
         ].map(({ id, label, icon: Icon }) => (
           <Link
             key={id}

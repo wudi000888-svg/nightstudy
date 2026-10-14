@@ -36,7 +36,6 @@ model User {
   bookImports     CustomBookImport[]
   dailyPlans      DailyPlan[]
   autoKnownWords  AutoKnownWord[]
-
 }
 
 model Session {
@@ -190,20 +189,20 @@ model UserSettings {
 }
 
 model Word {
-  id              String           @id
+  id              String            @id
   lemma           String
-  normalizedLemma String           @unique
-  phonetic        String           @default("")
-  phoneticUs      String           @default("")
-  phoneticUk      String           @default("")
-  phoneticSource  String           @default("")
+  normalizedLemma String            @unique
+  phonetic        String            @default("")
+  phoneticUs      String            @default("")
+  phoneticUk      String            @default("")
+  phoneticSource  String            @default("")
   goalTags        String[]
-  difficulty      Int              @default(1)
-  status          String           @default("published")
-  sourceRef       String           @default("NightStudy original demo")
-  contentVersion  String           @default("demo-2026-10-14")
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  difficulty      Int               @default(1)
+  status          String            @default("published")
+  sourceRef       String            @default("NightStudy original demo")
+  contentVersion  String            @default("demo-2026-10-14")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
   senses          Sense[]
   examples        WordExample[]
   bookItems       BookItem[]
@@ -223,16 +222,16 @@ model Word {
 }
 
 model Sense {
-  id           String @id
-  wordId       String
-  word         Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
-  pos          String
-  definitionZh String
-  definitionEn String @default("")
-  exampleEn    String @default("")
-  exampleZh    String @default("")
-  ordinal      Int    @default(0)
-  contentMetadata Json @default("{}")
+  id              String @id
+  wordId          String
+  word            Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  pos             String
+  definitionZh    String
+  definitionEn    String @default("")
+  exampleEn       String @default("")
+  exampleZh       String @default("")
+  ordinal         Int    @default(0)
+  contentMetadata Json   @default("{}")
 
   @@index([wordId, ordinal])
 }
@@ -270,11 +269,11 @@ model Book {
 }
 
 model WordCollocation {
-  wordId    String
-  word      Word @relation("CollocationHeadword", fields: [wordId], references: [id], onDelete: Cascade)
-  phraseId  String
-  phrase    Word @relation("CollocationPhrase", fields: [phraseId], references: [id], onDelete: Cascade)
-  ordinal   Int @default(0)
+  wordId   String
+  word     Word   @relation("CollocationHeadword", fields: [wordId], references: [id], onDelete: Cascade)
+  phraseId String
+  phrase   Word   @relation("CollocationPhrase", fields: [phraseId], references: [id], onDelete: Cascade)
+  ordinal  Int    @default(0)
 
   @@id([wordId, phraseId])
   @@index([phraseId])
@@ -339,16 +338,16 @@ model BookItem {
 }
 
 model UserWord {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wordId    String
-  word      Word     @relation(fields: [wordId], references: [id], onDelete: Restrict)
-  note      String   @default("")
-  favorite  Boolean  @default(true)
-  paused    Boolean  @default(false)
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId      String
+  word        Word      @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  note        String    @default("")
+  favorite    Boolean   @default(true)
+  paused      Boolean   @default(false)
   graduatedAt DateTime?
-  updatedAt DateTime @updatedAt
+  updatedAt   DateTime  @updatedAt
 
   @@unique([userId, wordId])
   @@index([userId, updatedAt, id])
@@ -549,6 +548,11 @@ model Assessment {
   status           String           @default("in_progress")
   seed             String
   reportJson       Json?
+  aiStatus         String           @default("not_requested")
+  aiClaimId        String?
+  aiStartedAt      DateTime?
+  aiCompletedAt    DateTime?
+  aiResultJson     Json?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   items            AssessmentItem[]
@@ -643,12 +647,13 @@ model RateBucket {
 }
 
 model DeepSeekSetting {
-  id            String   @id @default("singleton")
-  enabled       Boolean  @default(false)
-  model         String   @default("deepseek-flash")
-  keyCiphertext String?
-  keyPreview    String?
-  updatedAt     DateTime @updatedAt
+  id                String   @id @default("singleton")
+  enabled           Boolean  @default(false)
+  assessmentEnabled Boolean  @default(false)
+  model             String   @default("deepseek-flash")
+  keyCiphertext     String?
+  keyPreview        String?
+  updatedAt         DateTime @updatedAt
 }
 
 model DeepSeekRequestLease {

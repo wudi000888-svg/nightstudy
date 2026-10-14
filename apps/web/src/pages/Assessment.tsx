@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useApp, useRemote } from '../AppContext';
-import { newId, post } from '../lib/api';
+import { api, ApiError, post } from '../lib/api';
+import { AssessmentAnswerSender } from '../lib/assessment-answers';
 import { goalLabels, goalNames, type Goal, type Question, type Settings } from '../lib/types';
 import { Empty, ErrorNotice, Heading, LoginPrompt, Notice, Panel } from '../components/UI';
 interface AssessmentItem {
@@ -36,90 +37,262 @@ interface Report {
     groupSize: number;
   };
   byStratum: unknown;
+  aiAnalysis?: AssessmentAnalysisResult;
 }
+export interface AssessmentAnalysisResult {
+  status: 'available' | 'unavailable' | 'disabled' | 'pending';
+  payload: {
+    summary: string;
+    strengths: string[];
+    weaknesses: string[];
+    wordFeedback: { wordId: string; lemma?: string; suggestion: string }[];
+    suggestedPlan: { dailyTotalGoal: number; groupSize: number };
+  } | null;
+  reason: string | null;
+  generatedAt: string | null;
+}
+
+export function AssessmentAnalysis({
+  analysis,
+  busy,
+  onApply,
+  onRefresh,
+}: {
+  analysis: AssessmentAnalysisResult | undefined;
+  busy: boolean;
+  onApply: () => void;
+  onRefresh: () => void;
+}) {
+  if (!analysis || analysis.status === 'disabled') return null;
+  if (analysis.status === 'pending')
+    return (
+      <div className="management-card management-list" role="status">
+        <strong>正在分析学习情况…</strong>
+        <p>答题成绩已保存，可以先查看。分析完成后更新这份报告。</p>
+        <button className="button quiet" disabled={busy} onClick={onRefresh}>
+          更新分析
+        </button>
+      </div>
+    );
+  if (analysis.status !== 'available' || !analysis.payload)
+    return <p className="fine-print">本次智能分析暂不可用，答题成绩和基础学习建议已保留。</p>;
+  const result = analysis.payload;
+  return (
+    <div className="management-card management-list">
+      <div className="panel-title">
+        <Sparkles size={18} />
+        <h3>学习分析</h3>
+      </div>
+      <p>{result.summary}</p>
+      {result.strengths.length > 0 && (
+        <div>
+          <strong>已经做得不错</strong>
+          <ul>
+            {result.strengths.map((text, index) => (
+              <li key={index}>{text}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {result.weaknesses.length > 0 && (
+        <div>
+          <strong>接下来重点练习</strong>
+          <ul>
+            {result.weaknesses.map((text, index) => (
+              <li key={index}>{text}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {result.wordFeedback.length > 0 && (
+        <div>
+          <strong>本次答题建议</strong>
+          <ul>
+            {result.wordFeedback.map((item, index) => (
+              <li key={`${item.wordId}:${index}`}>
+                {item.lemma && <strong lang="en">{item.lemma} · </strong>}
+                {item.suggestion}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p>
+        建议每天总计 {result.suggestedPlan.dailyTotalGoal} 个词，每组{' '}
+        {result.suggestedPlan.groupSize} 词，先复习再新学。
+      </p>
+      <p className="fine-print">结合本次答案的辅助建议，熟练度仍由实际学习与复习积累。</p>
+      <button className="button ghost" disabled={busy} onClick={onApply}>
+        采用这份学习建议 <ArrowRight size={16} />
+      </button>
+    </div>
+  );
+}
+
 export function AssessmentPage() {
+  const { user, scope } = useApp();
+  if (!user)
+    return (
+      <div className="page">
+        <LoginPrompt />
+      </div>
+    );
+  return <AssessmentContent key={scope} />;
+}
+
+function AssessmentContent() {
   const { user, scope } = useApp();
   const client = useQueryClient();
   const [goal, setGoal] = useState<Goal>('daily');
+  const [size, setSize] = useState(12);
+  const [useAi, setUseAi] = useState(true);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [answer, setAnswer] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState('');
+  const running = useRef(false);
+  const answers = useRef<AssessmentAnswerSender<Assessment> | null>(null);
+  answers.current ??= new AssessmentAnswerSender<Assessment>();
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
   const savedSettings = useRemote<{ settings: Settings }>('settings', 'me/settings', !!user);
+  const capabilities = useRemote<{ aiAvailable: boolean }>(
+    'assessment-capabilities',
+    'assessments/capabilities',
+    !!user,
+  );
   useEffect(() => {
     if (savedSettings.data && !assessment) setGoal(savedSettings.data.settings.goal);
   }, [savedSettings.data]);
   async function start() {
+    if (running.current) return;
+    running.current = true;
     setBusy(true);
     setError(null);
     setNotice('');
     setReport(null);
     try {
-      const result = await post<{ assessment: Assessment }>('assessments', { goal, size: 8 });
-      setAssessment(result.assessment);
+      const result = await post<{ assessment: Assessment }>('assessments', { goal, size });
+      if (active.current) {
+        answers.current?.reset();
+        setAssessment(result.assessment);
+      }
     } catch (value) {
-      setError(value);
+      if (active.current) setError(value);
     } finally {
-      setBusy(false);
+      running.current = false;
+      if (active.current) setBusy(false);
     }
   }
   async function submit(value: string) {
     const item = assessment?.items.find((row) => row.id === assessment?.currentItemId);
-    if (!assessment || !item) return;
+    if (!assessment || !item || running.current) return;
+    running.current = true;
     setBusy(true);
     setError(null);
     try {
-      const data = await post<{ accepted: boolean; assessment: Assessment }>(
-        `assessments/${assessment.id}/answers`,
-        { commandId: newId(), itemId: item.id, answer: value },
-      );
-      setAssessment(data.assessment);
-      setAnswer('');
+      const data = await answers.current!.send(assessment.id, item.id, value);
+      if (active.current) {
+        setAssessment(data.assessment);
+        setAnswer('');
+      }
     } catch (value) {
-      setError(value);
+      if (!active.current) return;
+      if (value instanceof ApiError && value.code === 'assessment_item_not_current') {
+        try {
+          const fresh = await api<{ assessment: Assessment; report?: Report }>(
+            `assessments/${assessment.id}`,
+          );
+          if (active.current) {
+            answers.current?.reset();
+            setAssessment(fresh.assessment);
+            setAnswer('');
+            if (fresh.report) setReport(fresh.report);
+            setNotice('答题进度已更新，请从当前题目继续。');
+          }
+        } catch (readError) {
+          if (active.current) setError(readError);
+        }
+      } else setError(value);
     } finally {
-      setBusy(false);
+      running.current = false;
+      if (active.current) setBusy(false);
     }
   }
   async function finish() {
-    if (!assessment) return;
+    if (!assessment || running.current) return;
+    running.current = true;
     setBusy(true);
     setError(null);
     try {
-      const data = await post<{ report: Report }>(`assessments/${assessment.id}/finish`, {});
+      const data = await post<{ report: Report }>(`assessments/${assessment.id}/finish`, {
+        useAi: !!capabilities.data?.aiAvailable && useAi,
+      });
+      if (!active.current) return;
       setReport(data.report);
       void client.invalidateQueries({ queryKey: [scope] });
     } catch (value) {
-      setError(value);
+      if (active.current) setError(value);
     } finally {
-      setBusy(false);
+      running.current = false;
+      if (active.current) setBusy(false);
     }
   }
-  async function applyPlan() {
-    if (!report || typeof report.suggestedPlan.dailyTotalGoal !== 'number') return;
+  async function refreshReport() {
+    if (!assessment || running.current) return;
+    running.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await api<{ assessment: Assessment; report?: Report }>(
+        `assessments/${assessment.id}`,
+      );
+      if (active.current) {
+        answers.current?.reset();
+        setAssessment(data.assessment);
+        setAnswer('');
+        if (data.report) setReport(data.report);
+      }
+    } catch (value) {
+      if (active.current) setError(value);
+    } finally {
+      running.current = false;
+      if (active.current) setBusy(false);
+    }
+  }
+  async function applyPlan(plan = report?.suggestedPlan) {
+    if (!plan || typeof plan.dailyTotalGoal !== 'number' || running.current) return;
+    running.current = true;
     setBusy(true);
     setError(null);
     try {
       await post(
         'me/settings',
         {
-          goal,
-          dailyTotalGoal: report.suggestedPlan.dailyTotalGoal,
+          goal: assessment?.goal ?? goal,
+          dailyTotalGoal: plan.dailyTotalGoal,
           ...(savedSettings.data ? { expectedRevision: savedSettings.data.settings.revision } : {}),
-          groupSize: report.suggestedPlan.groupSize,
+          groupSize: plan.groupSize,
         },
         'PATCH',
       );
+      if (!active.current) return;
       void client.invalidateQueries({ queryKey: [scope] });
       setNotice(
         '推荐每日总词数已保存，已签发任务保留。结果只确认实测词，不代表整个目标词表都已掌握。',
       );
     } catch (value) {
-      setError(value);
+      if (active.current) setError(value);
     } finally {
-      setBusy(false);
+      running.current = false;
+      if (active.current) setBusy(false);
     }
   }
   if (!user)
@@ -139,9 +312,14 @@ export function AssessmentPage() {
             熟悉到哪一步，<em>慢慢看清楚。</em>
           </>
         }
-        description="识义、语境与拼写是不同的能力。测过的词和目标范围估计，分开记录。"
+        description="从识义和拼写了解自己的熟悉度，找到下一步的学习重点。"
       />
       <ErrorNotice error={error} />
+      {!!error && assessment && (
+        <button className="button quiet" disabled={busy} onClick={() => void refreshReport()}>
+          读取最新答题进度
+        </button>
+      )}
       {notice && <Notice>{notice}</Notice>}
       {report ? (
         <Panel className="assessment-result">
@@ -178,6 +356,12 @@ export function AssessmentPage() {
             </div>
           </div>
           <Notice>这是本次抽样的有限基线，不是完整考试水平或全词表掌握证明。</Notice>
+          <AssessmentAnalysis
+            analysis={report.aiAnalysis}
+            busy={busy || savedSettings.isPending}
+            onApply={() => void applyPlan(report.aiAnalysis?.payload?.suggestedPlan)}
+            onRefresh={() => void refreshReport()}
+          />
           <p>
             {typeof report.suggestedPlan.dailyTotalGoal === 'number' ? (
               <>
@@ -296,9 +480,27 @@ export function AssessmentPage() {
               title="这一组题目已经完成。"
               description="提交后查看实测结果与建议计划。"
               action={
-                <button className="button primary" disabled={busy} onClick={() => void finish()}>
-                  查看基线结果 <ArrowRight size={16} />
-                </button>
+                <div className="form-stack">
+                  {capabilities.data?.aiAvailable && (
+                    <label className="field assessment-ai-choice">
+                      <span>
+                        <input
+                          type="checkbox"
+                          checked={useAi}
+                          disabled={busy}
+                          onChange={(event) => setUseAi(event.target.checked)}
+                        />{' '}
+                        完成后分析学习情况
+                      </span>
+                      <small className="fine-print">
+                        仅将本次目标、题目与答案提交 DeepSeek，不包含账户身份。
+                      </small>
+                    </label>
+                  )}
+                  <button className="button primary" disabled={busy} onClick={() => void finish()}>
+                    {busy ? '正在整理成绩与学习分析…' : '查看基线结果'} <ArrowRight size={16} />
+                  </button>
+                </div>
               }
             />
           )}
@@ -309,7 +511,9 @@ export function AssessmentPage() {
             <Sparkles size={28} />
           </span>
           <h2>从目标开始，了解一点自己的熟悉度。</h2>
-          <p>按目标词汇范围抽样，先测拼写再识义，避免答案提示影响判断。</p>
+          <p>
+            按目标词汇范围抽样，先测拼写再识义，避免答案提示影响判断。样本越多，越能看清薄弱点。
+          </p>
           <div className="form-columns">
             <label className="field">
               这次的目标
@@ -321,11 +525,30 @@ export function AssessmentPage() {
                 ))}
               </select>
             </label>
-            <div className="test-note">
-              <strong>分层与实测分开</strong>
-              <small>不把抽样结果当成逐词掌握。</small>
-            </div>
+            <label className="field">
+              测试长度
+              <select value={size} onChange={(event) => setSize(Number(event.target.value))}>
+                <option value={8}>快速了解 · 8 词 / 16 题</option>
+                <option value={12}>常规测试 · 12 词 / 24 题</option>
+                <option value={20}>细致测试 · 20 词 / 40 题</option>
+              </select>
+            </label>
           </div>
+          {capabilities.data?.aiAvailable && (
+            <label className="field assessment-ai-choice">
+              <span>
+                <input
+                  type="checkbox"
+                  checked={useAi}
+                  onChange={(event) => setUseAi(event.target.checked)}
+                />{' '}
+                完成后分析学习情况
+              </span>
+              <small className="fine-print">
+                仅将学习目标和本次题目、答案交给 DeepSeek 分析，不包含账户身份。
+              </small>
+            </label>
+          )}
           <button className="button primary" disabled={busy} onClick={() => void start()}>
             {busy ? '正在准备题目…' : '开始词汇基线'}
             <ArrowRight size={16} />

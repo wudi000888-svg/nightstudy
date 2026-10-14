@@ -11,6 +11,7 @@ import { Empty, ErrorNotice, Loading, Notice, Panel } from './UI';
 
 export interface DeepSeekConfig {
   enabled: boolean;
+  assessmentEnabled: boolean;
   configured: boolean;
   model: string;
   models: string[];
@@ -174,7 +175,11 @@ function DeepSeekSettingsContent() {
   const { scope } = useApp();
   const client = useQueryClient();
   const remote = useRemote<DeepSeekConfig>('admin-deepseek', path);
-  const [draft, setDraft] = useState<{ enabled: boolean; model: string } | null>(null);
+  const [draft, setDraft] = useState<{
+    enabled: boolean;
+    assessmentEnabled: boolean;
+    model: string;
+  } | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -197,7 +202,13 @@ function DeepSeekSettingsContent() {
   const form = draft ?? config;
   const dirty =
     Boolean(apiKey.trim()) ||
-    Boolean(config && form && (form.enabled !== config.enabled || form.model !== config.model));
+    Boolean(
+      config &&
+      form &&
+      (form.enabled !== config.enabled ||
+        form.model !== config.model ||
+        form.assessmentEnabled !== config.assessmentEnabled),
+    );
   const canRequest = Boolean(config?.enabled && config.configured && !dirty && !busy);
 
   async function perform(action: string, run: () => Promise<void>) {
@@ -227,10 +238,13 @@ function DeepSeekSettingsContent() {
   async function save() {
     if (!form || busy) return;
     await perform('save', async () => {
+      await client.cancelQueries({ queryKey: [scope, 'admin-deepseek', path], exact: true });
+      if (!active.current) return;
       const value = await post<DeepSeekConfig>(
         path,
         {
           enabled: form.enabled,
+          assessmentEnabled: form.assessmentEnabled,
           model: form.model,
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         },
@@ -242,6 +256,8 @@ function DeepSeekSettingsContent() {
   }
   async function removeKey() {
     await perform('remove', async () => {
+      await client.cancelQueries({ queryKey: [scope, 'admin-deepseek', path], exact: true });
+      if (!active.current) return;
       const value = await post<DeepSeekConfig>(path, { removeKey: true }, 'PUT');
       acceptConfig(value);
       if (active.current) setNotice('密钥已删除，DeepSeek 已关闭。');
@@ -302,7 +318,9 @@ function DeepSeekSettingsContent() {
           <KeyRound size={18} />
           <h2>DeepSeek 设置</h2>
         </div>
-        <p className="fine-print">仅管理员可配置。检测和预览需主动点击，会使用少量 API 额度。</p>
+        <p className="fine-print">
+          仅管理员可配置。连接检测、内容预览和启用后的水平测试分析会使用 API 额度。
+        </p>
         {remote.isPending && <Loading text="正在读取 AI 配置…" />}
         <ErrorNotice error={remote.error} onRetry={() => void remote.refetch()} />
         {config && form && (
@@ -319,7 +337,7 @@ function DeepSeekSettingsContent() {
                 value={form.enabled ? 'enabled' : 'disabled'}
                 disabled={!!busy}
                 onChange={(event) => {
-                  setDraft({ enabled: event.target.value === 'enabled', model: form.model });
+                  setDraft({ ...form, enabled: event.target.value === 'enabled' });
                   setTested(null);
                   setCandidate(null);
                 }}
@@ -334,7 +352,7 @@ function DeepSeekSettingsContent() {
                 value={form.model}
                 disabled={!!busy}
                 onChange={(event) => {
-                  setDraft({ enabled: form.enabled, model: event.target.value });
+                  setDraft({ ...form, model: event.target.value });
                   setTested(null);
                   setCandidate(null);
                 }}
@@ -345,6 +363,24 @@ function DeepSeekSettingsContent() {
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="field">
+              水平测试智能分析
+              <select
+                value={form.assessmentEnabled ? 'enabled' : 'disabled'}
+                disabled={!!busy}
+                onChange={(event) => {
+                  setDraft({ ...form, assessmentEnabled: event.target.value === 'enabled' });
+                  setTested(null);
+                  setCandidate(null);
+                }}
+              >
+                <option value="disabled">关闭，仅使用答题成绩</option>
+                <option value="enabled">启用，完成测试后分析</option>
+              </select>
+              <small className="fine-print">
+                启用后每份完整测试最多请求一次，按学习目标分析薄弱点并给出建议。只提交题目与答案，不提交账户身份；成绩和熟词判定仍依据实际答题。
+              </small>
             </label>
             <label className="field">
               API 密钥

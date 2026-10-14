@@ -300,3 +300,30 @@ update包含status/checkedAt/latestVersion/releaseUrl/message/channel，另有ca
 写动作registration.set、user.set-disabled、announcement.create/delete使用commandId与持久回执：同grant同编号同内容安全重试，内容变化409；客户端应在首次请求前生成并保留编号。updates.check为固定检测动作，由检查冷却约束。离线断开保留pending和凭据以便后续确认；网络失败不等于撤销。若管理员明确确认远端grant可能仍存在，可本地forget：清除密文、记forgotten并停止全部远程操作，返回remoteRevocationConfirmed=false；同URL可凭新票重配。远端仍可能需要管理员独立撤销旧grant。目标管理员撤销grant或发行管理员失去admin权限后，授权失效。域名/实例改变、密钥更换等恢复情况应按 [部署边界](DEPLOYMENT.md#群站与版本检测) 处理。
 
 生词本列表默认50条、每页最多100条，返回items与page（total、hasMore、nextCursor），按updatedAt/id倒序游标读取全部收藏；游标绑定本站与用户。`GET /wordbook/:wordId`只返回本人精确收藏项或null，词卡不以列表首批推断收藏状态。词书预览和确认按真实媒体文件、摘要及格式检查两口音；每进程最多2场检查、共8个文件读并发，30秒批间期限到达返回book_import_busy以供重试。
+
+### 水平测试可选智能分析
+
+`GET /assessments/capabilities` 要求登录，返回 `{aiAvailable: boolean}`，只读取当前站点开关与配 key 状态，不验证上游在线状态。`PUT /admin/ai/deepseek` 新增 `assessmentEnabled`，独立默认关闭；关闭服务总开关或删除 key 会关闭此功能。
+
+`POST /assessments/:id/finish` 接受严格 JSON `{useAi?: boolean}`。只有显式 `useAi: true` 且管理员开关与密钥都可用时才尝试；省略字段的旧客户端仍只获取本地报告。前端应让学习者明确选择并显示发送本次目标、题目和答案的说明。客观计分始终先完成，原 `report.accuracy`、`verifiedWordIds`、`byStratum` 与 `suggestedPlan` 保持；另返回 `report.aiAnalysis`：
+
+```json
+{
+  "status": "available",
+  "payload": {
+    "summary": "本次认知较稳，仍需巩固拼写。",
+    "strengths": ["能辨认已测试的常见词义。"],
+    "weaknesses": ["个别词尾容易遗漏。"],
+    "wordFeedback": [
+      { "wordId": "本次测试中的词条ID", "lemma": "rain", "suggestion": "听音后独立拼写。" }
+    ],
+    "suggestedPlan": { "dailyTotalGoal": 24, "groupSize": 5 }
+  },
+  "reason": null,
+  "generatedAt": "ISO时间"
+}
+```
+
+其它状态为 `pending`、`disabled`、`unavailable`，此时 `payload: null`。`reason` 只使用稳定状态：`not_enabled`、`not_requested`、`busy`、`unavailable`、`invalid_response`、`configuration_changed`、`interrupted` 或 `null`。未知词条、重复词反馈、超限计划或不合格结构均不会成为可用建议。反馈的可选 `lemma` 由服务器对应拼写题快照补入，模型不能提交或替换词形。建议总目标最少 20、最大 100，并保留复习压力下限；组大小为 1–20，需用户自行采用。
+
+每份测试最多一次上游尝试；完成请求重发和 `GET /assessments/:id` 不重新调用。90 秒的旧 claim 只降级为中断，不启动第二次请求。模型失败时返回正常本地成绩；鉴权或所有权失效仍返回 401/404，不能用降级绕过私有报告权限。用户响应不含内部 claim、usage、模型或密钥，AI 不修改客观成绩、学习设置、熟词或真实复习历史。

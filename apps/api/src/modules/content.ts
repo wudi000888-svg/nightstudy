@@ -422,11 +422,12 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         .object({
           limit: z.coerce.number().int().min(1).max(100).default(50),
           cursor: z.string().min(1).max(1200).optional(),
+          status: z.enum(['active', 'consolidated', 'all']).default('active'),
         })
         .strict(),
       req.query,
     );
-    const scope = `wordbook:${ctx.siteId}:${user.id}`,
+    const scope = `wordbook:${ctx.siteId}:${user.id}${query.status === 'active' ? '' : `:${query.status}`}`,
       cursor = decodeCursor(scope, query.cursor, 'string');
     let after: { updatedAt: Date; id: string } | null = null;
     if (cursor !== null) {
@@ -440,54 +441,91 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         throw new HttpError(400, 'invalid_cursor', '分页游标无效，请从第一页重新加载');
       }
     }
-    const [rows, total] = await Promise.all([
-      ctx.prisma.userWord.findMany({
-        where: {
-          userId: user.id,
-          graduatedAt: null,
-          ...(after
-            ? {
-                OR: [
-                  { updatedAt: { lt: after.updatedAt } },
-                  { updatedAt: after.updatedAt, id: { lt: after.id } },
-                ],
-              }
-            : {}),
-        },
-        include: { word: { include: wordInclude } },
-        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-        take: query.limit + 1,
-      }),
-      ctx.prisma.userWord.count({ where: { userId: user.id, graduatedAt: null } }),
-    ]);
-    const result = pageInfo(rows, query.limit, total, scope, (row) =>
-      JSON.stringify({ updatedAt: row.updatedAt.toISOString(), id: row.id }),
-    );
-    const progress = await ctx.prisma.studyProgress.findMany({
-      where: { userId: user.id, wordId: { in: result.items.map((x) => x.wordId) } },
-    });
-    return {
-      items: result.items.map((row) => ({
-        id: row.id,
-        wordId: row.wordId,
-        word: wordDto(row.word),
-        note: row.note,
-        favorite: row.favorite,
-        paused: row.paused,
-        progress: progressDto(progress.find((x) => x.wordId === row.wordId) ?? null),
-      })),
-      page: result.page,
+    const membership = {
+      userId: user.id,
+      ...(query.status === 'active'
+        ? { graduatedAt: null }
+        : query.status === 'consolidated'
+          ? { graduatedAt: { not: null } }
+          : {}),
     };
+    return ctx.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.userWord.findMany({
+          where: {
+            ...membership,
+            ...(after
+              ? {
+                  OR: [
+                    { updatedAt: { lt: after.updatedAt } },
+                    { updatedAt: after.updatedAt, id: { lt: after.id } },
+                  ],
+                }
+              : {}),
+          },
+          include: { word: { include: wordInclude } },
+          orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+          take: query.limit + 1,
+        });
+        const total = await tx.userWord.count({ where: membership });
+        const result = pageInfo(rows, query.limit, total, scope, (row) =>
+          JSON.stringify({ updatedAt: row.updatedAt.toISOString(), id: row.id }),
+        );
+        const progress = await tx.studyProgress.findMany({
+          where: { userId: user.id, wordId: { in: result.items.map((x) => x.wordId) } },
+        });
+        return {
+          items: result.items.map((row) => ({
+            id: row.id,
+            wordId: row.wordId,
+            word: wordDto(row.word),
+            note: row.note,
+            favorite: row.favorite,
+            paused: row.paused,
+            status: row.graduatedAt ? 'consolidated' : 'active',
+            graduatedAt: row.graduatedAt?.toISOString() ?? null,
+            progress: progressDto(progress.find((x) => x.wordId === row.wordId) ?? null),
+          })),
+          page: result.page,
+        };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
   });
   app.get('/wordbook/:wordId', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx);
     const { wordId } = parse(z.object({ wordId: id }), req.params);
-    const item = await ctx.prisma.userWord.findFirst({
-      where: { userId: user.id, wordId, graduatedAt: null },
-      select: { id: true, wordId: true, note: true, favorite: true, paused: true },
-    });
-    return { item, collection: await collectionState(ctx.prisma, user.id, wordId) };
+    return ctx.prisma.$transaction(
+      async (tx) => {
+        const row = await tx.userWord.findFirst({
+          where: { userId: user.id, wordId },
+          select: {
+            id: true,
+            wordId: true,
+            note: true,
+            favorite: true,
+            paused: true,
+            graduatedAt: true,
+          },
+        });
+        const item =
+          row && !row.graduatedAt
+            ? {
+                id: row.id,
+                wordId: row.wordId,
+                note: row.note,
+                favorite: row.favorite,
+                paused: row.paused,
+              }
+            : null;
+        const consolidatedItem = row?.graduatedAt
+          ? { ...row, graduatedAt: row.graduatedAt.toISOString() }
+          : null;
+        return { item, consolidatedItem, collection: await collectionState(tx, user.id, wordId) };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
   });
   app.post('/wordbook', async (req) => {
     const ctx = await getContext(req),
@@ -504,7 +542,12 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         where: { userId_wordId: { userId: user.id, wordId: input.wordId } },
       });
       if (existing && !existing.graduatedAt)
-        return { item: existing, added: false, alreadySaved: true };
+        return {
+          item: existing,
+          added: false,
+          alreadySaved: true,
+          collection: await collectionState(tx, user.id, input.wordId),
+        };
       const item = existing
         ? await tx.userWord.update({
             where: { id: existing.id },
@@ -517,7 +560,12 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         : await tx.userWord.create({
             data: { userId: user.id, wordId: input.wordId, note: input.note ?? '' },
           });
-      return { item, added: true, alreadySaved: false };
+      return {
+        item,
+        added: true,
+        alreadySaved: false,
+        collection: await collectionState(tx, user.id, input.wordId),
+      };
     });
   });
   app.patch('/wordbook/:wordId', async (req) => {
@@ -550,7 +598,11 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
     return transact(ctx.prisma, async (tx) => {
       await lockLearningPreferences(tx, user.id);
       await tx.userWord.deleteMany({ where: { userId: user.id, wordId: params.wordId } });
-      return { deleted: true, progressRetained: true };
+      return {
+        deleted: true,
+        progressRetained: true,
+        collection: await collectionState(tx, user.id, params.wordId),
+      };
     });
   });
   app.get('/announcements', async (req) => {

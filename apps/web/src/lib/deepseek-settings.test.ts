@@ -87,6 +87,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 });
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
+    cancelQueries: vi.fn().mockResolvedValue(undefined),
     setQueryData: (_key: unknown, value: DeepSeekConfig) => {
       state.config = value;
     },
@@ -100,6 +101,7 @@ vi.mock('./api', async (importOriginal) => {
 
 const config: DeepSeekConfig = {
   enabled: true,
+  assessmentEnabled: false,
   configured: true,
   model: 'deepseek-flash',
   models: ['deepseek-flash', 'deepseek-v4-pro'],
@@ -221,7 +223,30 @@ it('reads only saved configuration automatically and never fills the password in
   expect(markup).toMatch(/<input[^>]*name="deepseek-api-key"[^>]*value=""/);
   expect(markup).toContain('尾号 1234');
   expect(markup).not.toContain(config.keyPreview);
-  expect(markup).toContain('会使用少量 API 额度');
+  expect(markup).toContain('会使用 API 额度');
+});
+
+it('requires saving the independent assessment switch and does not call the provider while configuring it', async () => {
+  const label = find(
+    renderContent(),
+    (element) => element.type === 'label' && text(element).startsWith('水平测试智能分析'),
+  );
+  const select = find(label, (element) => element.type === 'select');
+  expect(select.props.value).toBe('disabled');
+  change(select, 'enabled');
+  const tree = renderContent();
+  expect(button(tree, '检测连接').props.disabled).toBe(true);
+  expect(post).not.toHaveBeenCalled();
+  vi.mocked(post).mockResolvedValue({ ...config, assessmentEnabled: true });
+  submit(find(tree, (element) => element.type === 'form'));
+  await vi.waitFor(() =>
+    expect(post).toHaveBeenCalledExactlyOnceWith(
+      'admin/ai/deepseek',
+      { enabled: true, assessmentEnabled: true, model: config.model },
+      'PUT',
+    ),
+  );
+  expect(api).not.toHaveBeenCalled();
 });
 
 it('preserves an empty key and only sends strict settings fields; saving a new key clears the input', async () => {
@@ -230,7 +255,7 @@ it('preserves an empty key and only sends strict settings fields; saving a new k
   await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   expect(post).toHaveBeenLastCalledWith(
     'admin/ai/deepseek',
-    { enabled: true, model: 'deepseek-flash' },
+    { enabled: true, assessmentEnabled: false, model: 'deepseek-flash' },
     'PUT',
   );
   await vi.waitFor(() => expect(state.slots[2]).toBe(null));
@@ -244,7 +269,7 @@ it('preserves an empty key and only sends strict settings fields; saving a new k
   await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(2));
   expect(post).toHaveBeenLastCalledWith(
     'admin/ai/deepseek',
-    { enabled: true, model: 'deepseek-flash', apiKey: 'sk-ui-test-only' },
+    { enabled: true, assessmentEnabled: false, model: 'deepseek-flash', apiKey: 'sk-ui-test-only' },
     'PUT',
   );
   await vi.waitFor(() => expect(state.slots[2]).toBe(null));

@@ -2,10 +2,14 @@ import { learningDayWindow, obj, type Db } from './shared.js';
 import { evaluateFamiliarity, familiarityPolicyVersion } from './familiarity-policy.js';
 
 export async function collectionState(db: Db, userId: string, wordId: string) {
-  const [state] = await db.$queryRaw<{ saved: boolean; manual: boolean; automatic: boolean }[]>`
+  const [state] = await db.$queryRaw<
+    { saved: boolean; consolidated: boolean; manual: boolean; automatic: boolean }[]
+  >`
     SELECT
       EXISTS(SELECT 1 FROM "UserWord" WHERE "userId"=${userId} AND "wordId"=${wordId}
         AND "graduatedAt" IS NULL) AS saved,
+      EXISTS(SELECT 1 FROM "UserWord" WHERE "userId"=${userId} AND "wordId"=${wordId}
+        AND "graduatedAt" IS NOT NULL) AS consolidated,
       EXISTS(SELECT 1 FROM "KnownClaim" c JOIN "KnownImport" i ON i."id"=c."importId"
         WHERE c."userId"=${userId} AND c."wordId"=${wordId} AND i."status"='confirmed') AS manual,
       EXISTS(SELECT 1 FROM "AutoKnownWord" WHERE "userId"=${userId} AND "wordId"=${wordId}
@@ -13,6 +17,11 @@ export async function collectionState(db: Db, userId: string, wordId: string) {
   `;
   return {
     inWordbook: state!.saved,
+    wordbookStatus: state!.saved
+      ? ('active' as const)
+      : state!.consolidated
+        ? ('consolidated' as const)
+        : null,
     known: state!.manual ? ('manual' as const) : state!.automatic ? ('automatic' as const) : null,
   };
 }

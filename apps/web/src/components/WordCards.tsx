@@ -4,11 +4,25 @@ import { Link, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pin, Star, X } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
-import { api, post } from '../lib/api';
+import { api } from '../lib/api';
 import { dictionaryText } from '../lib/dictionary';
-import type { Word, WordbookItem } from '../lib/types';
+import type { Word } from '../lib/types';
 import { WordCardContext } from '../lib/word-cards';
-import { Empty, ErrorNotice, Loading, Notice, WordSaveButton, WordView } from './UI';
+import {
+  isWordbookSaved,
+  mutateWordbook,
+  wordbookEntryPath,
+  type WordbookEntryResponse,
+} from '../lib/wordbook';
+import {
+  Empty,
+  ErrorNotice,
+  IconActionHint,
+  Loading,
+  Notice,
+  WordSaveButton,
+  WordView,
+} from './UI';
 
 interface ResolvedWord {
   word: Word | null;
@@ -74,6 +88,8 @@ export function WordCardSummaryText({ word }: { word: Word }) {
 
 export function WordCardProvider({ children }: { children: ReactNode }) {
   const { user, scope } = useApp();
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
   const queryClient = useQueryClient();
   const location = useLocation();
   const [card, setCard] = useState<CardState | null>(null);
@@ -94,12 +110,17 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
   const activeQuery = useRef<string | null>(null);
   const titleId = useId();
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [actionError, setActionError] = useState<unknown>(null);
+  const [actionNotice, setActionNotice] = useState('');
   const word = card?.result?.word;
-  const collection = useRemote<{
-    item: Pick<WordbookItem, 'id' | 'wordId' | 'note' | 'favorite' | 'paused'> | null;
-  }>('wordbook-entry', `wordbook/${encodeURIComponent(word?.id ?? '')}`, !!user && !!word);
-  const saved = !!word && collection.data?.item?.wordId === word.id;
+  const collection = useRemote<WordbookEntryResponse>(
+    'wordbook-entry',
+    wordbookEntryPath(word?.id ?? ''),
+    !!user && !!word,
+  );
+  const saved = !!word && isWordbookSaved(collection.data, word.id);
+  const consolidated = !!word && collection.data?.consolidatedItem?.wordId === word.id;
   const cancelClose = useCallback(() => {
     window.clearTimeout(closeTimer.current);
     closeTimer.current = undefined;
@@ -120,20 +141,27 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     setCard(null);
     setPinned(false);
     setActionError(null);
+    setActionNotice('');
+    busyRef.current = false;
     setBusy(false);
     if (restoreFocus && origin.current?.isConnected) origin.current.focus({ preventScroll: true });
   }, []);
   const scheduleClose = useCallback(() => {
+    const keyboardFocus = () =>
+      !!panel.current?.contains(document.activeElement) &&
+      !!(document.activeElement as HTMLElement | null)?.matches(':focus-visible');
     if (
       pinState.current ||
       insideCard.current ||
       onSource.current ||
+      keyboardFocus() ||
       closeTimer.current !== undefined
     )
       return;
     closeTimer.current = window.setTimeout(() => {
       closeTimer.current = undefined;
-      if (!pinState.current && !insideCard.current && !onSource.current) dismiss();
+      if (!pinState.current && !insideCard.current && !onSource.current && !keyboardFocus())
+        dismiss();
     }, 250);
   }, [dismiss]);
   const reposition = useCallback(() => {
@@ -162,6 +190,12 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     pinState.current = true;
     setPinned(true);
   }, [cancelClose]);
+  const togglePin = () => {
+    cancelClose();
+    pinState.current = !pinState.current;
+    setPinned(pinState.current);
+    if (!pinState.current) scheduleClose();
+  };
   const openWord = useCallback(
     (text: string, anchor: HTMLElement, mode: 'hover' | 'pinned' = 'pinned') => {
       if (panel.current?.contains(anchor)) return;
@@ -193,7 +227,9 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
       const requestId = ++generation.current;
       activeQuery.current = text;
       setBusy(false);
+      busyRef.current = false;
       setActionError(null);
+      setActionNotice('');
       setCard({ queried: text, loading: true, result: null, error: null });
       const load = () => {
         requestTimer.current = undefined;
@@ -296,20 +332,32 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     if (content) content.scrollTop = 0;
   }, [card]);
   async function toggleSaved() {
-    if (!user || !word || busy) return;
+    if (!user || !word || busyRef.current) return;
     const target = word;
     const requestId = generation.current;
+    busyRef.current = true;
     setBusy(true);
     setActionError(null);
+    setActionNotice('');
     try {
-      if (saved) await post(`wordbook/${encodeURIComponent(target.id)}`, {}, 'DELETE');
-      else await post('wordbook', { wordId: target.id });
-      await collection.refetch();
-      await queryClient.invalidateQueries({ queryKey: [scope, 'wordbook'] });
+      const receipt = await mutateWordbook(
+        queryClient,
+        scope,
+        target.id,
+        saved,
+        () => currentScope.current === scope,
+      );
+      if (receipt && generation.current === requestId && currentScope.current === scope)
+        setActionNotice(
+          saved ? (consolidated ? '已移除已巩固收藏' : '已从生词本移除') : '已加入生词本',
+        );
     } catch (error) {
-      if (generation.current === requestId) setActionError(error);
+      if (generation.current === requestId && currentScope.current === scope) setActionError(error);
     } finally {
-      if (generation.current === requestId) setBusy(false);
+      if (generation.current === requestId && currentScope.current === scope) {
+        busyRef.current = false;
+        setBusy(false);
+      }
     }
   }
   const context = useMemo(() => ({ openWord, leaveWord }), [openWord, leaveWord]);
@@ -334,8 +382,12 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
               insideCard.current = false;
               scheduleClose();
             }}
-            onPointerDown={pin}
-            onFocusCapture={pin}
+            onPointerDown={(event) => {
+              if (!(event.target as HTMLElement).closest?.('[data-word-card-pin]')) pin();
+            }}
+            onFocusCapture={(event) => {
+              if (!(event.target as HTMLElement).closest?.('[data-word-card-pin]')) pin();
+            }}
           >
             <div className="word-card-panel">
               <div className="word-card-top">
@@ -348,24 +400,34 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
                       <WordSaveButton
                         lemma={word.lemma}
                         saved={saved}
+                        consolidated={consolidated}
                         busy={busy}
                         disabled={collection.isFetching || !!collection.error || !collection.data}
                         onClick={() => void toggleSaved()}
                       />
                     ) : (
-                      <Link
-                        className="icon-button word-save-button"
-                        to="/auth"
-                        aria-label={`登录后收藏 ${word.lemma}`}
-                      >
-                        <Star size={20} />
-                      </Link>
+                      <IconActionHint label="登录后加入生词本">
+                        <Link
+                          className="icon-button word-save-button"
+                          to="/auth"
+                          aria-label={`登录后加入生词本 ${word.lemma}`}
+                        >
+                          <Star size={20} />
+                        </Link>
+                      </IconActionHint>
                     ))}
-                  {!pinned && (
-                    <button className="icon-button" aria-label="固定词卡" onClick={pin}>
-                      <Pin size={17} />
+                  <IconActionHint label={pinned ? '取消固定卡片' : '固定卡片'}>
+                    <button
+                      type="button"
+                      className={`icon-button word-card-pin${pinned ? ' pinned' : ''}`}
+                      data-word-card-pin
+                      aria-label={pinned ? '取消固定词卡' : '固定词卡'}
+                      aria-pressed={pinned}
+                      onClick={togglePin}
+                    >
+                      <Pin size={17} fill={pinned ? 'currentColor' : 'none'} />
                     </button>
-                  )}
+                  </IconActionHint>
                   <button
                     className="icon-button"
                     aria-label="关闭词卡，返回原文"
@@ -375,6 +437,20 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
                   </button>
                 </div>
               </div>
+              {actionNotice && (
+                <div className="word-card-save-notice" role="status">
+                  <span>{actionNotice}</span>
+                  <Link to="/wordbook">查看生词本</Link>
+                </div>
+              )}
+              {word && !!(actionError ?? collection.error) && (
+                <div className="word-card-action-notice">
+                  <ErrorNotice
+                    error={actionError ?? collection.error}
+                    onRetry={collection.error ? () => void collection.refetch() : undefined}
+                  />
+                </div>
+              )}
               {word && (
                 <div className="word-card-summary">
                   <WordCardSummaryText word={word} />
@@ -409,10 +485,6 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
                 )}
                 {word && (
                   <>
-                    <ErrorNotice
-                      error={actionError ?? collection.error}
-                      onRetry={collection.error ? () => void collection.refetch() : undefined}
-                    />
                     {card.result?.matchType === 'inflection' && (
                       <Notice>
                         {card.queried} → {card.result.matchedLemma}

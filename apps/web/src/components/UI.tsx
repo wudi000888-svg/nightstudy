@@ -33,35 +33,60 @@ export function Heading({
 export function Panel({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <section className={`panel ${className}`}>{children}</section>;
 }
+export function IconActionHint({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <span className="icon-action-hint">
+      {children}
+      <span className="icon-action-tooltip" role="tooltip">
+        {label}
+      </span>
+    </span>
+  );
+}
 export function WordSaveButton({
   lemma,
   saved,
   busy = false,
   disabled = false,
+  consolidated = false,
   onClick,
 }: {
   lemma: string;
   saved: boolean;
   busy?: boolean;
   disabled?: boolean;
+  consolidated?: boolean;
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      className={`icon-button word-save-button${saved ? ' saved' : ''}`}
-      disabled={busy || disabled}
-      aria-label={busy ? '正在保存' : saved ? `从生词本移除 ${lemma}` : `收藏 ${lemma}`}
-      aria-pressed={saved}
-      title={saved ? '取消收藏' : '收藏'}
-      onClick={onClick}
+    <IconActionHint
+      label={
+        busy ? '正在保存…' : saved ? (consolidated ? '移除已巩固收藏' : '移出生词本') : '加入生词本'
+      }
     >
-      {busy ? (
-        <LoaderCircle size={19} className="spin" />
-      ) : (
-        <Star size={20} fill={saved ? 'currentColor' : 'none'} />
-      )}
-    </button>
+      <button
+        type="button"
+        className={`icon-button word-save-button${saved ? ' saved' : ''}`}
+        disabled={busy || disabled}
+        aria-label={
+          busy
+            ? '正在保存'
+            : saved
+              ? consolidated
+                ? `移除 ${lemma} 已巩固收藏`
+                : `从生词本移除 ${lemma}`
+              : `加入生词本 ${lemma}`
+        }
+        aria-pressed={saved}
+        onClick={onClick}
+      >
+        {busy ? (
+          <LoaderCircle size={19} className="spin" />
+        ) : (
+          <Star size={20} fill={saved ? 'currentColor' : 'none'} />
+        )}
+      </button>
+    </IconActionHint>
   );
 }
 export function Loading({ text = '正在读取你的记录…' }: { text?: string }) {

@@ -392,4 +392,6 @@ export interface WordbookItem {
   favorite: boolean;
   paused: boolean;
   progress: Progress | null;
+  status?: 'active' | 'consolidated';
+  graduatedAt?: string | null;
 }

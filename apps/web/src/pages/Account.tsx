@@ -473,6 +473,9 @@ export function ProfilePage() {
           </button>
           {syncNote && <p className="fine-print">{syncNote}</p>}
           <div className="profile-links">
+            <Link to="/wordbook">
+              我的生词本 <ArrowRight size={15} />
+            </Link>
             <Link to="/known">
               我的熟词与导入导出 <ArrowRight size={15} />
             </Link>

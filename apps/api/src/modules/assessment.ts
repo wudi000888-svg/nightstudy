@@ -3,6 +3,8 @@ import type { FastifyInstance } from 'fastify';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { HttpError, requireUser, type ContextResolver } from '../context.js';
+import type { DeepSeekTransport } from '../providers/deepseek.js';
+import { assessmentAiDto, enrichAssessmentReport } from './assessment-ai.js';
 import {
   parse,
   id,
@@ -88,7 +90,22 @@ export function suggestedPlan(recognition: number, spelling: number, reviewPress
     groupSize: 5,
   };
 }
-export async function registerAssessment(app: FastifyInstance, getContext: ContextResolver) {
+export async function registerAssessment(
+  app: FastifyInstance,
+  getContext: ContextResolver,
+  options: { transport?: DeepSeekTransport } = {},
+) {
+  app.get('/assessments/capabilities', async (req) => {
+    const ctx = await getContext(req);
+    requireUser(ctx);
+    const setting = await ctx.prisma.deepSeekSetting.findUnique({
+      where: { id: 'singleton' },
+      select: { enabled: true, assessmentEnabled: true, keyCiphertext: true },
+    });
+    return {
+      aiAvailable: Boolean(setting?.enabled && setting.assessmentEnabled && setting.keyCiphertext),
+    };
+  });
   app.post('/assessments', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx),
@@ -212,7 +229,9 @@ export async function registerAssessment(app: FastifyInstance, getContext: Conte
     if (!assessment) throw new HttpError(404, 'assessment_not_found');
     return {
       assessment: assessmentDto(assessment),
-      ...(assessment.status === 'completed' ? { report: assessment.reportJson } : {}),
+      ...(assessment.status === 'completed'
+        ? { report: { ...obj(assessment.reportJson), aiAnalysis: assessmentAiDto(assessment) } }
+        : {}),
     };
   });
   app.post('/assessments/:id/answers', async (req) => {
@@ -272,8 +291,9 @@ export async function registerAssessment(app: FastifyInstance, getContext: Conte
   app.post('/assessments/:id/finish', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx),
-      params = parse(z.object({ id }), req.params);
-    return transact(ctx.prisma, async (tx) => {
+      params = parse(z.object({ id }), req.params),
+      input = parse(z.object({ useAi: z.boolean().optional() }).strict(), req.body ?? {});
+    const local = await transact(ctx.prisma, async (tx) => {
       const lock = await tx.$queryRaw<
         { id: string }[]
       >`SELECT "id" FROM "Assessment" WHERE "id"=${params.id} AND "userId"=${user.id} FOR UPDATE`;
@@ -391,6 +411,16 @@ export async function registerAssessment(app: FastifyInstance, getContext: Conte
       });
       return { report, plan };
     });
+    const report = await enrichAssessmentReport(
+      ctx,
+      user.id,
+      params.id,
+      input.useAi ?? false,
+      req,
+      getContext,
+      options.transport,
+    );
+    return { report, plan: local.plan };
   });
   app.get('/mastery/plan', async (req) => {
     const ctx = await getContext(req),

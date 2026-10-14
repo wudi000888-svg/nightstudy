@@ -657,12 +657,22 @@ it('shows two real US and UK audio controls without per-word source or device pa
   expect(markup).not.toMatch(/class="audio-button pronunciation-speaker"[^>]* disabled/);
 });
 
-it('uses a filled saved star with an accessible remove action and no extra visible bookmark text', () => {
+it('uses a filled saved star with an immediate functional hover and keyboard hint', () => {
   const markup = render(h(WordSaveButton, { lemma: 'water', saved: true, onClick: () => {} }));
   expect(markup).toContain('aria-label="从生词本移除 water"');
   expect(markup).toContain('aria-pressed="true"');
   expect(markup).toContain('fill="currentColor"');
   expect(markup).not.toContain('已在生词本');
   expect(markup).not.toContain('加入生词本');
-  expect(markup).not.toContain('>移除<');
+  expect(markup).toContain('class="icon-action-tooltip" role="tooltip">移出生词本');
+  const unsaved = render(h(WordSaveButton, { lemma: 'water', saved: false, onClick: () => {} }));
+  expect(unsaved).toContain('aria-label="加入生词本 water"');
+  expect(unsaved).toContain('role="tooltip">加入生词本');
+  const consolidated = render(
+    h(WordSaveButton, { lemma: 'water', saved: true, consolidated: true, onClick: () => {} }),
+  );
+  expect(consolidated).toContain('aria-label="移除 water 已巩固收藏"');
+  expect(consolidated).toContain('role="tooltip">移除已巩固收藏');
+  expect(consolidated).toContain('aria-pressed="true"');
+  expect(consolidated).not.toContain('加入生词本');
 });

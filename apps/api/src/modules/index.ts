@@ -13,16 +13,17 @@ import { registerCustomBooks } from './custom-books.js';
 import { registerDictionaryResolver } from './dictionary-resolver.js';
 import { registerBookTemplates } from './book-templates.js';
 import type { FleetTransport } from './fleet-transport.js';
+import type { DeepSeekTransport } from '../providers/deepseek.js';
 
 export async function registerModules(
   app: FastifyInstance,
   getContext: ContextResolver,
-  options: { fleetTransport?: FleetTransport } = {},
+  options: { fleetTransport?: FleetTransport; deepSeekTransport?: DeepSeekTransport } = {},
 ): Promise<void> {
   await registerContent(app, getContext);
   await registerStudy(app, getContext);
   await registerKnown(app, getContext);
-  await registerAssessment(app, getContext);
+  await registerAssessment(app, getContext, { transport: options.deepSeekTransport });
   await registerAnalytics(app, getContext);
   await registerTranslation(app, getContext);
   await registerPronunciation(app, getContext);

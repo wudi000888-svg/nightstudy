@@ -32,4 +32,4 @@ export function localDate(value: Date, timeZone = 'Asia/Shanghai'): string {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-export const appVersion = '0.6.0-alpha.3';
+export const appVersion = '0.6.0-alpha.4';

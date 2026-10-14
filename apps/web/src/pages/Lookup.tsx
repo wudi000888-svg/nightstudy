@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Bookmark, Search, Trash2, Pause, Play, Pencil, ArrowRight, Languages } from 'lucide-react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp, useRemote } from '../AppContext';
@@ -7,6 +7,13 @@ import { api, post } from '../lib/api';
 import type { PageInfo, Word, WordbookItem } from '../lib/types';
 import { TranslationPanel } from '../components/Translation';
 import { dictionaryText } from '../lib/dictionary';
+import {
+  isWordbookSaved,
+  mutateWordbook,
+  wordbookEntryKey,
+  wordbookEntryPath,
+  type WordbookEntryResponse,
+} from '../lib/wordbook';
 import {
   Dialog,
   Empty,
@@ -44,16 +51,18 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
   const selection = useRef(0);
   const [translationText, setTranslationText] = useState('');
   const [busy, setBusy] = useState(false);
+  const saveBusy = useRef(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState<WordbookItem | null>(null);
   const [note, setNote] = useState('');
+  const [wordbookStatus, setWordbookStatus] = useState<'active' | 'consolidated'>('active');
   const wordbook = useInfiniteQuery({
-    queryKey: [scope, 'wordbook', 'pages'],
+    queryKey: [scope, 'wordbook', 'pages', wordbookStatus],
     queryFn: ({ pageParam }) =>
       api<{ items: WordbookItem[]; page: PageInfo }>(
-        `wordbook?limit=50${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
+        `wordbook?limit=50&status=${wordbookStatus}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (last) =>
@@ -76,11 +85,17 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
     setNotice('');
     setError(null);
     setBusy(false);
+    saveBusy.current = false;
+    setWordbookStatus('active');
   }, [scope]);
-  const selectedCollection = useRemote<{
-    item: Pick<WordbookItem, 'id' | 'wordId' | 'note' | 'favorite' | 'paused'> | null;
-  }>('wordbook-entry', `wordbook/${encodeURIComponent(selected?.id ?? '')}`, !!user && !!selected);
-  const selectedSaved = !!selected && selectedCollection.data?.item?.wordId === selected.id;
+  const selectedCollection = useRemote<WordbookEntryResponse>(
+    'wordbook-entry',
+    wordbookEntryPath(selected?.id ?? ''),
+    !!user && !!selected,
+  );
+  const selectedSaved = !!selected && isWordbookSaved(selectedCollection.data, selected.id);
+  const selectedConsolidated =
+    !!selected && selectedCollection.data?.consolidatedItem?.wordId === selected.id;
   async function choose(word: Word) {
     const request = ++selection.current;
     setSelected(word);
@@ -135,28 +150,67 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
       setNotice('登录后可将这个词保存在本站生词本。');
       return;
     }
+    if (saveBusy.current) return;
+    saveBusy.current = true;
     setBusy(true);
     setError(null);
+    setNotice('');
     try {
-      if (selectedSaved && selected?.id === wordId)
-        await post(`wordbook/${encodeURIComponent(wordId)}`, {}, 'DELETE');
-      else await post('wordbook', { wordId });
-      if (currentScope.current !== scope) return;
-      await selectedCollection.refetch();
-      await client.invalidateQueries({ queryKey: [scope, 'wordbook'] });
-      if (currentScope.current === scope) setNotice('');
+      const remove = selectedSaved && selected?.id === wordId;
+      const receipt = await mutateWordbook(
+        client,
+        scope,
+        wordId,
+        remove,
+        () => currentScope.current === scope,
+      );
+      if (receipt && currentScope.current === scope)
+        setNotice(
+          remove
+            ? selectedConsolidated
+              ? '已移除已巩固收藏，学习进度仍保留。'
+              : '已从生词本移除，学习进度仍保留。'
+            : '已加入生词本，可在“我的生词本”查看。',
+        );
     } catch (value) {
       if (currentScope.current === scope) setError(value);
     } finally {
-      if (currentScope.current === scope) setBusy(false);
+      if (currentScope.current === scope) {
+        saveBusy.current = false;
+        setBusy(false);
+      }
     }
   }
   async function change(item: WordbookItem, input: Record<string, unknown>, method = 'PATCH') {
+    if (saveBusy.current) return;
+    saveBusy.current = true;
     setError(null);
     setBusy(true);
     try {
-      await post(`wordbook/${item.wordId}`, input, method);
-      await client.resetQueries({ queryKey: [scope, 'wordbook'] });
+      if (method === 'DELETE') {
+        await mutateWordbook(
+          client,
+          scope,
+          item.wordId,
+          true,
+          () => currentScope.current === scope,
+        );
+      } else {
+        const result = await post<{ item: WordbookItem }>(
+          wordbookEntryPath(item.wordId),
+          input,
+          method,
+        );
+        if (currentScope.current !== scope) return;
+        client.setQueryData<WordbookEntryResponse>(
+          wordbookEntryKey(scope, item.wordId),
+          (previous) => ({
+            ...previous,
+            item: result.item,
+          }),
+        );
+        void client.resetQueries({ queryKey: [scope, 'wordbook'] }).catch(() => {});
+      }
       if (currentScope.current === scope) {
         setEditing(null);
         setNotice(method === 'DELETE' ? '已从生词本移除，学习进度仍保留。' : '生词本记录已保存。');
@@ -164,7 +218,36 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
     } catch (value) {
       if (currentScope.current === scope) setError(value);
     } finally {
-      if (currentScope.current === scope) setBusy(false);
+      if (currentScope.current === scope) {
+        saveBusy.current = false;
+        setBusy(false);
+      }
+    }
+  }
+  async function restore(item: WordbookItem) {
+    if (saveBusy.current) return;
+    saveBusy.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const receipt = await mutateWordbook(
+        client,
+        scope,
+        item.wordId,
+        false,
+        () => currentScope.current === scope,
+      );
+      if (receipt && currentScope.current === scope) {
+        setWordbookStatus('active');
+        setNotice('已重新加入生词本，学习进度与备注仍保留。');
+      }
+    } catch (value) {
+      if (currentScope.current === scope) setError(value);
+    } finally {
+      if (currentScope.current === scope) {
+        saveBusy.current = false;
+        setBusy(false);
+      }
     }
   }
   return (
@@ -194,6 +277,27 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
       </div>
       <ErrorNotice error={error || (tab === 'wordbook' ? wordbook.error : null)} />
       {notice && <Notice>{notice}</Notice>}
+      {tab === 'wordbook' && user && (
+        <div className="wordbook-filters">
+          <div className="tab-row" aria-label="生词本分类">
+            <button
+              className={wordbookStatus === 'active' ? 'active' : ''}
+              onClick={() => setWordbookStatus('active')}
+            >
+              正在巩固
+            </button>
+            <button
+              className={wordbookStatus === 'consolidated' ? 'active' : ''}
+              onClick={() => setWordbookStatus('consolidated')}
+            >
+              已巩固
+            </button>
+          </div>
+          <p>
+            收藏留在生词本；复习后逐渐熟悉的词，可以在<Link to="/known">熟词页</Link>查看。
+          </p>
+        </div>
+      )}
       {tab === 'translation' ? (
         <TranslationPanel key={translationText} initialText={translationText} />
       ) : tab === 'lookup' ? (
@@ -273,6 +377,7 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
                         <WordSaveButton
                           lemma={selected.lemma}
                           saved={selectedSaved}
+                          consolidated={selectedConsolidated}
                           busy={busy}
                           disabled={
                             !!user &&
@@ -346,34 +451,50 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
                   </button>
                   {item.note && <p className="word-note">{item.note}</p>}
                   <small>
-                    {item.paused
-                      ? '已暂停复习'
-                      : item.progress?.dueAt
-                        ? `下次 ${formatDate(item.progress.dueAt)}`
-                        : '尚未完成记忆评价'}
+                    {item.status === 'consolidated' || item.graduatedAt
+                      ? '已巩固 · 可重新加入生词本'
+                      : item.paused
+                        ? '已暂停复习'
+                        : item.progress?.dueAt
+                          ? `下次 ${formatDate(item.progress.dueAt)}`
+                          : '尚未完成记忆评价'}
                   </small>
                 </div>
                 <div className="row-actions">
-                  <button
-                    className="icon-button"
-                    aria-label={`编辑 ${item.word.lemma} 备注`}
-                    onClick={() => {
-                      setEditing(item);
-                      setNote(item.note);
-                    }}
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    className="icon-button"
-                    disabled={busy}
-                    aria-label={
-                      item.paused ? `恢复 ${item.word.lemma} 复习` : `暂停 ${item.word.lemma} 复习`
-                    }
-                    onClick={() => void change(item, { paused: !item.paused })}
-                  >
-                    {item.paused ? <Play size={16} /> : <Pause size={16} />}
-                  </button>
+                  {item.status === 'consolidated' || item.graduatedAt ? (
+                    <button
+                      className="button ghost"
+                      disabled={busy}
+                      onClick={() => void restore(item)}
+                    >
+                      重新加入
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="icon-button"
+                        aria-label={`编辑 ${item.word.lemma} 备注`}
+                        onClick={() => {
+                          setEditing(item);
+                          setNote(item.note);
+                        }}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        className="icon-button"
+                        disabled={busy}
+                        aria-label={
+                          item.paused
+                            ? `恢复 ${item.word.lemma} 复习`
+                            : `暂停 ${item.word.lemma} 复习`
+                        }
+                        onClick={() => void change(item, { paused: !item.paused })}
+                      >
+                        {item.paused ? <Play size={16} /> : <Pause size={16} />}
+                      </button>
+                    </>
+                  )}
                   <button
                     className="icon-button"
                     disabled={busy}
@@ -401,8 +522,12 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
         </Panel>
       ) : (
         <Empty
-          title="生词本还是空的。"
-          description="先查一个词，再把它和自己的备注留下。"
+          title={wordbookStatus === 'consolidated' ? '还没有已巩固的词。' : '生词本还是空的。'}
+          description={
+            wordbookStatus === 'consolidated'
+              ? '继续复习，已经巩固的收藏会保留在这里。'
+              : '先查一个词，再把它和自己的备注留下。'
+          }
           action={
             <button className="button primary" onClick={() => setTab('lookup')}>
               去查词

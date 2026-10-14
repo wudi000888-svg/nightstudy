@@ -1523,6 +1523,19 @@ td strong {
   margin: 0 auto;
   padding: 38px;
 }
+.assessment-ai-choice > span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.assessment-ai-choice input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+  accent-color: var(--gold);
+}
 .assessment-intro h2 {
   font-size: 25px;
   line-height: 1.5;
@@ -3157,6 +3170,7 @@ td strong {
   display: flex;
   align-items: center;
   gap: 3px;
+  flex-shrink: 0;
 }
 .word-card-tools .icon-button {
   min-width: 36px;
@@ -3994,6 +4008,72 @@ td strong {
 .word-save-button.saved {
   color: var(--gold-light);
   background: transparent;
+}
+.icon-action-hint {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.icon-action-tooltip {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 2;
+  width: max-content;
+  max-width: 180px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #202a2f;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+.icon-action-hint:hover > .icon-action-tooltip,
+.icon-action-hint:focus-within > .icon-action-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+.word-card-pin.pinned {
+  color: var(--gold-light);
+}
+.word-card-save-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 18px 0;
+  color: var(--gold-light);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.word-card-save-notice a,
+.wordbook-filters a {
+  color: var(--gold-light);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.word-card-action-notice {
+  padding: 8px 18px 0;
+  flex-shrink: 0;
+}
+.word-card-action-notice .notice {
+  margin: 0;
+}
+.wordbook-filters {
+  margin-bottom: 18px;
+}
+.wordbook-filters .tab-row {
+  margin-bottom: 8px;
+}
+.wordbook-filters p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
 }
 .word-card-heading h2 {
   margin: 0;

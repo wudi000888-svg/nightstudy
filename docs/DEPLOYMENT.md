@@ -1,6 +1,6 @@
 # Alpha 运行与部署
 
-本文件描述 `0.4.0-alpha.1` 的部署配置，新增音频缓存和私有词书导入。代码 `b784133` 的133项测试、9项Python提取器回归、格式/类型/生产构建及 [PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38508645895) 通过；VPS完整音频安装及78项真实HTTPS检查通过。历史0.3管理员与双站42项检查单独记录。各版本范围单独记录；Render、主机断电恢复、异机/密钥灾备、高并发容量及音源逐条专家听辨未验收。
+本文件描述已部署的 `0.5.0-alpha.2`。代码2918aa9的25文件162项测试、9项Python回归、格式/类型/构建及 [双PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517645764) 通过；本轮VPS165项真实HTTPS任务检查通过。下面保留各历史版本的对应证据。Render、主机断电恢复、异机/密钥灾备、高并发容量及音源逐条专家听辨未验收。
 
 ## Docker Compose minimal
 
@@ -121,6 +121,12 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 
 ## 翻译网关与目标VPS
 
+当前运行镜像 `nightstudy-english:0.5.0-alpha.2-2918aa9`，代码与成功CI一致，init退出0、app/PG/网关健康。切换前另保存私密数据库归档、可读catalog和原.env；本次只核验catalog，未重复执行实际恢复演练。自动准备保留原管理员、词库770,611、4个ready包、五书去重8798词及17596条音源；8条媒体样本检查通过。初始凭据仍在VPS私密文件中，不通过Web交付。
+
+165项真实HTTPS断言通过，验证两普通账户隔离、私有词书和原子计划确认、命令幂等、主任务共享额度、暂停恢复、降目标/切书保留原组、实际到期巩固、历史分页及七日负担。三词产生四次真实评分、一次复习，每日仍计三词；未手工修改dueAt或生产时钟。2用户、1私有书、1导入、2计划、3任务、4评分、3进度和24个已接受回执已按精确ID、归属及创建窗口清理，公共内容和其他用户受事务保护。自然04:00跨日未遇到，跨日及DST只归入隔离回归证据。生产浏览器另验证即时悬停、英美真人及合成播放完成；真实更新检测返回up-to-date及0.5.0-alpha.2发布链接。
+
+本轮升级新增DailyPlan/DailyPlanWord和会话、日志、设置的附加字段，保留旧会话与原始评分。旧dailyNewLimit数值转换成1–100范围的每日总目标，客户端旧字段成为总量镜像；计划语义已变化，详见 [DAILY_TASKS.md](DAILY_TASKS.md)。已有Word检索索引保留。回滚应用镜像不会撤销这些数据库变更，升级前保管业务备份。下面0.4/0.3/0.2内容仅记录各自历史验收。
+
 保留Google官方网页入口和私密VPS备用网关，暂不接收费Cloud API；网页不支持本站iframe。网关请求非官方网页兼容接口，本机及目标VPS真实请求均遇到429，不能宣称站内结果已可用或实现加速。生产配置、同机Compose override与独立网关入口见 [TRANSLATION.md](TRANSLATION.md)。应用不保存翻译历史，网关ready仅表示进程就绪，鉴权401只验证入口关闭；上游可用性仍取决于真实鉴权翻译请求。
 
 0.4运行镜像为 `nightstudy-english:0.4.0-alpha.1-b784133`，代码与成功CI一致，init退出0、app/PG/网关健康。升级前保存私密数据库归档、catalog和原配置；只核验本次新归档catalog，不替代下段历史实际恢复试验。完整音频先由init准备，再切换app；原管理员凭据和770,611词保留，五书8798词/17596音源及两种音标完整性、8条媒体样本检查通过。78项真实HTTPS断言覆盖三格式模板与上传、合格/失败/重复预览、失败导出、确认幂等、生词本精确读写、私有书跨账户/admin/访客读选权限和未揭晓学习状态。测试2用户/1书/4导入/1会话及对应账号和回执已按精确ID和归属清理，原admin、其他用户、SiteState、公共内容不变。生产浏览器另验证rain英美真人录音和water点词卡合成播放；更新检测返回up-to-date及0.4 Release链接。不将浏览器播放或文件校验说成逐词专家听辨。
@@ -182,6 +188,16 @@ docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exi
 
 ## CI 与镜像发行
 
+0.5.0-alpha.2代码2918aa9的 [main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517645764) 与 [发行CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517674566) 全部成功，覆盖162项测试、9项Python回归、双PG17、默认完整内容与音频安装、随机admin登录及闭合翻译网关。
+
+公开linux/amd64镜像经匿名OCI索引访问及VPS空Docker认证配置实际拉取通过；实际响应体SHA与digest头一致。无网络、只读容器核对版本0.5.0-alpha.2、revision2918aa9、私密运行文件不存在、Piper引擎源码和许可摘要及运行版本匹配，音频/模型另在持久卷。索引包含amd64和attestation条目，不宣称arm64发行。
+
+当前固定发行摘要：
+
+```text
+ghcr.io/wudi000888-svg/nightstudy@sha256:1017b3171738e1cf08f9537127cf6f8a79bf242f6e2ef442ff5a6cc8c8b52dc5
+```
+
 0.4代码 `b784133` 的 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38508645895) 通过133项测试和9项Python提取器回归，默认完整Compose安装核对770,611词、五书去重8,798词/17,596音源及英美IPA，并实际检查8条真人/合成文件。随机admin登录与闭合网关401通过；不将媒体校验说成逐条人工听辨或上游Google可用。
 
 [0.4发行流水线](https://github.com/wudi000888-svg/nightstudy/actions/runs/38509383608) 全部通过，发布linux/amd64容器及provenance/SBOM。匿名OCI index请求的digest与实际body SHA一致；VPS以空Docker认证配置实际拉取成功。无网络运行核对version=0.4.0-alpha.1/x64、私有.env与管理员文件不存在、固定引擎源码与许可随镜像保留；大型音频与模型另放持久卷。index另含attestation，不代表arm64镜像。
@@ -192,10 +208,10 @@ CI对PR/main运行锁文件安装、格式、双PG17 migration/seed、sites/type
 
 `release.yml` 仅在维护者发布GitHub Release时触发，版本tag须为 `v0.3.0-alpha.1` 等格式；先复用完整CI，通过后使用仓库GITHUB_TOKEN推送GHCR（当前目标linux/amd64），保留版本、commit、provenance与SBOM。初次发布须核对package visibility，公开仓库不意味着镜像自动公开。[v0.3.0-alpha.1预览版](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.3.0-alpha.1) 的 [发行流水线](https://github.com/wudi000888-svg/nightstudy/actions/runs/38492073891) 已成功，完整86项/Compose检查后发布 [公开容器](https://github.com/wudi000888-svg/nightstudy/pkgs/container/nightstudy)。匿名manifest访问和VPS空Docker认证配置实际pull通过；无网络运行核对version=0.3.0-alpha.1/x64，镜像无.env或私密管理员文件。镜像含linux/amd64与attestation条目，不宣称有arm64发行。
 
-0.4固定发行摘要：
+历史0.4固定发行摘要：
 
 ```text
 ghcr.io/wudi000888-svg/nightstudy@sha256:061e117fb448e973813849679a154844118f74c3c38a2e562252b3460e3e805b
 ```
 
-已按前文准备.env、随机密钥与HTTPS入口后，可将NIGHTSTUDY_IMAGE配置为此摘要，使用 `docker compose up --detach --no-build --wait app` 从发行镜像启动。init仍负责默认首次admin、迁移与完整内容；凭据按前文私密导出。`scripts/install.sh` 是源码构建入口，使用发行摘要时不加--build。源码Compose也可自行构建；不要依赖浮动latest。[GitHub官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
+已按前文准备.env、随机密钥与HTTPS入口后，可将NIGHTSTUDY_IMAGE配置为上方0.5.0-alpha.2的当前摘要，使用 `docker compose up --detach --no-build --wait app` 从发行镜像启动。init仍负责默认首次admin、迁移与完整内容；凭据按前文私密导出。`scripts/install.sh` 是源码构建入口，使用发行摘要时不加--build。源码Compose也可自行构建；不要依赖浮动latest。[GitHub官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)

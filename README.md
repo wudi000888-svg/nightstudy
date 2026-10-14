@@ -11,15 +11,17 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前开发基线：`0.4.0-alpha.1`，待本轮完整验收与发布。** 新增英文点词卡、精确查词、私有标准文档词书导入，以及区分真人录音、服务器合成与设备备用的英美发音。五本源词书音频包已完成逐文件校验，并在本机安装；GitHub CI与生产部署仍待本轮验收。具体变化见 [CHANGELOG](CHANGELOG.md)。
+**当前版本：[`0.4.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.4.0-alpha.1)。** 新增英文点词卡、精确查词、私有标准文档词书导入，以及区分真人录音、服务器合成与设备备用的英美发音。五本源词书的8,798个词均有两种口音音源，已在本机、PG17/Compose CI和VPS完整安装。具体变化见 [CHANGELOG](CHANGELOG.md)。
 
-**线上已验收基线：[`0.3.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.3.0-alpha.1)。** 默认首次安装创建用户名admin和独立随机密码，私密文件交付初始凭据；既有管理员不被重置。群站使用10分钟单次配对票据与独立长期授权，可读取状态、按批准的权限管理用户/注册/公告并检测更新。版本检测只访问固定GitHub Release，不执行shell安装。代码基线 `86afefa` 的86项测试和 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过，VPS完成42项真实HTTPS管理员/双站检查。
+[移动单词卡实测](docs/media/word-card-mobile-preview.png) · [TXT模板](docs/templates/nightstudy-wordbook-template.txt) · [Word模板](docs/templates/nightstudy-wordbook-template.docx) · [PDF模板](docs/templates/nightstudy-wordbook-template.pdf)
+
+默认首次安装创建用户名admin和独立随机密码，私密文件交付初始凭据；既有管理员不被重置。群站使用10分钟单次配对票据与独立长期授权，可读取状态、按批准的权限管理用户/注册/公告并检测更新。版本检测只访问固定GitHub Release，不执行shell安装。这些功能在0.3代码 `86afefa` 的86项测试及VPS42项真实HTTPS管理员/双站检查中验收，0.4回归保留对应测试。
 
 [系统与更新预览](docs/media/admin-system-preview.png) · [群站管理预览](docs/media/admin-fleet-preview.png)
 
-系统截图采集于Release发布前，显示no-release；发布后VPS实际检测为up-to-date。
+系统截图采集于0.3 Release发布前，显示no-release；0.4线上实际检测为up-to-date。
 
-本版 [公开amd64容器](https://github.com/wudi000888-svg/nightstudy/pkgs/container/nightstudy) 已完成发行CI及VPS匿名实际拉取，固定摘要部署见 [指南](docs/DEPLOYMENT.md#ci-与镜像发行)。
+0.4 [发行流水线](https://github.com/wudi000888-svg/nightstudy/actions/runs/38509383608) 成功，公开amd64容器经匿名manifest及VPS空认证配置实际拉取验收。固定摘要部署见 [指南](docs/DEPLOYMENT.md#ci-与镜像发行)。
 
 ## 产品与边界
 
@@ -40,7 +42,7 @@
 
 五本新词书：常用英语 3,277 词、高考方向 3,677 词、四级方向 3,849 词、六级方向 5,407 词、雅思方向 5,040 词。它们完整导入固定源的对应频率规则或标签，不宣称等于当前官方考试大纲。0.4生产内容准备归档旧演示词书，公开词书页面不再展示它们；原40词ID、原创例句、用户进度与既有会话快照保留。
 
-五书去重联合范围为8,798个词，本轮音频包包含17,596条英美音源：其中3条已核验真人录音，17,593条采用Piper 1.8.0开源合成并明确标注。音频包已生成并校验，本机五书的两种音源已完整安装；可播放数量以各部署的就绪元数据与文件校验为准。网页优先就绪的本站音源；设备语音是单独选择的备用，不冒充真人或标准录音。登录用户可在服务可用且IPA齐全时显式补齐缺失合成音源，完成后再次点击播放。
+五书去重联合范围为8,798个词，本轮音频包包含17,596条英美音源：其中3条已核验来源与许可的真人录音，17,593条采用Piper 1.8.0开源合成并明确标注。音频包已生成并逐文件校验，本机、PG17/Compose CI和VPS完整安装；可播放数量以各部署的就绪元数据与文件校验为准。网页优先就绪的本站音源；设备语音是单独选择的备用，不冒充真人或标准录音。登录用户可在服务可用且IPA齐全时显式补齐缺失合成音源，完成后再次点击播放。
 
 私有词书每批最多10,000项，TXT限UTF-8和256 KiB；DOCX/PDF限2 MiB，PDF最多250页。首行使用标准版本标记，之后每行一个词或短语；不做OCR，不支持旧版DOC、任意表格或释义拼接。缺中文释义、英美IPA或任一口音的就绪音源会列入失败清单。归档保留已学进度。详细格式、失败处理与来源许可见 [内容包](docs/CONTENT.md)、[音标与音源](docs/PHONETICS.md) 和 [API](docs/API.md)。
 
@@ -69,15 +71,17 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 
 [在 Render 审阅部署配置](https://render.com/deploy?repo=https://github.com/wudi000888-svg/nightstudy) 使用 `render.yaml` 的首站Web/PG描述，采用付费规格。首次管理员密码由平台INITIAL_ADMIN_PASSWORD的generateValue独立生成，部署者从自己的Render私有环境保管；不是共用默认密码，也不依赖临时容器文件恢复。render-public仅适用于平台受控公网入口。Render实际创建、首装与恢复尚未实测，不自动创建无限租户。
 
-架构约定见 [架构](docs/architecture/ARCHITECTURE.md)、[多站与并发方案](docs/architecture/MULTISITE_AND_SCALING.md)。0.4完整音频包生成与部署验收、PgBouncer、Redis provider、跨主机 HA 和实测高并发容量仍待完成。当前 API 契约见 [API.md](docs/API.md)。词典/词书分页和学习选词不再被前 500/1,000 词截断；熟词导出以游标分批流式输出全部记录。
+架构约定见 [架构](docs/architecture/ARCHITECTURE.md)、[多站与并发方案](docs/architecture/MULTISITE_AND_SCALING.md)。PgBouncer、Redis provider、跨主机 HA 和实测高并发容量仍待完成。当前 API 契约见 [API.md](docs/API.md)。词典/词书分页和学习选词不再被前 500/1,000 词截断；熟词导出以游标分批流式输出全部记录。
 
-## 本机验证与待验收项
+## 验证范围
 
-0.4已完成Web格式、类型、生产构建与英文token静态渲染断言；私有词书解析和隔离PG回归包含1001词确认不截断的用例。音频完整生成、最终本轮测试总数、原生浏览器/手机与生产部署结果仍待汇总核实。以下0.3及更早记录保留为对应版本证据，不移用为0.4验收结论。
+0.4代码 `b784133` 的20文件133项测试、9项Python提取器回归及格式、类型、生产构建通过。[CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38508645895) 完成真实双PG17回归、完整Compose默认安装、随机管理员登录和闭合翻译网关检查；私有词书包含1001词确认不截断、真实损坏音频失败及账户隔离用例。
+
+本机浏览器实际完成Word模板上传、10词预览与确认、私有词书选择学习，以及390×844点词卡、生词本状态和英美合成播放。生产浏览器验证0.4查询、rain英美真人录音与water点词卡合成播放。实际播放事件和文件校验不等于逐条专家听辨。VPS运行 `nightstudy-english:0.4.0-alpha.1-b784133`，init退出0，app/PG/网关健康，770,611词及原管理员保留；5书8798词/17596音源完整性与8媒体样本检查通过。78项真实HTTPS断言验证三格式模板/上传、失败导出、确认幂等、精确生词本与私有词书权限和初始学习状态。临时用户、私有书、导入和会话精确清理，原管理员、其他用户和公共词库不变；实际更新检测返回up-to-date及0.4发布链接。以下0.3及更早记录保留为对应版本证据。
 
 2026-10-14，0.3代码基线 `86afefa` 的13文件86项测试、格式/类型/生产构建通过。本机PG18.4与 [PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 分别执行真实双数据库回归，覆盖一次性票并发兑换、权限、撤销、幂等、离线解绑、本地忘记与重配、历史长昵称及更新缓存。CI另完成770,611词默认全量安装，实际用私密导出的随机密码登录admin，并验证网关健康/未鉴权401。
 
-VPS运行 `nightstudy-english:0.3.0-alpha.1-86afefa`：init退出0、app/PG/网关健康、原770,611词和3包保留；自动生成admin的私密文件权限600。42项HTTPS检查使用真实公网TLS连接临时独立子站，验证管理员登录、配对/撤销、用户启停、注册开关、分页和公告去重；临时记录、子站、数据库与入口已清理。Release发布后另验证更新检测返回up-to-date及正确发布链接。本机桌面浏览器完成新版登录、系统信息/真实更新检测与群站界面检查；未执行新版手机或生产浏览器完整流程，也未进行容量压测。
+历史0.3 VPS运行 `nightstudy-english:0.3.0-alpha.1-86afefa`：init退出0、app/PG/网关健康、原770,611词和3包保留；自动生成admin的私密文件权限600。42项HTTPS检查使用真实公网TLS连接临时独立子站，验证管理员登录、配对/撤销、用户启停、注册开关、分页和公告去重；临时记录、子站、数据库与入口已清理。Release发布后另验证更新检测返回up-to-date及正确发布链接。本机桌面浏览器完成新版登录、系统信息/真实更新检测与群站界面检查；未执行新版手机或生产浏览器完整流程，也未进行容量压测。
 
 以下表格为0.1/0.2历史基线，保留各版本原始验证范围。
 
@@ -100,7 +104,7 @@ VPS运行 `nightstudy-english:0.3.0-alpha.1-86afefa`：init退出0、app/PG/网�
 
 22项生产HTTP检查包括首页CSP/JS/CSS、770,611词及3包元数据、分页检索与rain完整词义/英美IPA、注册Secure/HttpOnly Cookie、客户端role字段无法提权、普通用户admin403、空曲线、词书选择/5词会话/reveal/rate、真实FSRS曲线记录、Google官方deep link及私密网关真实429错误、退出/重新登录。测试账号已清理；这份HTTP检查不等于新版手机或完整生产浏览器live验收。
 
-0.2历史运行代码为 `577f48b`，当时尚未初始化；当前0.3已由首次init自动创建管理员。容器重建与数据保留不等于主机断电恢复或跨机HA。数据库恢复的限定证据见 [部署文档](docs/DEPLOYMENT.md#备份与升级)，后续进展见公开 [Issues](https://github.com/wudi000888-svg/nightstudy/issues) 与 [Milestones](https://github.com/wudi000888-svg/nightstudy/milestones)。
+0.2历史运行代码为 `577f48b`，当时尚未初始化；0.3起已由首次init自动创建管理员。容器重建与数据保留不等于主机断电恢复或跨机HA。数据库恢复的限定证据见 [部署文档](docs/DEPLOYMENT.md#备份与升级)，后续进展见公开 [Issues](https://github.com/wudi000888-svg/nightstudy/issues) 与 [Milestones](https://github.com/wudi000888-svg/nightstudy/milestones)。
 
 ## 内容与许可
 

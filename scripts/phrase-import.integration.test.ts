@@ -223,15 +223,17 @@ it.runIf(!!databaseUrl)(
     let preservedCatalog: Awaited<ReturnType<typeof catalogSummary>> | undefined;
     try {
       const binding = (
-        await client.query<{ database: string; address: string; siteId: string }>(
-          `SELECT current_database() AS database, host(inet_server_addr()) AS address, "siteId"
+        await client.query<{ database: string; role: string; siteId: string }>(
+          `SELECT current_database() AS database, current_user AS role, "siteId"
          FROM "SiteState" WHERE id='singleton'`,
         )
       ).rows[0];
       if (
         !binding ||
         binding.database !== databaseName ||
-        !['127.0.0.1', '::1'].includes(binding.address)
+        // The connection URL is loopback; Docker's server NIC need not be.
+        binding.role !== decodeURIComponent(url.username) ||
+        !binding.siteId
       )
         throw new Error('phrase_test_database_or_site_not_prepared');
       const schema = await client.query<{ ready: boolean }>(

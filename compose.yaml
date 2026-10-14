@@ -23,11 +23,15 @@ x-application: &application
     DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
     MAX_ACTIVE_SITES: ${MAX_ACTIVE_SITES:-20}
     CONTENT_PACK: ${CONTENT_PACK:-ecdict}
+    AUDIO_PACK: ${AUDIO_PACK:-}
+    AUDIO_CACHE_DIR: /app/.local/audio
+    AUDIO_PYTHON: /opt/nightstudy-audio/bin/python
     ADMIN_BOOTSTRAP: ${ADMIN_BOOTSTRAP:-auto}
     ADMIN_CREDENTIALS_DIR: /app/.local/admin
   volumes:
     - ./.local/sites:/run/nightstudy/sites:ro
     - content-cache:/app/.local/content
+    - audio-cache:/app/.local/audio
 
 services:
   postgres:
@@ -51,6 +55,7 @@ services:
     volumes:
       - ./.local/sites:/run/nightstudy/sites:ro
       - content-cache:/app/.local/content
+      - audio-cache:/app/.local/audio
       - admin-credentials:/app/.local/admin
     command: [pnpm, db:prepare]
     restart: 'no'
@@ -75,6 +80,7 @@ services:
 volumes:
   postgres-data:
   content-cache:
+  audio-cache:
   admin-credentials:
 
 networks:

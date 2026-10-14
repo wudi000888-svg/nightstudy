@@ -152,6 +152,7 @@ export interface Word {
     sourceRef?: string;
   }[];
   audioUrl?: string;
+  audio?: WordAudio[];
   difficulty?: number;
   goalTags?: string[];
   contentVersion?: string;
@@ -168,6 +169,18 @@ export interface Word {
   senses?: Sense[];
   senseCount?: number;
   detailAvailable?: boolean;
+}
+export interface WordAudio {
+  id: string;
+  accent: 'US' | 'UK';
+  kind: 'recorded' | 'synthesized';
+  url: string;
+  status: 'ready';
+  sourceName: string;
+  sourceUrl: string | null;
+  license: string | null;
+  attribution: string | null;
+  mimeType: string;
 }
 export interface PageInfo {
   nextCursor: string | null;
@@ -186,6 +199,69 @@ export interface Book {
   coveredCount: number;
   claimedKnownCount: number;
   isDemo: boolean;
+  status?: 'published' | 'archived';
+  visibility?: 'public' | 'private';
+  ownedByMe?: boolean;
+}
+export type BookFileFormat = 'txt' | 'docx' | 'pdf';
+export interface CustomBookImport {
+  id: string;
+  title: string;
+  description: string;
+  goal: Goal;
+  filename: string;
+  format: BookFileFormat;
+  formatVersion: string;
+  status: 'preview' | 'confirmed';
+  counts: {
+    totalRows: number;
+    ready: number;
+    failed: number;
+    duplicates: number;
+    missingPronunciation: number;
+    notFound: number;
+    missingDefinition: number;
+  };
+  expiresAt: string;
+  createdAt: string;
+  confirmedAt: string | null;
+  bookId: string | null;
+}
+export interface CustomBookRow {
+  lineNumber: number;
+  text: string;
+  normalizedLemma: string;
+  status: 'ready' | 'failed' | 'duplicate';
+  wordId?: string;
+  lemma?: string;
+  reasons: { code: string; message: string }[];
+  readiness?: {
+    phoneticUs: boolean;
+    phoneticUk: boolean;
+    audioUs: boolean;
+    audioUk: boolean;
+    definition: boolean;
+  };
+  duplicateOfLine?: number;
+}
+export interface CustomBookPreview {
+  import: CustomBookImport;
+  items: CustomBookRow[];
+  page: PageInfo;
+}
+export interface CustomBookTemplate {
+  formatVersion: string;
+  header: string;
+  text: string;
+  limits: {
+    maxEntries: number;
+    maxFileBytes: number;
+    maxTxtBytes: number;
+    maxPages: number;
+    maxTextCharacters: number;
+  };
+  requirements: string[];
+  downloadUrls: Record<BookFileFormat, string>;
 }
 export interface Settings {
   goal: Goal;

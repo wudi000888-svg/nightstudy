@@ -1,0 +1,69 @@
+NightStudy audio-v1 source and license notices
+
+The NightStudy application and newly authored generator are MIT-licensed. That
+license does not replace any third-party component or recording license below.
+
+SYNTHETIC AUDIO / VOICE MODELS
+Piper engine: OHF-Voice/piper1-gpl v1.8.0, commit
+639388b6317fc4731e91d53da42aea68fd4166ff; GPL-3.0-or-later.
+https://github.com/OHF-Voice/piper1-gpl/tree/639388b6317fc4731e91d53da42aea68fd4166ff
+Preserve PIPER-COPYING-GPL-3.0.txt when distributing the engine. Source is
+available at the fixed upstream commit and piper-tts 1.8.0 source distribution.
+Engine binaries and their dependencies retain their own licenses; a generated
+audio pack does not contain the Piper engine or claim to relicense it under MIT.
+
+Voice publisher: rhasspy/piper-voices, fixed revision
+c10ece1aade47bb51c153c893d14e5bf8e5b7117.
+https://huggingface.co/rhasspy/piper-voices/tree/c10ece1aade47bb51c153c893d14e5bf8e5b7117
+The publisher's README front matter declares MIT; this declaration is retained
+in PIPER-VOICES-LICENSE-DECLARATION.txt. The repository has no separate full
+LICENSE file. VOICE-MIT-TERMS.txt provides the standard SPDX MIT license text;
+it is a terms reference, not an additional grant from SPDX or NightStudy.
+The individual model cards must also be retained.
+
+US: en_US-ljspeech-high, trained by Bryce Beattie. Model card specifies en_US
+and a public-domain LJ Speech dataset. Original dataset: Keith Ito, recordings
+by Linda Johnson/LibriVox. https://keithito.com/LJ-Speech-Dataset/
+UK: en_GB-cori-high, trained by Bryce Beattie. Model card specifies en_GB and
+about 24 hours of public-domain LibriVox recordings. https://librivox.org/
+These are neural synthetic voices, not recordings of a person reading each
+NightStudy word. Publisher locale labels are not expert certification of every
+word or of a single standard accent. Homographs, stress, names, acronyms and
+inflections may be pronounced incorrectly. Original model configs are retained.
+Optional phonetic metadata is separately transcribed algorithmically using the
+bundled eSpeak-NG en-us or en-gb-x-rp language variant. It is not human-reviewed
+dictionary IPA or a transcription certified to match a particular recording.
+These variants change only the independent IPA calculation, not the original
+Piper model configuration used to render audio. Existing sourced dictionary IPA
+should remain authoritative rather than being overwritten by this supplement.
+
+RECORDED AUDIO / WIKIMEDIA COMMONS
+1. En-us-rain.ogg, Dvortygirl, CC BY-SA 3.0, original unchanged.
+https://commons.wikimedia.org/wiki/File:En-us-rain.ogg
+2. En-us-abandon.ogg, Dvortygirl, CC BY-SA 3.0, original unchanged.
+https://commons.wikimedia.org/wiki/File:En-us-abandon.ogg
+3. En-us-abacus.ogg, Dvortygirl, CC BY-SA 3.0, original unchanged.
+https://commons.wikimedia.org/wiki/File:En-us-abacus.ogg
+For these multi-licensed files we select the CC BY-SA 3.0 option.
+https://creativecommons.org/licenses/by-sa/3.0/
+4. En-uk-rain.ogg, Association Shtooka / Judith Franck, CC BY 3.0 US,
+original unchanged. File description identifies a speaker from London, England.
+https://commons.wikimedia.org/wiki/File:En-uk-rain.ogg
+https://creativecommons.org/licenses/by/3.0/us/
+Each recording retains its own license, attribution, source URL and checksum.
+Recorded files are kept as their original Ogg Vorbis files. Audio pack source
+metadata does not transfer these recordings to the application's MIT license.
+
+COMMONS REQUESTS AND PROVENANCE
+https://www.mediawiki.org/wiki/API:Imageinfo
+https://www.mediawiki.org/wiki/API:Etiquette
+https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits
+https://commons.wikimedia.org/wiki/Commons:Reusing_content_outside_Wikimedia
+Metadata was checked by a read-only Commons imageinfo batch on 2026-10-14;
+original bytes matched Commons SHA-1 and were independently SHA-256 checked.
+Accent is based on the specific audio's metadata plus file description, not
+inherited from nearby IPA tags, inferred from a filename or relabeled from CA.
+
+The manifest records the generator version, model/config digests, text, accent,
+content-addressed output key and each file digest. Public audio contains no user
+accounts, private server configuration, credentials or provider tokens.

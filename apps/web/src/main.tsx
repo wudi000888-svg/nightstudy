@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { AppProvider } from './AppContext';
 import { App } from './App';
+import { WordCardProvider } from './components/WordCards';
 import { basePath } from './lib/api';
 import './styles.css';
 
@@ -15,7 +16,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basePath || '/'}>
         <AppProvider>
-          <App />
+          <WordCardProvider>
+            <App />
+          </WordCardProvider>
         </AppProvider>
       </BrowserRouter>
     </QueryClientProvider>

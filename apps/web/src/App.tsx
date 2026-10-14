@@ -10,6 +10,7 @@ import { MemoryPage } from './pages/Memory';
 import { AuthPage, ProfilePage, SetupPage } from './pages/Account';
 import { AdminPage } from './pages/Admin';
 import { TranslationPage } from './components/Translation';
+import { CustomBookImportPage, MyBooksPage } from './pages/CustomBooks';
 
 export function App() {
   return (
@@ -17,6 +18,8 @@ export function App() {
       <Route element={<Shell />}>
         <Route index element={<HomePage />} />
         <Route path="books" element={<BooksPage />} />
+        <Route path="books/import" element={<CustomBookImportPage />} />
+        <Route path="books/mine" element={<MyBooksPage />} />
         <Route path="learn" element={<StudyPage key="learn" mode="learn" />} />
         <Route path="review" element={<StudyPage key="review" mode="review" />} />
         <Route path="lookup" element={<LookupPage key="lookup" />} />

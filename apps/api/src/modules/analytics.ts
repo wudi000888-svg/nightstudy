@@ -13,6 +13,7 @@ import {
   mergedSeconds,
   transact,
 } from './shared.js';
+import { visibleBookWhere } from './book-access.js';
 
 export function splitInterval(
   startAt: Date,
@@ -214,7 +215,12 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
     const ctx = await getContext(req),
       user = requireUser(ctx),
       query = parse(z.object({ bookId: id.optional(), goal: goal.optional() }), req.query);
-    if (query.bookId && !(await ctx.prisma.book.findUnique({ where: { id: query.bookId } })))
+    if (
+      query.bookId &&
+      !(await ctx.prisma.book.findFirst({
+        where: { id: query.bookId, ...visibleBookWhere(user.id) },
+      }))
+    )
       throw new HttpError(404, 'book_not_found');
     const where = {
       userId: user.id,

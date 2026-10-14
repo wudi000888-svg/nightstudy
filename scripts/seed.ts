@@ -256,6 +256,17 @@ for (const site of readConfig().sites) {
         }
         for (const goal of goals) {
           const id = `demo-book-${goal}`;
+          if (process.env.CONTENT_PACK !== 'demo') {
+            await tx.book.updateMany({
+              where: { id, ownerId: null },
+              data: { status: 'archived' },
+            });
+            await tx.userSettings.updateMany({
+              where: { currentBookId: id },
+              data: { currentBookId: null },
+            });
+            continue;
+          }
           await tx.book.upsert({
             where: { id },
             create: {
@@ -286,7 +297,7 @@ for (const site of readConfig().sites) {
         siteId: site.id,
         contentVersion: 'demo-2026-10-14',
         demoWords: words.length,
-        books: goals.length,
+        books: process.env.CONTENT_PACK === 'demo' ? goals.length : 0,
       }),
     );
   } finally {

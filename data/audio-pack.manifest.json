@@ -1,0 +1,17 @@
+{
+  "id": "audio-v1",
+  "status": "ready",
+  "version": "audio-v1",
+  "source": {
+    "url": "https://github.com/wudi000888-svg/nightstudy/releases/download/v0.3.0-alpha.1/nightstudy-audio-v1.tar.gz",
+    "sizeBytes": 515563016,
+    "sha256": "f41d73ae6c964fa5e42adf55d2ca6d3e0c4ff06916e0bd3d656e6ff5aa1134b1"
+  },
+  "lemmaCount": 8798,
+  "entryCount": 17596,
+  "recordedCount": 3,
+  "synthesizedCount": 17593,
+  "manifestSha256": "9de040398dfd422d74b4f1ab4654e8b2100052de235dd2c78451f6523154a82b",
+  "sourceManifestSha256": "3dafe3867fc2005ce1cf0be24485e771671121f4cca185521b17b8d381e7489f",
+  "note": "Independent versioned content asset hosted alongside the earlier tested release; application version and data version are separate. Per-entry source/type/license and algorithmic IPA metadata are retained. Synthesized speech is not expert-certified."
+}

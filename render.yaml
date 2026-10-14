@@ -5,11 +5,18 @@ services:
     name: nightstudy
     runtime: docker
     region: singapore
-    plan: 0.5c-512mb
+    # Reserve memory for bounded document workers and local speech inference.
+    plan: 1c-2g
     dockerfilePath: ./Dockerfile
     dockerContext: .
     autoDeployTrigger: off
-    preDeployCommand: pnpm db:prepare
+    # Pre-deploy instances cannot access the runtime persistent disk.
+    preDeployCommand: AUDIO_PACK=none pnpm db:prepare
+    dockerCommand: /bin/sh -c 'pnpm audio:prepare && exec pnpm start'
+    disk:
+      name: nightstudy-audio
+      mountPath: /app/.local/audio
+      sizeGB: 5
     healthCheckPath: /health/ready
     envVars:
       - key: NODE_ENV
@@ -37,6 +44,8 @@ services:
         generateValue: true
       - key: REGISTRATION_OPEN
         value: 'true'
+      - key: AUDIO_PACK
+        value: standard
       - key: CLIENT_IP_PROFILE
         value: render-public
 

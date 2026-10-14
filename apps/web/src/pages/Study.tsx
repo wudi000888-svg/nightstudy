@@ -337,7 +337,11 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
               <span className="eyebrow">
                 {item.revealed ? '现在，在语境里确认' : '先回忆这个词的意思'}
               </span>
-              <WordView word={item.word} focusSenseId={item.focusSenseId} />
+              <WordView
+                word={item.word}
+                focusSenseId={item.focusSenseId}
+                hideMeanings={!item.revealed}
+              />
               {!item.revealed ? (
                 <div className="recall-area">
                   <RotateCcw size={22} />

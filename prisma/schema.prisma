@@ -32,6 +32,8 @@ model User {
   assessments     Assessment[]
   mastery         MasteryProfile[]
   activity        ActivityInterval[]
+  customBooks     Book[]
+  bookImports     CustomBookImport[]
 }
 
 model Session {
@@ -204,6 +206,7 @@ model Word {
   reviews         ReviewLog[]
   claims          KnownClaim[]
   assessmentItems AssessmentItem[]
+  audio           WordAudio[]
 
   @@index([status, difficulty])
 }
@@ -230,9 +233,59 @@ model Book {
   goal        String
   status      String         @default("published")
   version     String         @default("demo-2026-10-14")
+  ownerId     String?
+  owner       User?          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  imports     CustomBookImport[]
   items       BookItem[]
   sessions    StudySession[]
   updatedAt   DateTime       @updatedAt
+
+  @@index([ownerId, status])
+}
+
+model WordAudio {
+  id           String   @id @default(cuid())
+  wordId       String
+  word         Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  accent       String
+  kind         String
+  status       String   @default("ready")
+  sourceName   String
+  sourceUrl    String
+  license      String
+  attribution  String
+  fileKey      String
+  fileSha256   String
+  mimeType     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([wordId, accent])
+  @@index([status, accent])
+}
+
+model CustomBookImport {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId        String?
+  book          Book?     @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  title         String
+  description   String    @default("")
+  goal          String
+  filename      String
+  format        String
+  formatVersion String    @default("word-lines-v1")
+  sha256        String
+  status        String    @default("preview")
+  rowsJson      Json
+  countsJson    Json
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+  confirmedAt   DateTime?
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
 }
 
 model BookItem {
@@ -260,6 +313,7 @@ model UserWord {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, wordId])
+  @@index([userId, updatedAt, id])
 }
 
 model StudyProgress {

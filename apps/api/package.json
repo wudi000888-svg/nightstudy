@@ -1,6 +1,6 @@
 {
   "name": "@nightstudy/api",
-  "version": "0.3.0-alpha.1",
+  "version": "0.4.0-alpha.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,13 +9,16 @@
     "typecheck": "tsc -p tsconfig.check.json --noEmit"
   },
   "dependencies": {
-    "@nightstudy/core": "workspace:*",
-    "@prisma/client": "7.10.0",
-    "@prisma/adapter-pg": "7.10.0",
-    "better-auth": "1.7.7",
-    "fastify": "5.12.7",
-    "@fastify/static": "10.1.6",
     "@fastify/rate-limit": "11.2.1",
+    "@fastify/static": "10.1.6",
+    "@nightstudy/core": "workspace:*",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "better-auth": "1.7.7",
+    "fast-xml-parser": "5.11.2",
+    "fastify": "5.12.7",
+    "fflate": "0.8.3",
+    "pdfjs-dist": "6.4.299",
     "pg": "8.23.1",
     "ts-fsrs": "5.4.2",
     "zod": "4.6.7"

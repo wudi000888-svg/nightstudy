@@ -23,6 +23,7 @@ import {
   isoDay,
   type Db,
 } from './shared.js';
+import { visibleBookWhere } from './book-access.js';
 
 export const sessionInclude = { items: { orderBy: { ordinal: 'asc' as const } } };
 type FullSession = Prisma.StudySessionGetPayload<{ include: typeof sessionInclude }>;
@@ -179,6 +180,12 @@ async function dailyAdmission(db: Db, userId: string, timeZone: string, limit: n
 }
 export async function dailyPlan(db: Db, userId: string) {
   const prefs = await settings(db, userId);
+  const selectedBook = prefs.currentBookId
+    ? await db.book.findFirst({
+        where: { id: prefs.currentBookId, ...visibleBookWhere(userId) },
+        select: { id: true },
+      })
+    : null;
   const admission = await dailyAdmission(db, userId, prefs.timeZone, prefs.dailyNewLimit);
   const dueCount = await db.studyProgress.count({
     where: {
@@ -198,7 +205,7 @@ export async function dailyPlan(db: Db, userId: string) {
   const recommendation = obj(obj(profile?.evidenceJson).suggestedPlan);
   return {
     goal: prefs.goal,
-    bookId: prefs.currentBookId,
+    bookId: selectedBook?.id ?? null,
     dailyNewLimit: prefs.dailyNewLimit,
     groupSize: prefs.groupSize,
     dueCount,
@@ -271,7 +278,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
         const book = await tx.book.findFirst({
           where: {
             ...(selectedBookId ? { id: selectedBookId } : { goal: prefs.goal }),
-            status: 'published',
+            ...visibleBookWhere(user.id),
           },
           orderBy: { title: 'asc' },
         });

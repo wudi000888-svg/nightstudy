@@ -42,6 +42,7 @@ jobs:
       REGISTRATION_OPEN: 'true'
       NODE_ENV: test
       CONTENT_PACK: demo
+      AUDIO_PACK: none
       ADMIN_BOOTSTRAP: manual
       TRANSLATION_GATEWAY_SECRET: ci-only-gateway-token-not-a-production-secret-2026
     steps:
@@ -65,6 +66,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm test
+      - name: Verify bounded audio archive extraction
+        run: python3 scripts/audio-extract.test.py
       - name: Validate Compose descriptors
         run: |
           cp .env.example .env
@@ -82,12 +85,14 @@ jobs:
           PUBLIC_URL: http://127.0.0.1:5198
           NODE_ENV: production
           CONTENT_PACK: ecdict
+          AUDIO_PACK: standard
           ADMIN_BOOTSTRAP: auto
         run: |
           docker compose up --detach --no-build --wait --wait-timeout 600 app
           curl --fail --silent http://127.0.0.1:5198/health/ready
           curl --fail --silent http://127.0.0.1:5198/api/v2/dictionary/stats > /tmp/nightstudy-catalog.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-catalog.json','utf8'));if(!j.installedDictionary||j.declaredEntryCount!==770611)process.exit(1)"
+          docker compose exec -T app node scripts/check-audio-install.mjs
           umask 077
           docker compose run --rm --no-deps --entrypoint node init scripts/export-admin-credentials.mjs > /tmp/nightstudy-ci-admin.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-ci-admin.json','utf8'));const c=j.credentials[0];if(j.credentials.length!==1||c.username!=='admin'||c.password.length<32)process.exit(1);const r=await fetch('http://127.0.0.1:5198/api/auth/sign-in/username',{method:'POST',headers:{'Content-Type':'application/json',Origin:'http://127.0.0.1:5198'},body:JSON.stringify({username:c.username,password:c.password})});if(r.status!==200)process.exit(1)"

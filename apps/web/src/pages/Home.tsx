@@ -38,7 +38,7 @@ export function BookGrid({
           <span className={`book-cover cover-${index % 4}`}>
             <BookOpen size={26} />
             <strong>{goalLabels[book.goal]}</strong>
-            <span>{book.isDemo ? '夜读 · 原创示例' : '本站发布词书'}</span>
+            <span>{book.visibility === 'private' ? '我的私有词书' : '本站发布词书'}</span>
           </span>
           <span className="book-description">
             <span className="tiny-label">
@@ -75,6 +75,7 @@ export function HomePage() {
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState<unknown>(null);
   const currentBook = books.data?.items.find((book) => book.id === plan.data?.plan.bookId);
+  const availableBooks = books.data?.items.filter((book) => !book.isDemo) ?? [];
   async function select(id: string) {
     if (!user) {
       navigate('/auth');
@@ -220,16 +221,14 @@ export function HomePage() {
         </div>
       </div>
       <p className="content-caption">
-        {books.data?.items.every((book) => book.isDemo)
-          ? '原创演示词书用于体验学习流程，并非完整考试词库。'
-          : '词书按本站词库组织。释义与音标以各词条来源提供的内容为准。'}
+        词书按本站词库组织，也可以导入自己的私有词书。释义与音标保留各词条来源。
       </p>
       <ErrorNotice error={books.error} onRetry={() => void books.refetch()} />
       {books.isPending ? (
         <Loading text="正在打开词书…" />
-      ) : books.data?.items.length ? (
+      ) : availableBooks.length ? (
         <BookGrid
-          books={books.data.items.slice(0, 4)}
+          books={availableBooks.slice(0, 4)}
           onSelect={(id) => void select(id)}
           busyId={busyId}
         />
@@ -292,6 +291,16 @@ export function BooksPage() {
           </>
         }
         description="词书决定新词来源。同一个词在本站不同词书间共享进度。"
+        action={
+          <div className="action-row">
+            <Link className="button ghost" to="/books/mine">
+              我的词书
+            </Link>
+            <Link className="button primary" to="/books/import">
+              导入自定义词书
+            </Link>
+          </div>
+        }
       />
       <div className="filter-row">
         <button className={goal === 'all' ? 'active' : ''} onClick={() => setGoal('all')}>
@@ -308,25 +317,38 @@ export function BooksPage() {
         ))}
       </div>
       <p className="content-caption">
-        {books.data?.items.every((book) => book.isDemo)
-          ? '原创演示词书用于体验学习流程，不代表完整考试词库或真实考试难度。'
-          : '词书词数和覆盖进度来自本站记录。同词跨书共享学习进度，词条保留来源与许可。'}
+        公开词书词数和覆盖进度来自本站记录。同词跨书共享学习进度；自己的私有词书在“我的词书”管理。
       </p>
       <ErrorNotice error={error || books.error} />
       {books.isPending ? (
         <Loading />
       ) : (
         <BookGrid
-          books={books.data?.items.filter((book) => goal === 'all' || book.goal === goal) ?? []}
+          books={
+            books.data?.items.filter(
+              (book) =>
+                !book.isDemo &&
+                book.visibility !== 'private' &&
+                (goal === 'all' || book.goal === goal),
+            ) ?? []
+          }
           onSelect={(id) => void select(id)}
           busyId={busyId}
         />
       )}
       {books.data &&
-        !books.data.items.filter((book) => goal === 'all' || book.goal === goal).length && (
+        !books.data.items.filter(
+          (book) =>
+            !book.isDemo && book.visibility !== 'private' && (goal === 'all' || book.goal === goal),
+        ).length && (
           <Empty
             title="这个方向还没有已发布词书。"
-            description="可以选择其他方向，或等待本站内容发布。"
+            description="可以选择其他方向，或导入自己的私有词书。"
+            action={
+              <Link className="button ghost" to="/books/import">
+                导入自定义词书
+              </Link>
+            }
           />
         )}
     </div>

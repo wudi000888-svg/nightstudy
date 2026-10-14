@@ -19,6 +19,7 @@ import {
   type WordWithSenses,
 } from './shared.js';
 import { decodeCursor, pageInfo } from './pagination.js';
+import { visibleBookWhere } from './book-access.js';
 
 const pageQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
@@ -156,7 +157,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
   app.get('/books', async (req) => {
     const ctx = await getContext(req);
     const books = await ctx.prisma.book.findMany({
-      where: { status: 'published' },
+      where: visibleBookWhere(ctx.user?.id),
       orderBy: { title: 'asc' },
     });
     const profiles = ctx.user
@@ -226,6 +227,8 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         coveredCount: count(covered, b.id),
         claimedKnownCount: count(known, b.id),
         isDemo: b.version.startsWith('demo-'),
+        visibility: b.ownerId ? 'private' : 'public',
+        ownedByMe: Boolean(ctx.user && b.ownerId === ctx.user.id),
       })),
     };
   });
@@ -236,7 +239,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
     const scope = `book:${params.id}`,
       after = decodeCursor(scope, query.cursor, 'number');
     const book = await ctx.prisma.book.findFirst({
-      where: { id: params.id, status: 'published' },
+      where: { id: params.id, ...visibleBookWhere(ctx.user?.id) },
     });
     if (!book) throw new HttpError(404, 'book_not_found');
     const where: Prisma.BookItemWhereInput = { bookId: book.id, word: { status: 'published' } };
@@ -258,6 +261,8 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         goal: book.goal,
         description: book.description,
         version: book.version,
+        visibility: book.ownerId ? 'private' : 'public',
+        ownedByMe: Boolean(ctx.user && book.ownerId === ctx.user.id),
       },
       items: pagination.items.map((i) => catalogWordDto(i.word, packs, true)),
       page: pagination.page,
@@ -267,7 +272,9 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
     const ctx = await getContext(req),
       user = requireUser(ctx),
       params = parse(z.object({ id }), req.params);
-    const book = await ctx.prisma.book.findFirst({ where: { id: params.id, status: 'published' } });
+    const book = await ctx.prisma.book.findFirst({
+      where: { id: params.id, ...visibleBookWhere(user.id) },
+    });
     if (!book) throw new HttpError(404, 'book_not_found');
     const value = await ctx.prisma.userSettings.upsert({
       where: { userId: user.id },
@@ -328,7 +335,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
       installedDictionary: packs.some((pack) => pack.id.startsWith('ecdict-')),
       countBasis: 'installed-pack-metadata',
       declaredEntryCount: packs
-        .filter((pack) => obj(pack.tagCounts).kind !== 'phonetics')
+        .filter((pack) => !['phonetics', 'audio'].includes(String(obj(pack.tagCounts).kind)))
         .reduce((sum, pack) => sum + pack.entryCount, 0),
       packs: packs.map(packDto),
     };
@@ -385,7 +392,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
     if (
       input.currentBookId &&
       !(await ctx.prisma.book.findFirst({
-        where: { id: input.currentBookId, status: 'published' },
+        where: { id: input.currentBookId, ...visibleBookWhere(user.id) },
       }))
     )
       throw new HttpError(404, 'book_not_found');
@@ -405,17 +412,56 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
   app.get('/wordbook', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx);
-    const rows = await ctx.prisma.userWord.findMany({
-      where: { userId: user.id },
-      include: { word: { include: wordInclude } },
-      orderBy: { updatedAt: 'desc' },
-      take: 500,
-    });
+    const query = parse(
+      z
+        .object({
+          limit: z.coerce.number().int().min(1).max(100).default(50),
+          cursor: z.string().min(1).max(1200).optional(),
+        })
+        .strict(),
+      req.query,
+    );
+    const scope = `wordbook:${ctx.siteId}:${user.id}`,
+      cursor = decodeCursor(scope, query.cursor, 'string');
+    let after: { updatedAt: Date; id: string } | null = null;
+    if (cursor !== null) {
+      try {
+        const value = z
+          .object({ updatedAt: z.string().datetime(), id })
+          .strict()
+          .parse(JSON.parse(cursor));
+        after = { updatedAt: new Date(value.updatedAt), id: value.id };
+      } catch {
+        throw new HttpError(400, 'invalid_cursor', '分页游标无效，请从第一页重新加载');
+      }
+    }
+    const [rows, total] = await Promise.all([
+      ctx.prisma.userWord.findMany({
+        where: {
+          userId: user.id,
+          ...(after
+            ? {
+                OR: [
+                  { updatedAt: { lt: after.updatedAt } },
+                  { updatedAt: after.updatedAt, id: { lt: after.id } },
+                ],
+              }
+            : {}),
+        },
+        include: { word: { include: wordInclude } },
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        take: query.limit + 1,
+      }),
+      ctx.prisma.userWord.count({ where: { userId: user.id } }),
+    ]);
+    const result = pageInfo(rows, query.limit, total, scope, (row) =>
+      JSON.stringify({ updatedAt: row.updatedAt.toISOString(), id: row.id }),
+    );
     const progress = await ctx.prisma.studyProgress.findMany({
-      where: { userId: user.id, wordId: { in: rows.map((x) => x.wordId) } },
+      where: { userId: user.id, wordId: { in: result.items.map((x) => x.wordId) } },
     });
     return {
-      items: rows.map((row) => ({
+      items: result.items.map((row) => ({
         id: row.id,
         wordId: row.wordId,
         word: wordDto(row.word),
@@ -424,7 +470,18 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         paused: row.paused,
         progress: progressDto(progress.find((x) => x.wordId === row.wordId) ?? null),
       })),
+      page: result.page,
     };
+  });
+  app.get('/wordbook/:wordId', async (req) => {
+    const ctx = await getContext(req),
+      user = requireUser(ctx);
+    const { wordId } = parse(z.object({ wordId: id }), req.params);
+    const item = await ctx.prisma.userWord.findUnique({
+      where: { userId_wordId: { userId: user.id, wordId } },
+      select: { id: true, wordId: true, note: true, favorite: true, paused: true },
+    });
+    return { item };
   });
   app.post('/wordbook', async (req) => {
     const ctx = await getContext(req),
@@ -486,7 +543,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
     const [users, words, books, reviews, imports] = await Promise.all([
       ctx.prisma.user.count(),
       ctx.prisma.word.count(),
-      ctx.prisma.book.count(),
+      ctx.prisma.book.count({ where: { ownerId: null } }),
       ctx.prisma.reviewLog.count(),
       ctx.prisma.knownImport.count(),
     ]);
@@ -532,7 +589,12 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
   app.get('/admin/books', async (req) => {
     const ctx = await getContext(req);
     requireAdmin(ctx);
-    return { items: await ctx.prisma.book.findMany({ orderBy: { title: 'asc' } }) };
+    return {
+      items: await ctx.prisma.book.findMany({
+        where: { ownerId: null },
+        orderBy: { title: 'asc' },
+      }),
+    };
   });
   app.post('/admin/books', async (req) => {
     const ctx = await getContext(req),
@@ -602,7 +664,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
       req.body,
     );
     return transact(ctx.prisma, async (tx) => {
-      if (!(await tx.book.findUnique({ where: { id: params.id } })))
+      if (!(await tx.book.findFirst({ where: { id: params.id, ownerId: null } })))
         throw new HttpError(404, 'book_not_found');
       const { wordIds, ...data } = input;
       if (wordIds) {

@@ -13,3 +13,5 @@ prisma/generated/
 *.dump
 *.backup
 .DS_Store
+__pycache__/
+*.pyc

@@ -5,14 +5,18 @@ import {
   type Word,
   type Sense,
   type StudyProgress,
+  type WordAudio,
 } from '@prisma/client';
 import { z } from 'zod';
 import { createEmptyCard, fsrs, Rating, type Card } from 'ts-fsrs';
 import { HttpError } from '../context.js';
 
 export type Db = PrismaClient | Prisma.TransactionClient;
-export type WordWithSenses = Word & { senses: Sense[] };
-export const wordInclude = { senses: { orderBy: { ordinal: 'asc' as const } } };
+export type WordWithSenses = Word & { senses: Sense[]; audio?: WordAudio[] };
+export const wordInclude = {
+  senses: { orderBy: { ordinal: 'asc' as const } },
+  audio: { where: { status: 'ready' }, orderBy: { accent: 'asc' as const } },
+};
 export const scheduler = fsrs({ request_retention: 0.9, enable_fuzz: false });
 export const ratingValues = {
   again: Rating.Again,
@@ -68,6 +72,18 @@ export function wordDto(word: WordWithSenses) {
     goalTags: word.goalTags,
     contentVersion: word.contentVersion,
     sourceRef: word.sourceRef,
+    audio: (word.audio ?? []).map((audio) => ({
+      id: audio.id,
+      accent: audio.accent,
+      kind: audio.kind,
+      status: 'ready',
+      url: `/api/v2/pronunciation/${encodeURIComponent(word.id)}/audio/${audio.accent}`,
+      sourceName: audio.sourceName,
+      sourceUrl: audio.sourceUrl,
+      license: audio.license,
+      attribution: audio.attribution,
+      mimeType: audio.mimeType,
+    })),
     senses: word.senses.map((s) => ({
       id: s.id,
       pos: s.pos,

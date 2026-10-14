@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Bookmark, Search, Trash2, Pause, Play, Pencil, ArrowRight, Languages } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp, useRemote } from '../AppContext';
 import { api, post } from '../lib/api';
 import type { PageInfo, Word, WordbookItem } from '../lib/types';
@@ -21,8 +22,18 @@ import {
 export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 'wordbook' }) {
   const { user, scope } = useApp();
   const client = useQueryClient();
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
+  const [params] = useSearchParams();
   const [tab, setTab] = useState<'lookup' | 'wordbook' | 'translation'>(initialTab);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(params.get('q') ?? '');
+  useEffect(() => {
+    const value = params.get('q');
+    if (value !== null) {
+      setQuery(value);
+      setTab('lookup');
+    }
+  }, [params]);
   const [results, setResults] = useState<Word[]>([]);
   const [selected, setSelected] = useState<Word | null>(null);
   const [page, setPage] = useState<PageInfo | null>(null);
@@ -37,7 +48,34 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState<WordbookItem | null>(null);
   const [note, setNote] = useState('');
-  const wordbook = useRemote<{ items: WordbookItem[] }>('wordbook', 'wordbook', !!user);
+  const wordbook = useInfiniteQuery({
+    queryKey: [scope, 'wordbook', 'pages'],
+    queryFn: ({ pageParam }) =>
+      api<{ items: WordbookItem[]; page: PageInfo }>(
+        `wordbook?limit=50${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
+      ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) =>
+      last.page?.hasMore ? (last.page.nextCursor ?? undefined) : undefined,
+    enabled: !!user,
+    retry: false,
+  });
+  const wordbookItems = useMemo(
+    () => [
+      ...new Map(
+        (wordbook.data?.pages.flatMap((batch) => batch.items) ?? []).map((item) => [item.id, item]),
+      ).values(),
+    ],
+    [wordbook.data],
+  );
+  const wordbookPage = wordbook.data?.pages.at(-1)?.page;
+  useEffect(() => {
+    setEditing(null);
+    setNote('');
+    setNotice('');
+    setError(null);
+    setBusy(false);
+  }, [scope]);
   const dictionary = useRemote<{
     installedDictionary: boolean;
     declaredEntryCount: number;
@@ -110,11 +148,11 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
     try {
       await post('wordbook', { wordId });
       await client.invalidateQueries({ queryKey: [scope, 'wordbook'] });
-      setNotice('已加入你的生词本。');
+      if (currentScope.current === scope) setNotice('已加入你的生词本。');
     } catch (value) {
-      setError(value);
+      if (currentScope.current === scope) setError(value);
     } finally {
-      setBusy(false);
+      if (currentScope.current === scope) setBusy(false);
     }
   }
   async function change(item: WordbookItem, input: Record<string, unknown>, method = 'PATCH') {
@@ -122,13 +160,15 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
     setBusy(true);
     try {
       await post(`wordbook/${item.wordId}`, input, method);
-      await wordbook.refetch();
-      setEditing(null);
-      setNotice(method === 'DELETE' ? '已从生词本移除，学习进度仍保留。' : '生词本记录已保存。');
+      await client.resetQueries({ queryKey: [scope, 'wordbook'] });
+      if (currentScope.current === scope) {
+        setEditing(null);
+        setNotice(method === 'DELETE' ? '已从生词本移除，学习进度仍保留。' : '生词本记录已保存。');
+      }
     } catch (value) {
-      setError(value);
+      if (currentScope.current === scope) setError(value);
     } finally {
-      setBusy(false);
+      if (currentScope.current === scope) setBusy(false);
     }
   }
   return (
@@ -140,7 +180,7 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
             把一个词，<em>读到有语境。</em>
           </>
         }
-        description="查询本站词库，查看来源音标、已有中文释义和英文解释，再用可用的设备英语语音读一遍。"
+        description="查询本站词库，查看来源音标、已有中文释义和英文解释，选择本站英美发音；音源类型和出处会明确标注。"
       />
       <div className="tab-row">
         <button className={tab === 'lookup' ? 'active' : ''} onClick={() => setTab('lookup')}>
@@ -303,14 +343,16 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
         <Empty title="生词本属于你的账户。" description="登录后，可以把遇到的词和备注一起保存。" />
       ) : wordbook.isPending ? (
         <Loading />
-      ) : wordbook.data?.items.length ? (
+      ) : wordbookItems.length ? (
         <Panel className="wordbook-panel">
           <div className="section-heading">
-            <h2>已保存 {wordbook.data.items.length} 个词</h2>
+            <h2>
+              已加载 {wordbookItems.length} / {wordbookPage?.total ?? wordbookItems.length} 个词
+            </h2>
             <span className="tiny-label">收藏与记忆进度分开</span>
           </div>
           <div className="wordbook-list">
-            {wordbook.data.items.map((item) => (
+            {wordbookItems.map((item) => (
               <article key={item.id}>
                 <div className="wordbook-main">
                   <button
@@ -372,6 +414,18 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
               </article>
             ))}
           </div>
+          {wordbook.hasNextPage && (
+            <div className="pagination-actions">
+              <button
+                className="button ghost"
+                disabled={wordbook.isFetching || busy}
+                onClick={() => void wordbook.fetchNextPage()}
+              >
+                {wordbook.isFetchingNextPage ? '正在读取更多…' : '更多生词'}{' '}
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
         </Panel>
       ) : (
         <Empty

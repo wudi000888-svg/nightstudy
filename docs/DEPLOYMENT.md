@@ -1,6 +1,6 @@
 # Alpha 运行与部署
 
-本文件描述 `0.3.0-alpha.1`、Node24、pnpm11.25、Prisma7与Postgres17。代码86afefa的86项测试、格式/类型/生产构建及 [PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过；VPS升级与42项真实HTTPS管理员/双站检查通过。各版本范围单独记录；Render、主机断电恢复、异机/密钥灾备、高并发容量和真人录音尚未验收。
+本文件描述 `0.4.0-alpha.1` 的部署配置，新增音频缓存和私有词书导入；本轮验收仍在进行。历史0.3验证单独记录：Node24、pnpm11.25、Prisma7与Postgres17。代码86afefa的86项测试、格式/类型/生产构建及 [PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过；VPS升级与42项真实HTTPS管理员/双站检查通过。各版本范围单独记录；Render、主机断电恢复、异机/密钥灾备、高并发容量和真人录音尚未验收。
 
 ## Docker Compose minimal
 
@@ -20,7 +20,7 @@ docker compose up --build --detach --wait --wait-timeout 600 app
 # 用install.sh完成私密凭据导出；直接compose启动不会在宿主机生成导出文件。
 ```
 
-`init` 运行 `pnpm db:prepare`：generate、全站迁移、seed、首次管理员准备，再按CONTENT_PACK安装内容。默认ecdict会校验完整ECDICT及独立英美IPA并逐站事务安装；成功后app启动，请求进程不重复迁移/创建管理员。默认ADMIN_BOOTSTRAP=auto，新站用户名admin、独立随机密码；已初始化站点不重置账号。manual模式跳过自动创建，保留BOOTSTRAP_TOKEN和/setup。CONTENT_PACK=demo显式跳过完整包，CI基础测试用manual/demo。
+`init` 运行 `pnpm db:prepare`：generate、全站迁移、seed、首次管理员准备，再按CONTENT_PACK安装内容，并运行audio:prepare安装所选音频包与模型。默认ecdict会校验完整ECDICT及独立英美IPA并逐站事务安装；成功后app启动，请求进程不重复迁移/创建管理员。默认ADMIN_BOOTSTRAP=auto，新站用户名admin、独立随机密码；已初始化站点不重置账号。manual模式跳过自动创建，保留BOOTSTRAP_TOKEN和/setup。CONTENT_PACK=demo显式跳过完整包，CI基础测试用manual/demo。
 
 ## 初始管理员凭据
 
@@ -30,11 +30,11 @@ Compose的admin-credentials卷仅init挂载到 `/app/.local/admin`，Web/app/wor
 
 这些文件记录创建时的**初始密码**，用户之后改密不会同步更新明文记录；维护既有站点也不会强制重置。既有手工管理员没有自动生成的初始文件，继续用其原账号。恢复业务DB时同时保管对应认证密钥与初始交付资料，密码哈希不能反推出明文。
 
-PG业务数据与内容源缓存分别保存在postgres-data、content-cache named volume；源缓存挂载 `/app/.local/content`，不塞入Git或应用镜像。首次源下载约71MB，安装耗时取决于网络与机器。等待600秒是CI smoke等待上限，不是承诺安装时间；超时先检查init日志再决定增加等待。重复准备验证缓存与已安装pack，保留历史和管理编辑；摘要失败停止安装。离线内容导入、来源许可与目标书规则见 [CONTENT.md](CONTENT.md)，独立音标见 [PHONETICS.md](PHONETICS.md)。
+PG业务数据、内容源缓存与音频分别保存在postgres-data、content-cache、audio-cache named volume；源缓存挂载 `/app/.local/content`，不塞入Git或应用镜像。词典源首次下载约71MB；默认英美音频另下载固定校验的audio-v1预生成包与约229MB的两份模型，具体音频包大小以data/audio-pack.manifest.json为准，安装耗时取决于网络与机器。音频卷挂载/app/.local/audio，init与app共用；它包含来源清单、逐条许可、校验后的媒体和模型，不含初始管理员凭据。重跑会校验缓存，媒体丢失或摘要失败时从固定包恢复；数据库逐站事务导入，仅补空IPA，不改已有音标、词义、状态或学习进度。等待600秒是CI smoke等待上限，不是承诺安装时间；超时先检查init日志再决定增加等待。重复准备验证缓存与已安装pack，保留历史和管理编辑；摘要失败停止安装。离线内容导入、来源许可与目标书规则见 [CONTENT.md](CONTENT.md)，独立音标见 [PHONETICS.md](PHONETICS.md)。
 
 本机全量库实测Word770,611、追加源Sense1,113,723、5本新目标词书，原40词ID和历史保留。本机/VPS查询US IPA匹配83,424词、UK匹配64,321词及3个ready包；至少一种现代IPA匹配104,261词；含原始音标的任一种音标覆盖256,047词。该安装数据库约974,468,799字节（约975MB）；这是一次本机数据体量记录，不能推断最小磁盘、内存或并发容量。各站各存一份核心词义和进度，另需预算WAL、索引、备份及升级空间。
 
-检查 `/health/live`、`/health/ready` 和 `/api/v2/dictionary/stats`；子路径API添加basePath。ready不代替内容数量验收。查看init/app日志，分享前移除凭据和个人数据。`docker compose down` 保留named volume；`down --volumes` 删除业务DB、内容缓存与初始凭据卷，仅用于可丢弃测试。
+检查 `/health/live`、`/health/ready` 和 `/api/v2/dictionary/stats`；子路径API添加basePath。ready不代替内容数量验收。查看init/app日志，分享前移除凭据和个人数据。`docker compose down` 保留named volume；`down --volumes` 删除业务DB、内容/音频缓存与初始凭据卷，仅用于可丢弃测试。
 
 默认 app 监听启动后及每 60 秒执行有界 PG lease 维护，清理过期限流/session/verification与旧任务；先核验本站 DB 绑定，同一任务由 lease 竞争执行。重试耗尽标记 failed，各表每次清理有批次上限。minimal 与 Render 无需额外维护 worker；scale/独立 worker 可复用同一维护入口，不重复消费同一个有效 lease。它仍只是维护任务入口，未实现大型内容异步导入。
 
@@ -76,7 +76,7 @@ PG业务数据与内容源缓存分别保存在postgres-data、content-cache nam
 ]
 ```
 
-相应环境变量写在私有 `.env`，Compose传给init/app/worker。每站DB和密钥单独准备；新增站点不是一个按钮自动创建数据库。`pnpm db:deploy` 按配置串行迁移各DB，`pnpm db:seed` 写各站原创版本种子，`pnpm db:prepare` 顺序执行generate/deploy/seed与所选内容安装；默认完整词典/音标逐站安装，共享校验后的源缓存，站点私有编辑与学习数据保存在各自DB。不能只准备一站就上线整个registry。再核对 `pnpm sites:check`。站点管理员不修改全局host或数据库映射。
+相应环境变量写在私有 `.env`，Compose传给init/app/worker。每站DB和密钥单独准备；新增站点不是一个按钮自动创建数据库。`pnpm db:deploy` 按配置串行迁移各DB，`pnpm db:seed` 写各站原创版本种子，`pnpm db:prepare` 顺序执行generate/deploy/seed与所选内容安装；默认完整词典/音标/音频元数据逐站安装，共享校验后的源与媒体缓存，站点私有编辑与学习数据保存在各自DB。不能只准备一站就上线整个registry。再核对 `pnpm sites:check`。站点管理员不修改全局host或数据库映射。
 
 `basePath` 使用空字符串或 `/school-a` 等规范路径，无尾斜杠；`publicUrl` 路径与其一致。配置站点数不得超过 MAX_ACTIVE_SITES，超出会启动失败；每站池也有硬上限。当前没有自动 LRU 淘汰。`/health/ready` 位于固定根路径并检查所有配置站点，因此也支持只有子路径的安装，但任一站 DB 异常会使整个副本 unready。总连接预算计算所有 Web/worker 副本的全部配置站点池，并预留迁移/运维连接。子路径认证、跨站点隔离及生产代理要按当前测试证据验收。
 
@@ -109,9 +109,9 @@ PgBouncer、完整分布式队列、活动 Realm LRU、公平调度及高并发�
 
 ## Render 首站描述
 
-根 `render.yaml` 描述一个 Docker Web 与一个 PG17 首站数据库，使用付费资源规格、内部 DB URL、随机认证/初始化密钥、`pnpm db:prepare` pre-deploy 和 ready 检查。默认 `autoDeployTrigger: off`，不因上游 push 自动升级所有使用者实例。
+根 `render.yaml` 描述一个 Docker Web 与一个 PG17 首站数据库，使用付费资源规格、内部 DB URL、随机认证/初始化密钥、`AUDIO_PACK=none pnpm db:prepare` pre-deploy、2GB Web计算实例、5GB音频持久磁盘及 ready 检查。默认 `autoDeployTrigger: off`，不因上游 push 自动升级所有使用者实例。
 
-该文件不会自行创建云资源。部署者在Render审阅费用、创建资源并检查构建/ready/catalog；PUBLIC_URL从RENDER_EXTERNAL_URL引用。INITIAL_ADMIN_PASSWORD使用平台generateValue独立生成，部署者从Render私有环境保管，避免依赖临时pre-deploy文件；不是所有实例共用默认密码，既有管理员也不因重部署重置。pre-deploy默认完整内容，临时缓存可能重新下载，已提交词义/用户保存在PG。实际首装、耗时、负载与恢复仍待平台实测。[Render Blueprint规范](https://render.com/docs/blueprint-spec)、[Docker部署](https://render.com/docs/docker)
+该文件不会自行创建云资源。部署者在Render审阅费用、创建资源并检查构建/ready/catalog；PUBLIC_URL从RENDER_EXTERNAL_URL引用。INITIAL_ADMIN_PASSWORD使用平台generateValue独立生成，部署者从Render私有环境保管，避免依赖临时pre-deploy文件；不是所有实例共用默认密码，既有管理员也不因重部署重置。pre-deploy默认准备完整词典/音标，临时内容缓存可能重新下载，已提交词义/用户保存在PG。Render的pre-deploy不能访问运行磁盘，因此dockerCommand在启动前单独执行audio:prepare，将媒体与模型保存在/app/.local/audio持久磁盘；后续重启校验并复用。持久磁盘仅供一个实例，不支持此模板多副本或零停机更新；费用与平台实测由部署者确认。参见[Render磁盘限制](https://render.com/docs/disks)。实际首装、耗时、负载与恢复仍待平台实测。[Render Blueprint规范](https://render.com/docs/blueprint-spec)、[Docker部署](https://render.com/docs/docker)
 
 新增站点由 operator 准备另一独立 DB/连接，再登记 Realm；不承诺免费数据库长期保存、无限租户或生产 SLA。Render 平台实际创建与恢复尚未验证，不展示已可一键使用的成功徽章。
 
@@ -123,7 +123,7 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 
 保留Google官方网页入口和私密VPS备用网关，暂不接收费Cloud API；网页不支持本站iframe。网关请求非官方网页兼容接口，本机及目标VPS真实请求均遇到429，不能宣称站内结果已可用或实现加速。生产配置、同机Compose override与独立网关入口见 [TRANSLATION.md](TRANSLATION.md)。应用不保存翻译历史，网关ready仅表示进程就绪，鉴权401只验证入口关闭；上游可用性仍取决于真实鉴权翻译请求。
 
-当前0.3运行镜像为 `nightstudy-english:0.3.0-alpha.1-86afefa`，init退出0，app/PG/网关健康，原770,611词及3个ready包保留。升级前另保存私密数据库归档与原配置；这份新归档只做catalog核验，不冒充下段早期实际恢复试验。首次auto init创建admin，初始凭据导出到VPS私密文件，权限600，应用容器不挂载凭据卷；实际用户名/随机密码HTTPS登录和已初始化setup409通过。42项真实HTTP断言涵盖管理授权、双站公网TLS、分页、用户启停、注册开关、公告去重、子站检测与撤销后本站session保持。临时主站记录、子站容器/DB/凭据卷与nginx入口均已清理；注册策略保留。Release发布后另测up-to-date及正确版本链接。本机桌面完成新版登录、系统与群站页检查，未执行新版手机或生产浏览器完整流程。
+历史0.3运行镜像为 `nightstudy-english:0.3.0-alpha.1-86afefa`，init退出0，app/PG/网关健康，原770,611词及3个ready包保留。升级前另保存私密数据库归档与原配置；这份新归档只做catalog核验，不冒充下段早期实际恢复试验。首次auto init创建admin，初始凭据导出到VPS私密文件，权限600，应用容器不挂载凭据卷；实际用户名/随机密码HTTPS登录和已初始化setup409通过。42项真实HTTP断言涵盖管理授权、双站公网TLS、分页、用户启停、注册开关、公告去重、子站检测与撤销后本站session保持。临时主站记录、子站容器/DB/凭据卷与nginx入口均已清理；注册策略保留。Release发布后另测up-to-date及正确版本链接。本机桌面完成新版登录、系统与群站页检查，未执行新版手机或生产浏览器完整流程。
 
 以下为0.2历史验收：目标VPS的独立PG17/私密网关/内容缓存与22项HTTPS HTTP检查通过，含主页资产/CSP、770,611词/3包/完整检索、认证权限、5词学习与真实FSRS、官方翻译链接/网关429及退出/登录；临时账号已清理。这些检查不说明Google上游可用。
 
@@ -131,30 +131,31 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 
 ## 环境变量
 
-| 变量                                                 | 用途                                                                               |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| DATABASE_URL                                         | 默认 site 的 PG URL；Compose 空值时使用内网 postgres，native 开发必须设真实 URL    |
-| BETTER_AUTH_SECRET / BOOTSTRAP_TOKEN                 | 认证 secret 至少32字符，bootstrap token 32–256字符；每个 Realm 使用自己的随机值    |
-| PUBLIC_URL / BASE_PATH                               | 规范公开地址与挂载路径；root basePath 是空字符串                                   |
-| REGISTRATION_OPEN                                    | `true` / `false`；false 关闭普通注册，不代替初始化管理员                           |
-| HOST / PORT                                          | 进程监听；容器使用 `0.0.0.0:3000`，主机映射由 Compose 配置                         |
-| TRUST_PROXY_CIDRS                                    | socket模式的明确可信代理IP/CIDR，逗号分隔、默认空；不用于Realm Host选站            |
-| CLIENT_IP_PROFILE                                    | 默认socket；render-public仅在Render受控公网Web入口启用，health例外，私网服务不适用 |
-| SITES_FILE                                           | operator 的私有站点数组文件，路径不是用户可控路由参数                              |
-| DB_POOL_SIZE / MAX_ACTIVE_SITES                      | 每 Realm 池上限和活动 Realm 上限；副本增加时审核全 cluster 预算                    |
-| NIGHTSTUDY_HTTP_PORT                                 | Compose 主机回环端口，默认 5198                                                    |
-| NIGHTSTUDY_IMAGE                                     | 可选已核验发行镜像；空值从当前 checkout 构建本地镜像                               |
-| CONTENT_PACK                                         | 默认ecdict完整内容；demo显式跳过完整词典/音标，仅保留40词演示                      |
-| CONTENT_FILE                                         | operator的本地ECDICT源文件；必须匹配固定大小/SHA256，缺失时不自动换源              |
-| ADMIN_BOOTSTRAP                                      | 默认auto，仅首次创建admin；manual保留/setup，既有管理员不重置                      |
-| ADMIN_CREDENTIALS_DIR                                | Native私密目录；Compose init固定/app/.local/admin，不挂给Web/worker                |
-| INITIAL_ADMIN_PASSWORD / INITIAL_ADMIN_EMAIL         | 单站私有初始覆盖；Render密码generateValue保管，多Realm不可共用                     |
-| TRANSLATION_MODE                                     | 默认website-official；gateway用于生产站内结果，direct仅本机开发                    |
-| TRANSLATION_GATEWAY_URL / TRANSLATION_GATEWAY_SECRET | 固定网关地址与独立私密token，不返回浏览器；详细约束见TRANSLATION.md                |
+| 变量                                                 | 用途                                                                                                                                                                               |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DATABASE_URL                                         | 默认 site 的 PG URL；Compose 空值时使用内网 postgres，native 开发必须设真实 URL                                                                                                    |
+| BETTER_AUTH_SECRET / BOOTSTRAP_TOKEN                 | 认证 secret 至少32字符，bootstrap token 32–256字符；每个 Realm 使用自己的随机值                                                                                                    |
+| PUBLIC_URL / BASE_PATH                               | 规范公开地址与挂载路径；root basePath 是空字符串                                                                                                                                   |
+| REGISTRATION_OPEN                                    | `true` / `false`；false 关闭普通注册，不代替初始化管理员                                                                                                                           |
+| HOST / PORT                                          | 进程监听；容器使用 `0.0.0.0:3000`，主机映射由 Compose 配置                                                                                                                         |
+| TRUST_PROXY_CIDRS                                    | socket模式的明确可信代理IP/CIDR，逗号分隔、默认空；不用于Realm Host选站                                                                                                            |
+| CLIENT_IP_PROFILE                                    | 默认socket；render-public仅在Render受控公网Web入口启用，health例外，私网服务不适用                                                                                                 |
+| SITES_FILE                                           | operator 的私有站点数组文件，路径不是用户可控路由参数                                                                                                                              |
+| DB_POOL_SIZE / MAX_ACTIVE_SITES                      | 每 Realm 池上限和活动 Realm 上限；副本增加时审核全 cluster 预算                                                                                                                    |
+| NIGHTSTUDY_HTTP_PORT                                 | Compose 主机回环端口，默认 5198                                                                                                                                                    |
+| NIGHTSTUDY_IMAGE                                     | 可选已核验发行镜像；空值从当前 checkout 构建本地镜像                                                                                                                               |
+| CONTENT_PACK                                         | 默认ecdict完整内容；demo显式最小测试配置；默认不安装全量音频                                                                                                                       |
+| AUDIO_PACK / AUDIO_CACHE_DIR / AUDIO_PYTHON          | AUDIO_PACK空时ecdict用standard、demo用none；standard下载固定音频包/模型，none跳过；Docker缓存/app/.local/audio，Python为/opt/nightstudy-audio/bin/python，Native需自己的Piper venv |
+| CONTENT_FILE                                         | operator的本地ECDICT源文件；必须匹配固定大小/SHA256，缺失时不自动换源                                                                                                              |
+| ADMIN_BOOTSTRAP                                      | 默认auto，仅首次创建admin；manual保留/setup，既有管理员不重置                                                                                                                      |
+| ADMIN_CREDENTIALS_DIR                                | Native私密目录；Compose init固定/app/.local/admin，不挂给Web/worker                                                                                                                |
+| INITIAL_ADMIN_PASSWORD / INITIAL_ADMIN_EMAIL         | 单站私有初始覆盖；Render密码generateValue保管，多Realm不可共用                                                                                                                     |
+| TRANSLATION_MODE                                     | 默认website-official；gateway用于生产站内结果，direct仅本机开发                                                                                                                    |
+| TRANSLATION_GATEWAY_URL / TRANSLATION_GATEWAY_SECRET | 固定网关地址与独立私密token，不返回浏览器；详细约束见TRANSLATION.md                                                                                                                |
 
 ## 备份与升级
 
-各站DB分别做一致性逻辑备份，含核心词典、管理编辑与学习记录；另保留registry/密钥与映射。不要只复制正在写的PG volume。内容源缓存可按固定摘要重新下载，不替代业务DB备份。恢复到新DB核验身份、内容pack、进度和统计后再切换。`pg_dump/pg_restore` 与固定PG版本匹配，备份移到另一机器并定期恢复演练。[Postgres备份](https://www.postgresql.org/docs/current/backup-dump.html)
+各站DB分别做一致性逻辑备份，含核心词典、管理编辑与学习记录；另保留registry/密钥与映射。不要只复制正在写的PG volume。内容/预生成媒体和模型可按固定摘要重新下载，不替代业务DB备份。音频卷还包含本站按需合成文件；保管它可避免重新生成，但媒体来源和WordAudio业务记录随对应站点DB备份。恢复到新DB核验身份、内容pack、进度和统计后再切换。`pg_dump/pg_restore` 与固定PG版本匹配，备份移到另一机器并定期恢复演练。[Postgres备份](https://www.postgresql.org/docs/current/backup-dump.html)
 
 默认单站 Compose 的逻辑备份示例，在本地私有目录保留 dump：
 
@@ -179,7 +180,7 @@ docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exi
 
 ## CI 与镜像发行
 
-CI对PR/main运行锁文件安装、格式、双PG17 migration/seed、sites/typecheck/build与一次 `pnpm test`。测试库显式CONTENT_PACK=demo，CONTENT_TEST_DATABASE_URL启用源码内合成内容PG fixture；不重复执行独立CLI夹具。随后验证基础/scale/翻译Compose描述，构建镜像，并在隔离Compose默认ecdict安装完整字典及英美音标，等待最多600秒，核对ready和catalog声明770,611；另启动闭合网关容器，验证无鉴权请求返回401，不依赖真实Google可用性。清理只针对CI隔离project的卷。
+CI对PR/main运行锁文件安装、格式、双PG17 migration/seed、sites/typecheck/build与一次 `pnpm test`。测试库显式CONTENT_PACK=demo，CONTENT_TEST_DATABASE_URL启用源码内合成内容PG fixture；不重复执行独立CLI夹具。另执行有界tar提取的Python回归；随后验证基础/scale/翻译Compose描述，构建镜像，并在隔离Compose默认ecdict安装完整字典、英美音标与预生成音频，等待最多600秒，核对ready、catalog声明770,611、5书去重8798词的17596音源与两口音IPA完整性，并校验真人/合成样本文件；另启动闭合网关容器，验证无鉴权请求返回401，不依赖真实Google可用性。清理只针对CI隔离project的卷。
 
 0.3代码86afefa的 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过13文件86项测试、双PG17回归和Compose默认全量安装；明确断言installedDictionary/declaredEntryCount=770611，私密导出后实际登录随机admin，网关健康及无鉴权401通过。US/UK数值和3包数量由本机/VPS验证，未写成CI的独立数值断言。VPS管理员与公网双站42项断言另列，不混用测试环境与生产容量证据。
 

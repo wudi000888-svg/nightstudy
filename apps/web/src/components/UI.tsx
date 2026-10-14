@@ -5,6 +5,7 @@ import { errorText } from '../lib/api';
 import type { Word } from '../lib/types';
 import { AudioButton } from './Pronunciation';
 import { dictionaryText } from '../lib/dictionary';
+import { InteractiveEnglish } from './InteractiveEnglish';
 export { AudioButton } from './Pronunciation';
 
 export function Heading({
@@ -89,8 +90,16 @@ export function LoginPrompt() {
     />
   );
 }
-export function WordView({ word, focusSenseId }: { word: Word; focusSenseId?: string }) {
-  const senses = [...(word.senses ?? [])]
+export function WordView({
+  word,
+  focusSenseId,
+  hideMeanings = false,
+}: {
+  word: Word;
+  focusSenseId?: string;
+  hideMeanings?: boolean;
+}) {
+  const senses = [...(hideMeanings ? [] : (word.senses ?? []))]
     .filter((sense) => (sense.definitionZh ?? '').trim() || sense.definitionEn?.trim())
     .sort((a, b) => Number(b.id === focusSenseId) - Number(a.id === focusSenseId));
   return (
@@ -124,7 +133,10 @@ export function WordView({ word, focusSenseId }: { word: Word; focusSenseId?: st
           </div>
           {word.phoneticUs || word.phoneticUk
             ? word.phoneticSource && (
-                <span className="phonetic-caption">音标来源 · {word.phoneticSource}</span>
+                <details className="phonetic-caption">
+                  <summary>音标出处</summary>
+                  <span>{word.phoneticSource}</span>
+                </details>
               )
             : !!word.phonetics?.length && (
                 <span className="phonetic-caption">词库音标 · 来源未分型</span>
@@ -141,16 +153,24 @@ export function WordView({ word, focusSenseId }: { word: Word; focusSenseId?: st
                 {sense.id === focusSenseId ? ' · 当前重点' : ` · 释义 ${index + 1}`}
               </span>
               {dictionaryText(sense.definitionZh) && (
-                <p className="meaning-zh">{dictionaryText(sense.definitionZh)}</p>
+                <p className="meaning-zh">
+                  <InteractiveEnglish text={dictionaryText(sense.definitionZh)} />
+                </p>
               )}
               {dictionaryText(sense.definitionEn) && (
-                <p className="meaning-en">{dictionaryText(sense.definitionEn)}</p>
+                <p className="meaning-en">
+                  <InteractiveEnglish text={dictionaryText(sense.definitionEn)} />
+                </p>
               )}
               {sense.exampleEn?.trim() && (
                 <blockquote>
-                  <p>{dictionaryText(sense.exampleEn)}</p>
+                  <p>
+                    <InteractiveEnglish text={dictionaryText(sense.exampleEn)} />
+                  </p>
                   {dictionaryText(sense.exampleZh) && (
-                    <small>{dictionaryText(sense.exampleZh)}</small>
+                    <small>
+                      <InteractiveEnglish text={dictionaryText(sense.exampleZh)} />
+                    </small>
                   )}
                   {sense.exampleSource && (
                     <small className="source-line">
@@ -170,10 +190,10 @@ export function WordView({ word, focusSenseId }: { word: Word; focusSenseId?: st
           ))}
         </div>
       )}
-      {word.senses && senses.length === 0 && (
+      {!hideMeanings && word.senses && senses.length === 0 && (
         <p className="fine-print">该词条来源暂未提供可展示的释义。</p>
       )}
-      {(word.source?.reference || word.sourceRef) && (
+      {!hideMeanings && (word.source?.reference || word.sourceRef) && (
         <div className="word-source-detail">
           <p className="source-line">内容来源 · {word.source?.reference || word.sourceRef}</p>
           {word.source?.license && (

@@ -9,6 +9,9 @@ import { registerTranslation } from './translation.js';
 import { registerPronunciation } from './pronunciation.js';
 import { registerSystem } from './system.js';
 import { registerFleet } from './fleet.js';
+import { registerCustomBooks } from './custom-books.js';
+import { registerDictionaryResolver } from './dictionary-resolver.js';
+import { registerBookTemplates } from './book-templates.js';
 import type { FleetTransport } from './fleet-transport.js';
 
 export async function registerModules(
@@ -25,4 +28,7 @@ export async function registerModules(
   await registerPronunciation(app, getContext);
   await registerSystem(app, getContext);
   await registerFleet(app, getContext, { transport: options.fleetTransport });
+  await registerCustomBooks(app, getContext);
+  await registerDictionaryResolver(app, getContext);
+  await registerBookTemplates(app, getContext);
 }

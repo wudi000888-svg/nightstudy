@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "version": "audio-v1",
+  "description": "Pinned Piper voices plus four independently verified Commons word recordings; generated audio is explicitly synthetic.",
+  "engine": {
+    "package": "piper-tts",
+    "version": "1.8.0",
+    "pythonRequires": ">=3.9",
+    "license": "GPL-3.0-or-later",
+    "sourceUrl": "https://github.com/OHF-Voice/piper1-gpl/tree/639388b6317fc4731e91d53da42aea68fd4166ff",
+    "licenseNotice": "audio-licenses/PIPER-COPYING-GPL-3.0.txt",
+    "licenseSha256": "0ae0485a5bd37a63e63603596417e4eb0e653334fa6c7f932ca3a0e85d4af227",
+    "officialPackages": [
+      {
+        "digests": {
+          "blake2b_256": "0af990e75adb55b3470a73030598c36f9969fe568e8458c066fa9b4fbc78a4c1",
+          "md5": "7a19ec0219b1f3815288c6e044e6a4d9",
+          "sha256": "33e7425933e9290fe651ae127916ed1ca6104cfa3d94e9049295dd3a5c449382"
+        },
+        "filename": "piper_tts-1.8.0-cp39-abi3-macosx_11_0_arm64.whl",
+        "size": 34119781,
+        "url": "https://files.pythonhosted.org/packages/0a/f9/90e75adb55b3470a73030598c36f9969fe568e8458c066fa9b4fbc78a4c1/piper_tts-1.8.0-cp39-abi3-macosx_11_0_arm64.whl"
+      },
+      {
+        "digests": {
+          "blake2b_256": "84810112a7d510911f33018dc24023d1655bb772f84a4e95fe7f0180f66bbd17",
+          "md5": "700ba6d2a2e75b3ece0bbdedcf4e635c",
+          "sha256": "25b4d3f31ff70c8fa7151908e00aaa5650cbdf16bca8fcf21299f3941b89a7d3"
+        },
+        "filename": "piper_tts-1.8.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl",
+        "size": 34131442,
+        "url": "https://files.pythonhosted.org/packages/84/81/0112a7d510911f33018dc24023d1655bb772f84a4e95fe7f0180f66bbd17/piper_tts-1.8.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl"
+      },
+      {
+        "digests": {
+          "blake2b_256": "02cc95b18b58d9c235d8e0bcece7321b7a7347873c14f9fea2c734b31ef04ff2",
+          "md5": "b034a2f4cde39c73275c1008e5d38ebd",
+          "sha256": "830588aded347df579c91a32703e0fc2a3685d84f1e3533b14f2de69135d4904"
+        },
+        "filename": "piper_tts-1.8.0.tar.gz",
+        "size": 24276117,
+        "url": "https://files.pythonhosted.org/packages/02/cc/95b18b58d9c235d8e0bcece7321b7a7347873c14f9fea2c734b31ef04ff2/piper_tts-1.8.0.tar.gz"
+      }
+    ],
+    "phoneticSupplement": {
+      "method": "algorithmic",
+      "package": "piper-tts@1.8.0 bundled eSpeak-NG",
+      "voices": {
+        "US": "en-us",
+        "UK": "en-gb-x-rp"
+      },
+      "overridesExistingTypedIPA": false,
+      "expertValidated": false,
+      "audioModelConfigChanged": false
+    }
+  },
+  "voiceRevision": "c10ece1aade47bb51c153c893d14e5bf8e5b7117",
+  "voiceLicenseDeclaration": {
+    "kind": "voice-repo-license-declaration",
+    "url": "https://huggingface.co/rhasspy/piper-voices/resolve/c10ece1aade47bb51c153c893d14e5bf8e5b7117/README.md",
+    "size": 497,
+    "sha256": "33e93643fce5180886300f9f0070eeeab8af148efb8e84361f8904def80fd9fb",
+    "license": "MIT (publisher front-matter declaration)",
+    "caveat": "No full LICENSE file exists at repository root; do not substitute engine GPL/MIT license as the voice-model grant."
+  },
+  "voiceLicenseTerms": {
+    "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+    "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+    "size": 1078,
+    "caveat": "Standard license text only, not an independent grant. Preserve publisher declaration/model authors separately."
+  },
+  "voices": {
+    "US": {
+      "locale": "en-US",
+      "sourceName": "Piper ljspeech (high), US English female",
+      "sourceUrl": "https://huggingface.co/rhasspy/piper-voices/blob/c10ece1aade47bb51c153c893d14e5bf8e5b7117/en/en_US/ljspeech/high/MODEL_CARD",
+      "license": "MIT",
+      "attribution": "Synthetic speech generated with Piper 1.8.0; voice trained by Bryce Beattie and distributed by rhasspy/piper-voices (MIT declaration); training dataset declared public domain. Not a human word recording or expert-certified pronunciation.",
+      "model": {
+        "fileName": "en_US-ljspeech-high.onnx",
+        "url": "https://huggingface.co/rhasspy/piper-voices/resolve/c10ece1aade47bb51c153c893d14e5bf8e5b7117/en/en_US/ljspeech/high/en_US-ljspeech-high.onnx",
+        "sizeBytes": 114199011,
+        "sha256": "5d4f08ba6a2a48c44592eed3ce56bf85e9de3dd4e20df90541ae68a8310c029a"
+      },
+      "config": {
+        "fileName": "en_US-ljspeech-high.onnx.json",
+        "url": "https://huggingface.co/rhasspy/piper-voices/resolve/c10ece1aade47bb51c153c893d14e5bf8e5b7117/en/en_US/ljspeech/high/en_US-ljspeech-high.onnx.json",
+        "sizeBytes": 4970,
+        "sha256": "7e1f4634af596d83cca997fb7a931ba80b70f8a316a2655ee69c55365e0ace14"
+      },
+      "modelCard": {
+        "url": "https://huggingface.co/rhasspy/piper-voices/resolve/c10ece1aade47bb51c153c893d14e5bf8e5b7117/en/en_US/ljspeech/high/MODEL_CARD",
+        "sha256": "289f7421072d689a3d91f6c632f486af46f9b8b04417536104a4ea667b8a394b",
+        "notice": "audio-licenses/MODEL-CARD-US-LJSPEECH.txt"
+      }
+    },
+    "UK": {
+      "locale": "en-GB",
+      "sourceName": "Piper cori (high), UK English female",
+      "sourceUrl": "https://huggingface.co/rhasspy/piper-voices/blob/c10ece1aade47bb51c153c893d14e5bf8e5b7117/en/en_GB/cori/high/MODEL_CARD",
+      "license": "MIT",
+      "attribution": "Synthetic speech generated with Piper 1.8.0; voice trained by Bryce Beattie and distributed by rhasspy/piper-voices (MIT declaration); training dataset declared public domain. Not a human word recording or expert-certified pronunciation.",
+      "model": {
+        "fileName": "en_GB-cori-high.onnx",
+        "url": "https://huggingface.co/rhasspy/piper-voices/resolve/c10ece1aade47bb51c153c893d14e5bf8e5b7117/en/en_GB/cori/high/en_GB-cori-high.onnx",
+        "sizeBytes": 114219352,
+        "sha256": "470b4dd634c98f8a4850d7626ffc3dfc90774628eeef6605a6dd8f88f30a5903"
+      },
+      "config": {
+        "fileName": "en_GB-cori-high.onnx.json",
+        "url": "https://huggingface.co/rhasspy/piper-voices/resolve/c10ece1aade47bb51c153c893d14e5bf8e5b7117/en/en_GB/cori/high/en_GB-cori-high.onnx.json",
+        "sizeBytes": 4963,
+        "sha256": "9e7fb5b5671612c22f3c81cbe46c1ae87b031a4632bcb509e499dad6f1e2adec"
+      },
+      "modelCard": {
+        "url": "https://huggingface.co/rhasspy/piper-voices/resolve/c10ece1aade47bb51c153c893d14e5bf8e5b7117/en/en_GB/cori/high/MODEL_CARD",
+        "sha256": "136e7bd168b6c35b4a5df01a0253297e5773b5775ceae0af5160f264aa58208f",
+        "notice": "audio-licenses/MODEL-CARD-UK-CORI.txt"
+      }
+    }
+  },
+  "recordings": [
+    {
+      "lemma": "rain",
+      "accent": "US",
+      "sourceName": "Wikimedia Commons: En-us-rain.ogg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:En-us-rain.ogg",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/9/95/En-us-rain.ogg",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "Dvortygirl; https://commons.wikimedia.org/wiki/File:En-us-rain.ogg; CC-BY-SA-3.0; original recording unchanged.",
+      "fileName": "En-us-rain.ogg",
+      "sizeBytes": 10751,
+      "sha256": "26dc74292f65151cc7b824f8d82eb15833cc7cc03c60b0d8b79164e554635361",
+      "commonsSha1": "4be4233dc6179c9feb7d3ffb83262e431d4a53cf",
+      "mimeType": "audio/ogg",
+      "regionEvidence": "File description states United States/US English; specific Kaikki audio sound US/General-American.",
+      "recordingVerifiedAt": "2026-10-14"
+    },
+    {
+      "lemma": "abacus",
+      "accent": "US",
+      "sourceName": "Wikimedia Commons: En-us-abacus.ogg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:En-us-abacus.ogg",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/b/ba/En-us-abacus.ogg",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "Dvortygirl; https://commons.wikimedia.org/wiki/File:En-us-abacus.ogg; CC-BY-SA-3.0; original recording unchanged.",
+      "fileName": "En-us-abacus.ogg",
+      "sizeBytes": 14604,
+      "sha256": "fe56e09c1e64a57a9c874653399ee2a734ad9e3929586e4bb54a6f6423566778",
+      "commonsSha1": "131b93d65022aab0c32b8ec692bf0a588d2df841",
+      "mimeType": "audio/ogg",
+      "regionEvidence": "File description states United States/US English; specific Kaikki audio sound US/General-American.",
+      "recordingVerifiedAt": "2026-10-14"
+    },
+    {
+      "lemma": "abandon",
+      "accent": "US",
+      "sourceName": "Wikimedia Commons: En-us-abandon.ogg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:En-us-abandon.ogg",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/d/dd/En-us-abandon.ogg",
+      "license": "CC-BY-SA-3.0",
+      "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+      "attribution": "Dvortygirl; https://commons.wikimedia.org/wiki/File:En-us-abandon.ogg; CC-BY-SA-3.0; original recording unchanged.",
+      "fileName": "En-us-abandon.ogg",
+      "sizeBytes": 13368,
+      "sha256": "dd02950aab699d82377765bc9d62cc0b0bae2322a44e2e163e26432280f46b2b",
+      "commonsSha1": "e33d1e1c92d04d2ae66697dc998c242120e50c12",
+      "mimeType": "audio/ogg",
+      "regionEvidence": "File description states United States/US English; specific Kaikki audio sound US/General-American.",
+      "recordingVerifiedAt": "2026-10-14"
+    },
+    {
+      "lemma": "rain",
+      "accent": "UK",
+      "sourceName": "Wikimedia Commons: En-uk-rain.ogg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:En-uk-rain.ogg",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/9/99/En-uk-rain.ogg",
+      "license": "CC-BY-3.0-US",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0/us/deed.en",
+      "attribution": "Association Shtooka / Judith Franck; https://commons.wikimedia.org/wiki/File:En-uk-rain.ogg; CC-BY-3.0-US; original recording unchanged.",
+      "fileName": "En-uk-rain.ogg",
+      "sizeBytes": 16363,
+      "sha256": "596b749b3e0ffa7c966e838351cea9c6476a4291a25da89f38051030955190d5",
+      "commonsSha1": "336e828c86f0ef3f5bbc58d267811578fc3d076f",
+      "mimeType": "audio/ogg",
+      "regionEvidence": "File description: speaker from London, England; specific Kaikki audio sound UK.",
+      "recordingVerifiedAt": "2026-10-14"
+    }
+  ],
+  "constraints": {
+    "accents": ["US", "UK"],
+    "nativeSampleRate": 22050,
+    "channels": 1,
+    "sampleWidthBytes": 2,
+    "maxTextCharacters": 160,
+    "expectedFullPackLemmaCount": 8798,
+    "maximumCpuThreadsPerWorker": 4,
+    "synthesisDoesNotCertifyAccent": true
+  },
+  "licenseNotices": [
+    "audio-licenses/NOTICE.txt",
+    "audio-licenses/PIPER-COPYING-GPL-3.0.txt",
+    "audio-licenses/VOICE-MIT-TERMS.txt",
+    "audio-licenses/PIPER-VOICES-LICENSE-DECLARATION.txt",
+    "audio-licenses/MODEL-CARD-US-LJSPEECH.txt",
+    "audio-licenses/MODEL-CARD-UK-CORI.txt",
+    "audio-licenses/COMMONS-CC-BY-SA-3.0.txt",
+    "audio-licenses/COMMONS-CC-BY-3.0-US.txt"
+  ]
+}

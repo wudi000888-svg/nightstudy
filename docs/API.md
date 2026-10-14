@@ -1,12 +1,12 @@
 # Alpha API 契约
 
-对应已验收的 `0.3.0-alpha.1` 代码 `86afefa`；86项测试、PG17/Compose CI及VPS42项管理员/真实双站HTTPS检查通过，范围见 [README](../README.md)。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。root的basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
+对应 `0.4.0-alpha.1` 开发接口；本轮完整音频生成、最终验收和发布仍在进行。已验收的0.3代码 `86afefa` 及其86项测试/生产HTTPS证据保持为历史范围，见 [README](../README.md)。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。root的basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
 
 请求由可信 Host 与规范 basePath 选择 operator 配置的 Realm，随后只访问该站独立认证/业务 PG DB。客户端不能通过 `siteId`、`userId`、数据库 URL 参数切换身份。真正互不信任的站点使用不同 origin；同 origin 子路径属于同一信任域。
 
 ## 请求、认证与错误
 
-业务请求返回 JSON；写请求必须使用 `Content-Type: application/json`。浏览器携带本站 session Cookie，使用 `credentials: include`。Cookie 是 host-only、HttpOnly、SameSite=Lax，每站独立 prefix/path；HTTPS 生产站启用 Secure。应用拒绝不可信 Origin 及显式 cross-site 写请求，不允许任意 CORS 来源。
+业务接口通常返回JSON；音频、模板和失败清单下载返回对应媒体或文本。写请求必须使用 `Content-Type: application/json`，词书文件也按base64放入JSON，不使用multipart。浏览器携带本站 session Cookie，使用 `credentials: include`。Cookie 是 host-only、HttpOnly、SameSite=Lax，每站独立 prefix/path；HTTPS 生产站启用 Secure。应用拒绝不可信 Origin 及显式 cross-site 写请求，不允许任意 CORS 来源。
 
 应用PG原子限流以site/IP/分钟计数：认证、初始化与配对票据兑换30次，普通API600次，429返回Retry-After。数字是请求门槛，不是实测容量；Better Auth另有附加限流。
 
@@ -15,6 +15,8 @@
 默认 app 启动后及每60秒执行有界 PG lease 维护；独立worker复用同入口。过期记录清理有每表批次上限，失败任务至多5次后标 failed，先核验SiteState/site绑定。该机制只描述维护任务，不是通用内容导入队列。
 
 业务错误结构：`{ "code": "session_conflict", "message": "…", "details": { } }`，details 可省略。常见状态：400 输入有误，401 未登录，403 缺权限/来源不可信，404 本站资源不存在，409 版本或动作冲突，415 非 JSON 写请求，429 限流，503 DB 未准备/暂不可用。冲突后读取最新资源，保留原动作编号用于同内容重试，不能改内容后复用编号。
+
+浏览器只对本站401 `authentication_required` 通知本地会话失效。子站401 `fleet_grant_revoked` 等仅代表远端授权问题，不退出控制站账户；前置代理401无法确认远端grant撤销时返回 `fleet_remote_authorization_unconfirmed`，不能假报已解绑。
 
 ## 站点初始化与登录
 
@@ -48,39 +50,70 @@
 
 ## 用户内容与设置
 
-| 方法与相对路径                    | 访问 | 主要参数与响应                                                                   |
-| --------------------------------- | ---- | -------------------------------------------------------------------------------- |
-| `GET /books`                      | 访客 | 已发布词书；wordCount/learnedCount/coveredCount/claimedKnownCount/isDemo         |
-| `GET /books/:id`                  | 访客 | book/items/page；limit 1–200，默认100；cursor按ordinal继续读取完整词书           |
-| `POST /books/:id/select`          | 用户 | JSON `{}`；更新 currentBookId 与 goal，返回 settings                             |
-| `GET /dictionary?q=rain&limit=20` | 访客 | 规范化前缀查词；limit 1–50，cursor；items/page/source/sources/completeDictionary |
-| `GET /dictionary/stats`           | 访客 | ready数据包元数据；installedDictionary/countBasis/declaredEntryCount/packs       |
-| `GET /words/:id`                  | 访客 | 已发布word的全部senses、音标与来源；每个Sense包含source/exampleSource            |
-| `GET /me/settings`                | 用户 | settings                                                                         |
-| `PATCH /me/profile`               | 用户 | name；不允许修改 role/email/其他用户                                             |
-| `PATCH /me/settings`              | 用户 | 可选 goal/currentBookId/dailyNewLimit/groupSize/timeZone/expectedRevision        |
-| `GET /wordbook`                   | 用户 | 本人生词本，当前最多 500 条，含 note/favorite/paused/progress                    |
-| `POST /wordbook`                  | 用户 | wordId 与可选 note；加入/收藏已发布词                                            |
-| `PATCH /wordbook/:wordId`         | 用户 | 可选 note/favorite/paused                                                        |
-| `DELETE /wordbook/:wordId`        | 用户 | JSON `{}`；移除生词本项，保留学习进度                                            |
-| `GET /announcements`              | 访客 | 最近 20 条已发布公告                                                             |
+| 方法与相对路径                      | 访问      | 主要参数与响应                                                                                                          |
+| ----------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GET /books`                        | 访客/本人 | 公开已发布词书及登录用户本人的私有书；wordCount/learnedCount/coveredCount/claimedKnownCount/isDemo/visibility/ownedByMe |
+| `GET /books/:id`                    | 访客/本人 | 公开书或本人私有书的book/items/page；limit 1–200，默认100；cursor按ordinal继续读取完整词书                              |
+| `POST /books/:id/select`            | 用户      | JSON `{}`；更新 currentBookId 与 goal，返回 settings                                                                    |
+| `GET /dictionary?q=rain&limit=20`   | 访客      | 规范化前缀查词；limit 1–50，cursor；items/page/source/sources/completeDictionary                                        |
+| `GET /dictionary/resolve?text=rain` | 访客      | 点词精确解析；word/queried/matchedLemma/matchType，未命中word=null                                                      |
+| `GET /dictionary/stats`             | 访客      | ready数据包元数据；installedDictionary/countBasis/declaredEntryCount/packs                                              |
+| `GET /words/:id`                    | 访客      | 已发布word的全部senses、音标与来源；每个Sense包含source/exampleSource                                                   |
+| `GET /me/settings`                  | 用户      | settings                                                                                                                |
+| `PATCH /me/profile`                 | 用户      | name；不允许修改 role/email/其他用户                                                                                    |
+| `PATCH /me/settings`                | 用户      | 可选 goal/currentBookId/dailyNewLimit/groupSize/timeZone/expectedRevision                                               |
+| `GET /wordbook?limit=50&cursor=...` | 用户      | 本人生词本，当前最多 500 条，含 note/favorite/paused/progress                                                           |
+| `POST /wordbook`                    | 用户      | wordId 与可选 note；加入/收藏已发布词                                                                                   |
+| `PATCH /wordbook/:wordId`           | 用户      | 可选 note/favorite/paused                                                                                               |
+| `DELETE /wordbook/:wordId`          | 用户      | JSON `{}`；移除生词本项，保留学习进度                                                                                   |
+| `GET /announcements`                | 访客      | 最近 20 条已发布公告                                                                                                    |
 
-goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固定版 ECDICT 的770,611词及5本源目标词书，并保留40词原创演示内容；目标书按上游标签/词频规则建立，不是官方完整考试大纲。`CONTENT_PACK=demo` 显式保留最小演示模式。内容版本、许可和覆盖见 [CONTENT.md](CONTENT.md)。dailyNewLimit 1–100，groupSize 1–20，timeZone 必须是有效 IANA 时区。settings 有 revision；建议 PATCH 携带 expectedRevision，过期返回409 `settings_conflict` 和最新settings。
+goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固定版ECDICT的770,611词及5本源目标词书；0.4生产内容准备归档旧演示书，40词身份、原创内容、历史学习和会话快照仍保留。目标书按上游标签/词频规则建立，不是官方完整考试大纲。`CONTENT_PACK=demo` 用于显式最小开发/测试数据。内容版本、许可和覆盖见 [CONTENT.md](CONTENT.md)。dailyNewLimit 1–100，groupSize 1–20，timeZone 必须是有效 IANA 时区。settings 有 revision；建议 PATCH 携带 expectedRevision，过期返回409 `settings_conflict` 和最新settings。
+
+`/dictionary/resolve` 接受text长度1–80，当前执行规范化精确匹配，返回 `matchType=exact` 或 `not-found`；没有前缀近似替代、后缀猜测或未经证实的原形推断。客户端可兼容未来有词典关系证据的 `inflection` 类型，但本轮不能把它描述为已实现的词形分析。未命中示例：`{ "word": null, "queried": "…", "matchedLemma": null, "matchType": "not-found" }`。
 
 词书详情、字典和admin词检索使用keyset分页，返回 `page={total,hasMore,nextCursor}`；词书按ordinal、词检索按normalizedLemma排序。后续请求原样携带nextCursor；游标绑定词书ID或规范化查询词，不能在变更q或词书时复用，否则400 `invalid_cursor`。它是分页位置，不能切换Realm，也不是事务快照。列表仅提供前3个Sense及senseCount/detailAvailable，完整多义项从 `/words/:id` 读取。
 
 字典返回 `source=postgres-catalog`，已安装ready ECDICT时 `completeDictionary=true`；该值只声明固定数据包已安装，不代表覆盖所有英语。`/dictionary/stats` 的 `countBasis=installed-pack-metadata`，declaredEntryCount累计ready词典包声明词数，排除kind=phonetics的独立音标包，不能当作当前已发布Word的实时计数。每个Word及Sense披露来源，原创例句、站点编辑和源释义分开标记；缺失的释义、音标、例句保持缺失。现代US/UK IPA与原始source-transcription分开，参见 [PHONETICS.md](PHONETICS.md)。
 
+## 私有自定义词书
+
+除模板外，下列入口要求本站用户，资源按服务端user身份隔离，不接收ownerId/userId来替换所有者。私有书在本人 `/books`、详情、选择和学习会话中使用；其他用户及访客不能读取或选用。
+
+| 方法与相对路径                                      | 契约                                                                                                  |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `GET /custom-books/template`                        | 格式元数据：formatVersion/header/text/limits/requirements/downloadUrls                                |
+| `GET /custom-books/templates/:format`               | `txt`、`docx`、`pdf` 的标准模板文件                                                                   |
+| `POST /custom-books/imports`                        | title/description?/goal/format/filename/contentBase64；生成本人预览，返回import/items/page，首屏100行 |
+| `GET /custom-books/imports/:id`                     | 读取预览；limit1–200/cursor/status=all\|ready\|failed\|duplicate                                      |
+| `POST /custom-books/imports/:id/confirm`            | commandId；再次核验原合格项并创建私有词书，返回book/import/duplicate/addedCount/skippedCount          |
+| `GET /custom-books/imports/:id/failures?format=txt` | TXT或TSV失败/重复清单，包含原行和具体原因                                                             |
+| `GET /custom-books?status=published`                | 本人词书；status=published\|archived\|all，含词数和学习覆盖计数，最近最多100本                        |
+| `PATCH /custom-books/:id`                           | title?/description?/status=published\|archived；不改变所有权或公开可见性                              |
+| `DELETE /custom-books/:id`                          | JSON `{}`；归档，返回archived/progressRetained/existingSessionsRetainSnapshots                        |
+
+格式版本为 `word-lines-v1`。首个非空文本行必须为 `NIGHTSTUDY-WORDBOOK v1`，随后每行一个英语单词或短语，不接受编号、释义、任意表格或混合语言行。TXT使用UTF-8，原始文件最多262,144字节；DOCX/PDF最多2,097,152字节；每批最多10,000项，PDF最多250页，抽取文本最多512,000字符。上传路由JSON上限4 MiB，原文件限制按base64解码后的字节另查。仅支持DOCX，不把旧DOC当文本读取；PDF需可抽取文本，不做OCR。解析超时、活动内容、布局/编码不支持、过度解压及损坏文档明确失败。
+
+预览import包含id/title/description/goal/filename/format/formatVersion/status/counts/expiresAt/createdAt/confirmedAt/bookId。status为preview或confirmed，预览有效24小时；每人最多10份未到期未确认预览。`counts={totalRows,ready,failed,duplicates,missingPronunciation,notFound,missingDefinition}`；缺音源或IPA按失败行计一次，各原因可以重叠，不相加作为总失败数。
+
+每行返回lineNumber/text/normalizedLemma/status/wordId?/lemma?/reasons/readiness?/duplicateOfLine?。只有精确命中的已发布词、非空中文义、US/UK地区IPA及两口音ready音源记录齐备时才是ready；音源可以是按来源明确标注的真人录音或Piper合成。失败原因包括not_found、missing_definition、missing_phonetic_us/uk、missing_audio_us/uk；重复行单独标duplicate。不会生成虚构词义、猜词形或用设备语音冒充已就绪服务器音源。
+
+确认携带稳定commandId；同内容重试不会重复创建词书。原ready项在确认时再次核验，失效项跳过；若一个合格词都不剩，409 `custom_import_no_ready_words` 的details.import给出最新统计，读取预览可见新失败原因。原failed项不会被静默加入，补齐资料后可重新上传预览。归档只停止新书选择，保留canonical词进度、历史评价和已签发内容快照。
+
 ## 发音与在线翻译
 
-| 方法与相对路径               | 访问 | 主要参数与响应                                                                              |
-| ---------------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| `GET /pronunciation/:wordId` | 访客 | pronunciation：text/phonetics/audio/recordedAudioAvailable/speech                           |
-| `GET /translation/provider`  | 访客 | provider的mode/transport/configured/unofficial/bestEffort/maxTextLength等，无网关URL或token |
-| `POST /translation/website`  | 访客 | text/sourceLanguage/targetLanguage；返回Google官方网页链接及iframeSupported=false           |
-| `POST /translation/text`     | 用户 | 同一文本契约；配置后返回translation与website；本站用户共享PG限流20次/分钟                   |
+| 方法与相对路径                             | 访问 | 主要参数与响应                                                                              |
+| ------------------------------------------ | ---- | ------------------------------------------------------------------------------------------- |
+| `GET /pronunciation/:wordId`               | 访客 | pronunciation：text/phonetics/audio/recordedAudioAvailable/speech                           |
+| `GET /pronunciation/:wordId/audio/:accent` | 访客 | US或UK同源音频，验证文件/MIME头/SHA-256后返回媒体；ETag支持304                              |
+| `POST /pronunciation/:wordId/prepare`      | 用户 | JSON `{}`；服务可用且英美IPA齐备时补缺失合成音源，返回最新pronunciation                     |
+| `GET /translation/provider`                | 访客 | provider的mode/transport/configured/unofficial/bestEffort/maxTextLength等，无网关URL或token |
+| `POST /translation/website`                | 访客 | text/sourceLanguage/targetLanguage；返回Google官方网页链接及iframeSupported=false           |
+| `POST /translation/text`                   | 用户 | 同一文本契约；配置后返回translation与website；本站用户共享PG限流20次/分钟                   |
 
-发音接口提供已安装音标；audio为空、recordedAudioAvailable=false。speech声明由浏览器设备语音朗读，en-US/en-GB是否可用取决于设备语音，不是真人录音库。
+发音接口提供已安装音标、ready音源、recordedAudioAvailable、generationAvailable和设备speech能力。`audio=[{id,accent,kind,url,status,sourceName,sourceUrl,license,attribution,mimeType}]`，accent为US/UK，kind为recorded/synthesized；URL是未添加挂载前缀的 `/api/v2/pronunciation/:wordId/audio/:accent`，客户端用本站mountUrl添加basePath，不接受任意外部字符串作为播放器源。WordDTO也有可选audio；旧会话快照没有该字段时读取fresh发音接口，不附带词义、不提前揭晓答案。
+
+prepare只补缺失音源，不覆盖优先的已就绪真人录音；返回后只更新选项，不自动播放。每用户每分钟最多20次补齐请求，合成运行并发有界。409 `audio_missing_phonetics`/`audio_preparing`、429 `audio_generation_busy`/`audio_generation_rate_limit`、503服务/文件失败与504超时显式报错；处理中可刷新元数据后重试。设备en-US/en-GB需要真实可用voice，是独立备用选项。音源来源许可、算法IPA与目标生成范围见 [PHONETICS.md](PHONETICS.md)。
 
 翻译文本最多1,000个Unicode字符，sourceLanguage为auto/en/zh-CN（默认en），targetLanguage为en/zh-CN（默认zh-CN）。默认website-official仅提供官方网页入口，站内text返回503 `translation_not_configured`；生产站内结果使用带私密token的固定VPS网关，direct仅供本机开发。网页兼容provider返回 `google-web-compat` / `unofficial=true` / `bestEffort=true`，不是受支持的Google Cloud API。本机真实调用已遇到上游429；失败显示明确错误，不把离线词义冒充翻译。Google网页不能直接iframe，本站返回链接。原文会传送至配置网关/Google，不写翻译历史。配置、鉴权、超时的验证范围与尚待项见 [TRANSLATION.md](TRANSLATION.md)。
 
@@ -195,3 +228,5 @@ update包含status/checkedAt/latestVersion/releaseUrl/message/channel，另有ca
 跨站机器入口为POST /fleet/pair及/fleet/remote下的status/users/announcements/actions/unpair。兑换票据原子消耗，独立长期credential保存hash；控制端AES-GCM密文绑定本地/远端instanceId+siteId、连接、地址及grant。机器请求携Bearer及X-Nightstudy-Fleet-Instance/Site目标身份，不建立/转发浏览器Cookie。公共HTTPS443、规范basePath、验证DNS与固定实际拨号地址；拒绝私网/redirect/任意上游路径。
 
 写动作registration.set、user.set-disabled、announcement.create/delete使用commandId与持久回执：同grant同编号同内容安全重试，内容变化409；客户端应在首次请求前生成并保留编号。updates.check为固定检测动作，由检查冷却约束。离线断开保留pending和凭据以便后续确认；网络失败不等于撤销。若管理员明确确认远端grant可能仍存在，可本地forget：清除密文、记forgotten并停止全部远程操作，返回remoteRevocationConfirmed=false；同URL可凭新票重配。远端仍可能需要管理员独立撤销旧grant。目标管理员撤销grant或发行管理员失去admin权限后，授权失效。域名/实例改变、密钥更换等恢复情况应按 [部署边界](DEPLOYMENT.md#群站与版本检测) 处理。
+
+生词本列表默认50条、每页最多100条，返回items与page（total、hasMore、nextCursor），按updatedAt/id倒序游标读取全部收藏；游标绑定本站与用户。`GET /wordbook/:wordId`只返回本人精确收藏项或null，词卡不以列表首批推断收藏状态。词书预览和确认按真实媒体文件、摘要及格式检查两口音；每进程最多2场检查、共8个文件读并发，30秒批间期限到达返回book_import_busy以供重试。

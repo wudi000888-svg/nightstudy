@@ -296,7 +296,7 @@ async function snapshot(ctx: RequestContext) {
     ctx.prisma.contentPack.findMany({ where: { status: 'ready' }, orderBy: { updatedAt: 'desc' } }),
     ctx.prisma.user.count(),
     ctx.prisma.user.count({ where: { disabled: true } }),
-    ctx.prisma.book.count(),
+    ctx.prisma.book.count({ where: { ownerId: null } }),
     getUpdateState(ctx.prisma),
   ]);
   const coverage = packs
@@ -306,7 +306,7 @@ async function snapshot(ctx: RequestContext) {
     typeof coverage?.words === 'number'
       ? coverage.words
       : packs
-          .filter((pack) => obj(pack.tagCounts).kind !== 'phonetics')
+          .filter((pack) => !['phonetics', 'audio'].includes(String(obj(pack.tagCounts).kind)))
           .reduce((sum, pack) => sum + pack.entryCount, 0);
   return {
     site: {

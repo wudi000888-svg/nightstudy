@@ -239,6 +239,39 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     fs.rmSync(webRoot, { recursive: true, force: true });
   }, 60000);
 
+  it('initializes one settings row and plan when a new user concurrently reads settings, statistics and the daily plan', async () => {
+    const { userId } = await actor();
+    await db.userSettings.delete({ where: { userId } });
+    expect(await db.dailyPlan.count({ where: { userId } })).toBe(0);
+    const paths = [
+      '/me/settings',
+      '/study/plan',
+      '/stats',
+      '/me/settings',
+      '/study/plan',
+      '/stats',
+      '/study/plan',
+      '/me/settings',
+    ];
+    const responses = await Promise.all(paths.map((route) => request(userId, 'GET', route)));
+    responses.forEach((response) => expect(response.statusCode, response.body).toBe(200));
+    const settings = await db.userSettings.findMany({ where: { userId } });
+    expect(settings).toHaveLength(1);
+    expect(settings[0]).toMatchObject({
+      userId,
+      dailyTotalGoal: 20,
+      dailyNewLimit: 20,
+      revision: 0,
+    });
+    const plans = await db.dailyPlan.findMany({ where: { userId } });
+    expect(plans).toHaveLength(1);
+    for (const [index, response] of responses.entries()) {
+      const value = response.json();
+      if (paths[index] === '/stats') continue;
+      expect(value.settings).toMatchObject({ userId, revision: 0, dailyTotalGoal: 20 });
+      if (paths[index] === '/study/plan') expect(value.plan.id).toBe(plans[0]!.id);
+    }
+  });
   it('atomically confirms a plan, repeats a command and issues the same primary group across devices', async () => {
     const { userId, bookId } = await actor();
     const preview = await request(

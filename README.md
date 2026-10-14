@@ -11,7 +11,7 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前开发基线：`0.5.0-alpha.1`。** 每日计划改为“复习 + 新学”的不同词总数：先预留到期复习，再从选定词书补新词。选书先预览并确认计划，任务支持暂停、延期、跨端继续、完成历史与七天复习负担；本轮统一验收、发行与部署结果尚待记录。具体规则见 [每日任务](docs/DAILY_TASKS.md)、[个性化计划](docs/architecture/PERSONALIZATION.md) 和 [CHANGELOG](CHANGELOG.md)。
+**当前开发基线：`0.5.0-alpha.2`。** 每日计划改为“复习 + 新学”的不同词总数：先预留到期复习，再从选定词书补新词。选书先预览并确认计划，任务支持暂停、延期、跨端继续、完成历史与七天复习负担；本轮统一验收、发行与部署结果尚待记录。具体规则见 [每日任务](docs/DAILY_TASKS.md)、[个性化计划](docs/architecture/PERSONALIZATION.md) 和 [CHANGELOG](CHANGELOG.md)。
 
 **已验收历史基线：[`0.4.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.4.0-alpha.1)。** 英文点词卡、精确查词、私有标准文档词书导入，以及区分真人录音、服务器合成与设备备用的英美发音已在该版本交付。五本源词书的8,798个词均有两种口音音源；下文已有验证记录仅属于标注的历史版本。
 

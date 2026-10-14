@@ -157,16 +157,17 @@ export async function prepareWordAudio(
         }
       }
       const jobId = `pronunciation:${word.id}:${accent}`;
-      await prisma.job.upsert({
-        where: { id: jobId },
-        create: {
-          id: jobId,
-          type: 'pronunciation',
-          status: 'pending',
-          runAfter: new Date(Date.now() + 45000),
-          payload: { wordId: word.id, accent },
-        },
-        update: {},
+      await prisma.job.createMany({
+        data: [
+          {
+            id: jobId,
+            type: 'pronunciation',
+            status: 'pending',
+            runAfter: new Date(Date.now() + 45000),
+            payload: { wordId: word.id, accent },
+          },
+        ],
+        skipDuplicates: true,
       });
       const claim = await prisma.$queryRaw<
         Array<{ id: string }>

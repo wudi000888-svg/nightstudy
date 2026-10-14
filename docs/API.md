@@ -1,6 +1,6 @@
 # Alpha API 契约
 
-对应 `0.5.0-alpha.1` 开发接口。此文说明当前实现契约，本轮统一验收、发行和部署结果另行记录；0.4及更早的验证仍是各自版本的历史证据，见 [README](../README.md)。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
+对应 `0.5.0-alpha.2` 开发接口。此文说明当前实现契约，本轮统一验收、发行和部署结果另行记录；0.4及更早的验证仍是各自版本的历史证据，见 [README](../README.md)。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
 
 请求由可信 Host 与规范 basePath 选择 operator 配置的 Realm，随后只访问该站独立认证/业务 PG DB。客户端不能通过 `siteId`、`userId`、数据库 URL 参数切换身份。真正互不信任的站点使用不同 origin；同 origin 子路径属于同一信任域。
 

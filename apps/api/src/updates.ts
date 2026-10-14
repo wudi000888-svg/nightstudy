@@ -156,7 +156,11 @@ export async function checkForUpdates(
   prisma: PrismaClient,
   options: { fetchFn?: typeof fetch } = {},
 ): Promise<UpdateView> {
-  await prisma.systemUpdateCheck.upsert({ where: { id: 'singleton' }, create: {}, update: {} });
+  // Initialize atomically across replicas without overwriting cached results or active claims.
+  await prisma.systemUpdateCheck.createMany({
+    data: [{ id: 'singleton' }],
+    skipDuplicates: true,
+  });
   const lockId = randomUUID(),
     now = new Date();
   const claimed = await prisma.$queryRaw<

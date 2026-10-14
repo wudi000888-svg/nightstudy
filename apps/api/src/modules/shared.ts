@@ -109,11 +109,11 @@ export function progressDto(progress: StudyProgress | null) {
   };
 }
 export async function settings(db: Db, userId: string) {
-  const current = await db.userSettings.upsert({
-    where: { userId },
-    create: { userId },
-    update: {},
+  await db.userSettings.createMany({
+    data: [{ userId }],
+    skipDuplicates: true,
   });
+  const current = await db.userSettings.findUniqueOrThrow({ where: { userId } });
   if (
     current.pendingTimeZone &&
     current.timeZoneEffectiveAt &&

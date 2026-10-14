@@ -11,9 +11,13 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前线上版本：[`0.6.0-alpha.3`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.3)。** 五书8,798词的独立中英文解释、8,786词的真实配对或原创用法，以及437词组的学习与英美音源已安装。学习正文保留词性、解释、例句和两个发音选项，来源许可单独查看。生词本按真实复习证据自动整理，熟词本合并自己标记和自动熟词。后台「AI 内容辅助」支持加密保存DeepSeek密钥、主动检测和缺项预览，候选需人工校对保存；日常学习不会触发付费请求。详细范围见 [双语内容](docs/BILINGUAL_CONTENT.md)、[内容包](docs/CONTENT.md) 和 [AI配置](docs/AI_CONFIGURATION.md)。
+**当前线上版本：[`0.6.0-alpha.4`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.4)。** 星星和钉子悬停立即显示功能名称，修复收藏时按钮位移导致点击失效的问题；成功后显示生词本入口，已保存的词可直接移除。生词本增加「已巩固」分类，个人中心也可直接进入。后台「AI 设置」可加密保存DeepSeek密钥并独立启用水平测试智能分析；用户明确选择后，按目标和本次答题生成薄弱点、逐词建议及可手动采用的计划。每份测试最多请求一次，失败仍提供基础报告；不自动改变成绩、熟词或复习证据。详细规则见 [AI配置](docs/AI_CONFIGURATION.md) 和 [CHANGELOG](CHANGELOG.md)。
 
-本版代码 `b2ace74` 已通过363项测试、类型/格式/构建和完整隔离Compose安装验证：[CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38604154087)、[镜像发行](https://github.com/wudi000888-svg/nightstudy/actions/runs/38604382836)。VPS保持770,611个词条，完成25组数据保留检查、45项HTTPS/只读数据库混合检查和旧任务7组快照回读；升级前备份在独立测试库实际恢复并核对原始元数据，临时库和测试账户已清理。管理员现用密码不重置，浏览器现有会话实际验证DeepSeek设置及最新版本检测。未提供真实API密钥，本次付费推理请求为0；未进行容量压测或专家语义认证。
+本版代码 `4a7f4e5` 已通过52文件396项测试、类型/格式/构建和真实双PostgreSQL 17、完整隔离Compose安装验证：[CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38639404852)、[镜像发行](https://github.com/wudi000888-svg/nightstudy/actions/runs/38639482010)。公开amd64镜像已匿名拉取到VPS并按固定摘要部署，HTTPS健康返回alpha.4。升级前后全部40张业务表的原有字段逐行摘要一致，新增AI字段保持默认值；本次升级前备份在独立测试库实际恢复并完成同样的40表核对，临时库已清理，未恢复覆盖在线数据库。现有管理员密码和会话保持，生产浏览器确认新版AI设置与星星、钉子提示。
+
+隔离本机浏览器实际验证收藏成功、已保存状态、取消固定、390×844仿真尺寸的词卡边界与分析报告；AI诊断使用受控模拟响应，选择关闭分析时不调用模型，手动采用计划后才更新每日目标。临时测试账户、数据库和独立运行目录已精确清理。未提供真实API密钥，本次付费推理请求为0；不将模拟结果描述为DeepSeek在线质量或更高准确率的证明，未进行容量压测或专家语义认证。
+
+五书8,798词的独立中英文解释、8,786词的真实配对或原创用法，以及437词组的学习与英美音源保持安装。学习正文保留词性、解释、例句和两个发音选项，来源许可单独查看；日常复习不会触发付费请求。详细范围见 [双语内容](docs/BILINGUAL_CONTENT.md) 和 [内容包](docs/CONTENT.md)。此前alpha.3的363项测试、45项HTTPS/只读数据库混合检查和旧任务快照验收记录属于 [alpha.3发行](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.3)。
 
 [线上双语词卡](docs/media/bilingual-card-preview.jpg) · [DeepSeek 配置页面](docs/media/deepseek-preview.jpg)。IPA包覆盖统计按实测词条刷新，原始账号、词书与学习数据保持；词库完整收录不代表每个冷门词已有双语例句，五书覆盖范围及12个待核对词见内容文档。
 

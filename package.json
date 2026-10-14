@@ -1,6 +1,6 @@
 {
   "name": "nightstudy",
-  "version": "0.6.0-alpha.2",
+  "version": "0.6.0-alpha.3",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.25.0",
@@ -20,7 +20,7 @@
     "translation:gateway": "node apps/api/dist/translation-gateway-server.js",
     "db:deploy": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "db:prepare": "pnpm generate && pnpm db:deploy && pnpm db:seed && pnpm db:bootstrap && tsx scripts/prepare-content.ts && pnpm audio:prepare",
+    "db:prepare": "pnpm generate && pnpm db:deploy && pnpm db:seed && pnpm db:bootstrap && tsx scripts/prepare-content.ts && pnpm audio:prepare && pnpm phonetics:prepare --refresh-coverage-only",
     "content:fetch": "tsx scripts/content-fetch.ts",
     "content:import": "tsx scripts/content-import.ts",
     "content:prepare": "tsx scripts/content-prepare.ts",

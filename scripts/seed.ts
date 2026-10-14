@@ -258,7 +258,7 @@ for (const site of readConfig().sites) {
           const id = `demo-book-${goal}`;
           if (process.env.CONTENT_PACK !== 'demo') {
             await tx.book.updateMany({
-              where: { id, ownerId: null },
+              where: { id, ownerId: null, status: { not: 'archived' } },
               data: { status: 'archived' },
             });
             await tx.userSettings.updateMany({

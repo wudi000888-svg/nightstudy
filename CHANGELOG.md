@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0-alpha.3
+
+- Preserve archived demo book timestamps when initialization repeats.
+- Keep IPA pack metadata stable on repeated preparation and refresh derived coverage after audio installation.
+- Add real PostgreSQL regressions for initialization idempotence; DeepSeek remains optional and disabled until configured.
+
 ## 0.6.0-alpha.2 — Docker 测试库检查修复
 
 包含下述 0.6 功能。词组 PostgreSQL 回归保留本机连接地址、`_test` 库名、实际库名/角色与初始化站点检查，支持 Docker 服务容器的内部网卡地址。0.6.0-alpha.1 的本机验收通过，但 CI 因这项保护检查提前失败，未发行容器、未部署生产；标签及固定内容附件保留。

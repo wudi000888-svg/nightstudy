@@ -62,7 +62,8 @@
 | `GET /me/settings`                  | 用户      | settings                                                                                                                |
 | `PATCH /me/profile`                 | 用户      | name；不允许修改 role/email/其他用户                                                                                    |
 | `PATCH /me/settings`                | 用户      | 可选 goal/currentBookId/dailyNewLimit/groupSize/timeZone/expectedRevision                                               |
-| `GET /wordbook?limit=50&cursor=...` | 用户      | 本人生词本，当前最多 500 条，含 note/favorite/paused/progress                                                           |
+| `GET /wordbook?limit=50&cursor=...` | 用户      | 本人生词本游标分页，默认50条、每页最多100条，items/page含note/favorite/paused/progress                                  |
+| `GET /wordbook/:wordId`             | 用户      | 读取本人精确收藏项或null，不用列表首批推断收藏状态                                                                      |
 | `POST /wordbook`                    | 用户      | wordId 与可选 note；加入/收藏已发布词                                                                                   |
 | `PATCH /wordbook/:wordId`           | 用户      | 可选 note/favorite/paused                                                                                               |
 | `DELETE /wordbook/:wordId`          | 用户      | JSON `{}`；移除生词本项，保留学习进度                                                                                   |
@@ -94,7 +95,7 @@ goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固�
 
 格式版本为 `word-lines-v1`。首个非空文本行必须为 `NIGHTSTUDY-WORDBOOK v1`，随后每行一个英语单词或短语，不接受编号、释义、任意表格或混合语言行。TXT使用UTF-8，原始文件最多262,144字节；DOCX/PDF最多2,097,152字节；每批最多10,000项，PDF最多250页，抽取文本最多512,000字符。上传路由JSON上限4 MiB，原文件限制按base64解码后的字节另查。仅支持DOCX，不把旧DOC当文本读取；PDF需可抽取文本，不做OCR。解析超时、活动内容、布局/编码不支持、过度解压及损坏文档明确失败。
 
-预览import包含id/title/description/goal/filename/format/formatVersion/status/counts/expiresAt/createdAt/confirmedAt/bookId。status为preview或confirmed，预览有效24小时；每人最多10份未到期未确认预览。`counts={totalRows,ready,failed,duplicates,missingPronunciation,notFound,missingDefinition}`；缺音源或IPA按失败行计一次，各原因可以重叠，不相加作为总失败数。
+预览import包含id/title/description/goal/filename/format/formatVersion/status/counts/expiresAt/createdAt/confirmedAt/bookId。status为preview或confirmed，预览有效24小时；每人最多20份未到期未确认预览。`counts={totalRows,ready,failed,duplicates,missingPronunciation,notFound,missingDefinition}`；缺音源或IPA按失败行计一次，各原因可以重叠，不相加作为总失败数。
 
 每行返回lineNumber/text/normalizedLemma/status/wordId?/lemma?/reasons/readiness?/duplicateOfLine?。只有精确命中的已发布词、非空中文义、US/UK地区IPA及两口音ready音源记录齐备时才是ready；音源可以是按来源明确标注的真人录音或Piper合成。失败原因包括not_found、missing_definition、missing_phonetic_us/uk、missing_audio_us/uk；重复行单独标duplicate。不会生成虚构词义、猜词形或用设备语音冒充已就绪服务器音源。
 
@@ -191,7 +192,7 @@ commandId 8–120 字符，对同一用户全局去重。同内容重试不重�
 
 这些接口必须role=admin，只管理本站；群站跨站能力必须另经目标管理员批准grant。没有配置全局Host/DB/secret的Web API。词书Web编排一次最多500个wordIds，不限制源完整书/分页；旧session保留快照，管理变更记录审计。公告与释义是文本。
 
-词书/字典/admin词列表已分页，生词本、用户/公告/审计等接口仍有上述读取上限。operator可通过固定摘要的工具批量安装源内容；当前没有Web通用内容上传、媒体上传或OpenAPI导出。生产客户端应固定版本并在升级时核对 [CHANGELOG](../CHANGELOG.md) 与 [部署文档](DEPLOYMENT.md)。
+词书/字典/生词本/admin词列表已分页，用户/公告/审计等接口仍有上述读取上限。operator可通过固定摘要的工具批量安装源内容；自定义词书使用前述标准文档导入，当前没有管理员通用内容上传、媒体上传或OpenAPI导出。生产客户端应固定版本并在升级时核对 [CHANGELOG](../CHANGELOG.md) 与 [部署文档](DEPLOYMENT.md)。
 
 ## 版本检测
 

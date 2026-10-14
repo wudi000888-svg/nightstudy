@@ -8,6 +8,8 @@ if (pack === 'ecdict') {
   const commands = [
     ['scripts/content-prepare.ts'],
     ...readConfig().sites.map((site) => ['scripts/phonetics-prepare.ts', '--site', site.id]),
+    ['scripts/phrase-prepare.ts'],
+    ['scripts/bilingual-prepare.ts'],
   ];
   for (const args of commands) {
     const command = spawnSync(process.execPath, ['--import', 'tsx', ...args], {

@@ -13,6 +13,8 @@ import { registerModules } from './modules/index.js';
 import { siteOrigins, requestClientIp, authenticationHeaders } from './auth.js';
 import { maintenanceTick } from './maintenance.js';
 import type { FleetTransport } from './modules/fleet-transport.js';
+import { registerDeepSeek } from './modules/deepseek.js';
+import type { DeepSeekTransport } from './providers/deepseek.js';
 
 const setupInput = z.object({
   token: z.string().min(32).max(256),
@@ -24,7 +26,7 @@ const setupInput = z.object({
 export async function buildApp(
   config: AppConfig,
   logging = true,
-  options: { fleetTransport?: FleetTransport } = {},
+  options: { fleetTransport?: FleetTransport; deepSeekTransport?: DeepSeekTransport } = {},
 ) {
   const app = Fastify({
     logger: logging
@@ -36,6 +38,7 @@ export async function buildApp(
             'req.body.token',
             'req.body.pairingToken',
             'req.body.credential',
+            'req.body.apiKey',
           ],
         }
       : false,
@@ -127,6 +130,7 @@ export async function buildApp(
           return { user: ctx.user, siteId: ctx.siteId };
         });
         await registerModules(scope, context, options);
+        await registerDeepSeek(scope, context, { transport: options.deepSeekTransport });
       },
       { prefix: `${basePath}/api/v2` },
     );

@@ -1,6 +1,6 @@
 # Alpha API 契约
 
-对应 `0.5.0-alpha.2` 接口。当前版本的测试、发行与线上验收范围见 [README](../README.md) 和 [每日任务](DAILY_TASKS.md)；0.4及更早的记录保留为历史证据。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
+对应当前0.6源码接口；最终版本的测试、发行与线上验收范围见 [README](../README.md) 和 [每日任务](DAILY_TASKS.md)，已记录的0.5及更早结果保留为历史证据。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
 
 请求由可信 Host 与规范 basePath 选择 operator 配置的 Realm，随后只访问该站独立认证/业务 PG DB。客户端不能通过 `siteId`、`userId`、数据库 URL 参数切换身份。真正互不信任的站点使用不同 origin；同 origin 子路径属于同一信任域。
 
@@ -58,16 +58,21 @@
 | `GET /dictionary?q=rain&limit=20`   | 访客      | 规范化前缀查词；limit 1–50，cursor；items/page/source/sources/completeDictionary                                        |
 | `GET /dictionary/resolve?text=rain` | 访客      | 点词精确解析；word/queried/matchedLemma/matchType，未命中word=null                                                      |
 | `GET /dictionary/stats`             | 访客      | ready数据包元数据；installedDictionary/countBasis/declaredEntryCount/packs                                              |
+| `GET /dictionary/credits?q=rain`    | 访客      | 全部ready包来源与可选精确词条的原始来源/用法说明；不把独立语言义项冒称翻译对照                                          |
 | `GET /words/:id`                    | 访客      | 已发布word的全部senses、音标与来源；每个Sense包含source/exampleSource                                                   |
 | `GET /me/settings`                  | 用户      | settings                                                                                                                |
 | `PATCH /me/profile`                 | 用户      | name；不允许修改 role/email/其他用户                                                                                    |
 | `PATCH /me/settings`                | 用户      | 可选 goal/currentBookId/dailyTotalGoal/groupSize/timeZone/expectedRevision；旧dailyNewLimit仅作兼容                     |
-| `GET /wordbook?limit=50&cursor=...` | 用户      | 本人生词本游标分页，默认50条、每页最多100条，items/page含note/favorite/paused/progress                                  |
+| `GET /wordbook?limit=50&cursor=...` | 用户      | 本人活动生词本游标分页，排除软毕业项，默认50条、每页最多100条，items/page含note/favorite/paused/progress                |
 | `GET /wordbook/:wordId`             | 用户      | 读取本人精确收藏项或null，不用列表首批推断收藏状态                                                                      |
-| `POST /wordbook`                    | 用户      | wordId 与可选 note；加入/收藏已发布词                                                                                   |
+| `POST /wordbook`                    | 用户      | wordId与可选note；已有活动项返回added=false/alreadySaved=true，不覆盖笔记；重新加入毕业项恢复活动状态                   |
 | `PATCH /wordbook/:wordId`           | 用户      | 可选 note/favorite/paused                                                                                               |
 | `DELETE /wordbook/:wordId`          | 用户      | JSON `{}`；移除生词本项，保留学习进度                                                                                   |
 | `GET /announcements`                | 访客      | 最近 20 条已发布公告                                                                                                    |
+
+Word DTO保持canonical ID、词性、音标、senses、独立examples与实际collocations。字段级contentMetadata保留来源；中英文若分属两个Sense，只能作为同词的独立解释，不假定逐义配对。`GET /dictionary/credits`提供独立说明页所需的原始来源以及受原文摘要保护的learningDefinitions。学习正文不因隐藏技术说明而删除可追溯来源数据。
+
+`GET /wordbook/:wordId`还返回collection：`inWordbook`为活动收藏状态，known为manual/automatic/null。生词本删除、软毕业和熟词来源均不删除FSRS历史；具体自动规则见 [内容与个人词本](CONTENT.md#生词本与熟词本)。
 
 goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固定版ECDICT的770,611词及5本源目标词书；0.4生产内容准备归档旧演示书，40词身份、原创内容、历史学习和会话快照仍保留。目标书按上游标签/词频规则建立，不是官方完整考试大纲。`CONTENT_PACK=demo` 用于显式最小开发/测试数据。内容版本、许可和覆盖见 [CONTENT.md](CONTENT.md)。dailyTotalGoal 1–100，是每天复习与新学的不同词总目标；groupSize 1–20。timeZone 必须是有效 IANA 时区，学习日按当地04:00交接；时区改变返回pendingTimeZone/timeZoneEffectiveAt，下个学习日生效，不重切今日窗口。settings有revision；建议PATCH携带expectedRevision，过期返回409 `settings_conflict` 和最新settings。Settings中的旧dailyNewLimit兼容字段现在镜像总目标，不能继续理解为独立新词配额；与dailyTotalGoal同时提交但不相等时返回400 `conflicting_daily_goal`。网页选书使用下述原子计划确认入口，旧book select保留兼容。
 
@@ -175,6 +180,8 @@ pause保留固定内容、历史与未评分预约；deferUntil须为未来且�
 
 评分流程仍是当前item先reveal，再rate（again/hard/good/easy，必须含expectedProgressRevision）；整组评分后进入practice，当前题用answer。phase保持recall/practice/completed，step为prompt/revealed/exercise/completed。拼写只记录练习，不能写FSRS或伪造评分。巩固是到达真实FSRS dueAt后再回忆并评分，产生真实ReviewLog，不是重复增加当日词数，也不是将点击看答案当作复习成功。
 
+接受真实rate时同步返回collection：inWordbook、known及本次transition（graduated/auto-known/auto-known-withdrawn/restored/null）。自动分层只依真实FSRS Review状态、stability与最近Again之后的不同学习日Good/Easy复习，不把首学、拼写或重复回执当作新证据；14天/3日与90天/5日规则见 [内容说明](CONTENT.md#生词本与熟词本)。
+
 ```json
 {
   "commandId": "<本次动作独立UUID>",
@@ -194,23 +201,26 @@ forecast的days含localDate/startsAt/endsAt/dueUnique/overdueCarry。dueUnique�
 
 ## 熟词声明、测试与个人统计
 
-| 方法与相对路径                          | 主要参数与响应                                                       |
-| --------------------------------------- | -------------------------------------------------------------------- |
-| `POST /known-words/imports`             | format=text/csv/json，text；生成 preview，不立即标为熟词             |
-| `GET /known-words/imports`              | 最近最多 50 个本人批次                                               |
-| `POST /known-words/imports/:id/confirm` | JSON `{}`；只确认 matched，重复确认安全                              |
-| `POST /known-words/imports/:id/revoke`  | JSON `{}`；撤销声明，保留已有学习进度                                |
-| `GET /known-words/exports?format=json`  | json/csv；本人已确认声明按wordId去重，每1000行keyset批次流式完整导出 |
-| `POST /assessments`                     | goal、size 1–20（抽样词数，每词拼写与认知两题）                      |
-| `GET /assessments/:id`                  | 本人题目顺序/当前项；完成后 report                                   |
-| `POST /assessments/:id/answers`         | commandId/itemId/answer；只接受当前题，动作去重                      |
-| `POST /assessments/:id/finish`          | JSON `{}`；全部答完才结算 report/plan                                |
-| `GET /mastery/plan?goal=daily`          | 本人对应目标的诊断证据与建议                                         |
-| `POST /activity`                        | eventId/startAt/endAt；仅近期 1–60 秒前台心跳，去重                  |
-| `GET /stats`                            | 今日/30日趋势、学习/复习/熟词声明数与达标天数                        |
-| `GET /memory/curve`                     | 可选 bookId 或 goal；FSRS 预测、真实自评观察及 dataLimited           |
+| 方法与相对路径                          | 主要参数与响应                                                                         |
+| --------------------------------------- | -------------------------------------------------------------------------------------- |
+| `GET /known-words?limit=50&cursor=...`  | 本人熟词列表；默认50、最多100；items/page，manual与automatic同词去重且manual优先       |
+| `POST /known-words/imports`             | format=text/csv/json，text；生成 preview，不立即标为熟词                               |
+| `GET /known-words/imports`              | 最近最多 50 个本人批次                                                                 |
+| `POST /known-words/imports/:id/confirm` | JSON `{}`；只确认 matched，重复确认安全                                                |
+| `POST /known-words/imports/:id/revoke`  | JSON `{}`；撤销声明，保留已有学习进度                                                  |
+| `GET /known-words/exports?format=json`  | json/csv；本人已确认手动声明与活动自动熟词按wordId去重，每1000行keyset批次流式完整导出 |
+| `POST /assessments`                     | goal、size 1–20（抽样词数，每词拼写与认知两题）                                        |
+| `GET /assessments/:id`                  | 本人题目顺序/当前项；完成后 report                                                     |
+| `POST /assessments/:id/answers`         | commandId/itemId/answer；只接受当前题，动作去重                                        |
+| `POST /assessments/:id/finish`          | JSON `{}`；全部答完才结算 report/plan                                                  |
+| `GET /mastery/plan?goal=daily`          | 本人对应目标的诊断证据与建议                                                           |
+| `POST /activity`                        | eventId/startAt/endAt；仅近期 1–60 秒前台心跳，去重                                    |
+| `GET /stats`                            | 今日/30日趋势、学习/复习/熟词声明数与达标天数                                          |
+| `GET /memory/curve`                     | 可选 bookId 或 goal；FSRS 预测、真实自评观察及 dataLimited                             |
 
 以上均要求登录。熟词每批 1–1,000 行、UTF-8 256 KiB 以内。text 每行一词；CSV 必須有 `lemma`/`word`/`单词` 列，可选 wordId/language；JSON 为字符串数组、对象数组或含 rows 的对象。预览区分 matched/unknown/duplicate。确认前如内容状态改变会要求重新预览。跨站导出是声明内容，不迁移账号、session、FSRS 状态或能力结论。
+
+列表每项提供wordId、word、origin=manual/automatic、knownAt和progress，page含total/hasMore/nextCursor，游标绑定本站及本人。自动熟词在Again时撤回，但手动声明独立保留；撤销手动批次也不顺带删除仍有效的自动来源。统计区分总去重熟词、手动熟词与仅自动来源，不把导入或自动分类当作新增ReviewLog。
 
 导出没有10,000行总量截断。JSON含 `consistency=cursor_export`、exportedAt和最终rowCount；CSV是UTF-8 BOM的声明表。导出不是跨批次事务快照，并发确认/撤销可能影响后续批次；需要稳定结果时在导出期间停止修改声明。
 
@@ -218,24 +228,40 @@ forecast的days含localDate/startsAt/endsAt/dueUnique/overdueCarry。dueUnique�
 
 ## 本站管理员
 
-| 方法与相对路径                    | 主要参数与响应                                                                |
-| --------------------------------- | ----------------------------------------------------------------------------- |
-| `GET /admin/overview`             | 本站 users/words/books/reviews/imports 计数                                   |
-| `GET /admin/users`                | 最近最多 100 位，返回必要管理字段                                             |
-| `PATCH /admin/users/:id`          | disabled 布尔值；停用时撤销 session，保护最后一位有效管理员                   |
-| `GET /admin/books`                | 本站词书                                                                      |
-| `POST /admin/books`               | slug/title/goal/wordIds，description/status 可选，默认 draft                  |
-| `PATCH /admin/books/:id`          | 可选 title/description/goal/status/wordIds，保留旧会话快照                    |
-| `GET /admin/words?q=rain`         | prefix检索本站词含未发布状态；limit 1–100默认50、cursor，items/page/matchMode |
-| `PATCH /admin/words/:id`          | 可选 status/senseId/definitionZh/definitionEn/exampleEn/exampleZh             |
-| `GET /admin/announcements`        | 最近最多 100 条                                                               |
-| `POST /admin/announcements`       | title/body、可选 status                                                       |
-| `DELETE /admin/announcements/:id` | JSON `{}`                                                                     |
-| `GET /admin/audit`                | 最近最多 100 条管理审计                                                       |
+| 方法与相对路径                    | 主要参数与响应                                                                                                      |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `GET /admin/overview`             | 本站 users/words/books/reviews/imports 计数                                                                         |
+| `GET /admin/users`                | 最近最多 100 位，返回必要管理字段                                                                                   |
+| `PATCH /admin/users/:id`          | disabled 布尔值；停用时撤销 session，保护最后一位有效管理员                                                         |
+| `GET /admin/books`                | 本站词书                                                                                                            |
+| `POST /admin/books`               | slug/title/goal/wordIds，description/status 可选，默认 draft                                                        |
+| `PATCH /admin/books/:id`          | 可选 title/description/goal/status/wordIds，保留旧会话快照                                                          |
+| `GET /admin/words?q=rain`         | prefix检索本站词含未发布状态；limit 1–100默认50、cursor，items/page/matchMode                                       |
+| `GET /admin/words/:id`            | 本站任意状态的完整原始词条，含全部Sense和held来源，返回word；不用列表摘要代替编辑详情                               |
+| `PATCH /admin/words/:id`          | 可选status/senseId/expectedContentVersion/definitionZh/definitionEn/exampleEn/exampleZh；合并后的中英文至少一项非空 |
+| `GET /admin/announcements`        | 最近最多 100 条                                                                                                     |
+| `POST /admin/announcements`       | title/body、可选 status                                                                                             |
+| `DELETE /admin/announcements/:id` | JSON `{}`                                                                                                           |
+| `GET /admin/audit`                | 最近最多 100 条管理审计                                                                                             |
 
 这些接口必须role=admin，只管理本站；群站跨站能力必须另经目标管理员批准grant。没有配置全局Host/DB/secret的Web API。词书Web编排一次最多500个wordIds，不限制源完整书/分页；旧session保留快照，管理变更记录审计。公告与释义是文本。
 
+词条编辑先GET完整raw详情并明确选择senseId，不能从最多三义的列表摘要推断默认目标。中文或英文可为空，但两者合并后全空返回400 sense_definition_required；其他词的senseId返回400 sense_not_in_word。提供expectedContentVersion时，过期返回409 word_content_changed且不写词条或审计；重新载入后校对，不自动重试旧编辑。归档词仍可由本站管理员读取，公开详情返回404。
+
 词书/字典/生词本/admin词列表已分页，用户/公告/审计等接口仍有上述读取上限。operator可通过固定摘要的工具批量安装源内容；自定义词书使用前述标准文档导入，当前没有管理员通用内容上传、媒体上传或OpenAPI导出。生产客户端应固定版本并在升级时核对 [CHANGELOG](../CHANGELOG.md) 与 [部署文档](DEPLOYMENT.md)。
+
+## 可选 DeepSeek 管理接口
+
+全部要求本站admin；固定官方api.deepseek.com，不接受任意baseUrl。模型ID为当前代码支持的deepseek-flash/deepseek-v4-pro。默认无key、不请求；保存设置不调用上游，只有管理员明确test/preview才使用其服务商额度。
+
+| 方法与相对路径                    | 契约                                                                                              |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GET /admin/ai/deepseek`          | enabled/configured/model/models/baseUrl/keyPreview/updatedAt；不返回明文key                       |
+| `PUT /admin/ai/deepseek`          | enabled?/model?/apiKey?/removeKey?；删除key同时禁用，空key保留已有配置                            |
+| `POST /admin/ai/deepseek/test`    | JSON `{}`；主动检查，最多32输出tokens，返回ok/provider/model/usage                                |
+| `POST /admin/ai/deepseek/preview` | `{wordId}`；已发布单词的缺项候选，preview包含definitions/examples/review/applied=false，另有usage |
+
+预览不修改词典或FSRS，也没有候选应用接口。无缺项返回reason=no_missing_content/usage=null，不调用上游；同Sense空字段及原文SHA校验，源文/配置/权限变化时丢弃候选。单次20秒/64KiB、最大2400输出tokens，无自动重试；站点20次/分钟、管理员6次/分钟，site2/actor1并发lease。配置与加密/备份边界、收费责任及受控上游测试范围见 [AI_CONFIGURATION.md](AI_CONFIGURATION.md)。
 
 ## 版本检测
 

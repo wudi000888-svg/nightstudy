@@ -15,6 +15,7 @@ import {
   normalize,
   transact,
   getReceipt,
+  selectLearningSense,
 } from './shared.js';
 
 type AssessmentView = Prisma.AssessmentGetPayload<{ include: { items: true } }>;
@@ -122,9 +123,7 @@ export async function registerAssessment(app: FastifyInstance, getContext: Conte
       where: { id: { in: sampledIds.map((word) => word.id) } },
       include: wordInclude,
     });
-    const usable = eligible.filter((word) =>
-      word.senses.some((sense) => sense.definitionZh.trim()),
-    );
+    const usable = eligible.filter((word) => Boolean(selectLearningSense(word.senses)));
     const selected = stratifiedSample(usable, Math.min(input.size, usable.length), seed);
     if (!selected.length) throw new HttpError(409, 'assessment_content_unavailable');
     const population = Object.fromEntries(strata.map((s) => [String(s.difficulty), s.population]));
@@ -148,17 +147,17 @@ export async function registerAssessment(app: FastifyInstance, getContext: Conte
       stratum: String(word.difficulty),
       ordinal,
       questionJson: json({
-        prompt: `请拼写对应的英文词：${word.senses.find((sense) => sense.definitionZh.trim())!.definitionZh}`,
+        prompt: `请拼写对应的英文词：${selectLearningSense(word.senses)!.definitionZh}`,
         answer: word.lemma,
         wordVersion: word.contentVersion,
       }),
     }));
     for (const [index, word] of selected.entries()) {
-      const correct = word.senses.find((sense) => sense.definitionZh.trim())!,
+      const correct = selectLearningSense(word.senses)!,
         seen = new Set([correct.definitionZh]);
       const wrong = distractors
         .filter((w) => w.id !== word.id)
-        .map((w) => w.senses.find((sense) => sense.definitionZh.trim()))
+        .map((w) => selectLearningSense(w.senses))
         .filter(
           (sense): sense is NonNullable<typeof sense> =>
             !!sense && !seen.has(sense.definitionZh) && !!seen.add(sense.definitionZh),

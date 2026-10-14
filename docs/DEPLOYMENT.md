@@ -1,6 +1,6 @@
 # Alpha 运行与部署
 
-本文件描述已部署的 `0.5.0-alpha.2`。代码2918aa9的25文件162项测试、9项Python回归、格式/类型/构建及 [双PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517645764) 通过；本轮VPS165项真实HTTPS任务检查通过。下面保留各历史版本的对应证据。Render、主机断电恢复、异机/密钥灾备、高并发容量及音源逐条专家听辨未验收。
+本文件描述当前0.6代码的运行约定；0.6最终构建、完整安装与生产升级结果待对应验收记录。最近已记录的线上基线为 `0.5.0-alpha.2`：代码2918aa9的25文件162项测试、9项Python回归、格式/类型/构建及 [双PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517645764) 通过，VPS165项真实HTTPS任务检查通过。下面保留各历史版本的对应证据。Render、主机断电恢复、异机/密钥灾备、高并发容量及音源逐条专家听辨未验收。
 
 ## Docker Compose minimal
 
@@ -20,7 +20,7 @@ docker compose up --build --detach --wait --wait-timeout 600 app
 # 用install.sh完成私密凭据导出；直接compose启动不会在宿主机生成导出文件。
 ```
 
-`init` 运行 `pnpm db:prepare`：generate、全站迁移、seed、首次管理员准备，再按CONTENT_PACK安装内容，并运行audio:prepare安装所选音频包与模型。默认ecdict会校验完整ECDICT及独立英美IPA并逐站事务安装；成功后app启动，请求进程不重复迁移/创建管理员。默认ADMIN_BOOTSTRAP=auto，新站用户名admin、独立随机密码；已初始化站点不重置账号。manual模式跳过自动创建，保留BOOTSTRAP_TOKEN和/setup。CONTENT_PACK=demo显式跳过完整包，CI基础测试用manual/demo。
+`init` 运行 `pnpm db:prepare`：generate、全站迁移、seed、首次管理员准备，再按CONTENT_PACK安装内容，并运行audio:prepare安装所选音频包与语音模型。默认ecdict准备完整ECDICT、独立英美IPA、437词组与五书词级双语补充，逐站事务安装；成功后app启动，请求进程不重复迁移/创建管理员。0.6不运行本地翻译模型。默认ADMIN_BOOTSTRAP=auto，新站用户名admin、独立随机密码；已初始化站点不重置账号。manual模式跳过自动创建，保留BOOTSTRAP_TOKEN和/setup。CONTENT_PACK=demo显式跳过完整包，CI基础测试用manual/demo。
 
 ## 初始管理员凭据
 
@@ -30,7 +30,7 @@ Compose的admin-credentials卷仅init挂载到 `/app/.local/admin`，Web/app/wor
 
 这些文件记录创建时的**初始密码**，用户之后改密不会同步更新明文记录；维护既有站点也不会强制重置。既有手工管理员没有自动生成的初始文件，继续用其原账号。恢复业务DB时同时保管对应认证密钥与初始交付资料，密码哈希不能反推出明文。
 
-PG业务数据、内容源缓存与音频分别保存在postgres-data、content-cache、audio-cache named volume；源缓存挂载 `/app/.local/content`，不塞入Git或应用镜像。词典源首次下载约71MB；默认英美音频另下载固定校验的audio-v1预生成包与约229MB的两份模型，具体音频包大小以data/audio-pack.manifest.json为准，安装耗时取决于网络与机器。音频卷挂载/app/.local/audio，init与app共用；它包含来源清单、逐条许可、校验后的媒体和模型，不含初始管理员凭据。重跑会校验缓存，媒体丢失或摘要失败时从固定包恢复；数据库逐站事务导入，仅补空IPA，不改已有音标、词义、状态或学习进度。等待600秒是CI smoke等待上限，不是承诺安装时间；超时先检查init日志再决定增加等待。重复准备验证缓存与已安装pack，保留历史和管理编辑；摘要失败停止安装。离线内容导入、来源许可与目标书规则见 [CONTENT.md](CONTENT.md)，独立音标见 [PHONETICS.md](PHONETICS.md)。
+PG业务数据、内容源缓存与音频分别保存在postgres-data、content-cache、audio-cache named volume；源缓存挂载 `/app/.local/content`，不塞入Git或应用镜像。词典源首次下载约71MB；默认英美音频另下载固定校验的audio-v1和phrase-audio-v1预生成包，以及供按需发音使用的Piper声学模型。具体大小以两个音频manifest和audio-voices.manifest.json为准，安装耗时取决于网络与机器。这些是语音模型，不是翻译模型，0.6双语文字包不依赖MLX、PyTorch或大型翻译权重。音频卷挂载/app/.local/audio，init与app共用；它包含来源清单、逐条许可、校验后的媒体和语音模型，不含初始管理员凭据。重跑会校验缓存，媒体丢失或摘要失败时从固定包恢复；数据库逐站事务导入，仅补空IPA，不改已有音标、词义、状态或学习进度。等待600秒是CI smoke等待上限，不是承诺安装时间；超时先检查init日志再决定增加等待。重复准备验证缓存与已安装pack，保留历史和管理编辑；摘要失败停止安装。离线内容导入、来源许可与目标书规则见 [CONTENT.md](CONTENT.md)，独立音标见 [PHONETICS.md](PHONETICS.md)，词级语言与例句范围见 [BILINGUAL_CONTENT.md](BILINGUAL_CONTENT.md)。
 
 本机全量库实测Word770,611、追加源Sense1,113,723、5本新目标词书，原40词ID和历史保留。本机/VPS查询US IPA匹配83,424词、UK匹配64,321词及3个ready包；至少一种现代IPA匹配104,261词；含原始音标的任一种音标覆盖256,047词。该安装数据库约974,468,799字节（约975MB）；这是一次本机数据体量记录，不能推断最小磁盘、内存或并发容量。各站各存一份核心词义和进度，另需预算WAL、索引、备份及升级空间。
 
@@ -139,6 +139,8 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 
 ## 环境变量
 
+DeepSeek不是部署必填环境变量。各站管理员从本站后台可选配置加密API key；保存不发请求，仅手动test/preview调用固定官方上游。未配置不产生AI费用，配置后的主动调用由该key所属账户承担费用，结果仍不自动入库。轮换本站认证secret可能使已有DeepSeek与群站密文不可读，需同时规划重新配置和撤销/配对。详细限制和测试边界见 [AI_CONFIGURATION.md](AI_CONFIGURATION.md)。
+
 | 变量                                                 | 用途                                                                                                                                                                               |
 | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | DATABASE_URL                                         | 默认 site 的 PG URL；Compose 空值时使用内网 postgres，native 开发必须设真实 URL                                                                                                    |
@@ -152,7 +154,7 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 | DB_POOL_SIZE / MAX_ACTIVE_SITES                      | 每 Realm 池上限和活动 Realm 上限；副本增加时审核全 cluster 预算                                                                                                                    |
 | NIGHTSTUDY_HTTP_PORT                                 | Compose 主机回环端口，默认 5198                                                                                                                                                    |
 | NIGHTSTUDY_IMAGE                                     | 可选已核验发行镜像；空值从当前 checkout 构建本地镜像                                                                                                                               |
-| CONTENT_PACK                                         | 默认ecdict完整内容；demo显式最小测试配置；默认不安装全量音频                                                                                                                       |
+| CONTENT_PACK                                         | 默认ecdict完整源词典、IPA、词组和五书词级双语补充；demo显式最小测试配置；音频由AUDIO_PACK选择                                                                                      |
 | AUDIO_PACK / AUDIO_CACHE_DIR / AUDIO_PYTHON          | AUDIO_PACK空时ecdict用standard、demo用none；standard下载固定音频包/模型，none跳过；Docker缓存/app/.local/audio，Python为/opt/nightstudy-audio/bin/python，Native需自己的Piper venv |
 | CONTENT_FILE                                         | operator的本地ECDICT源文件；必须匹配固定大小/SHA256，缺失时不自动换源                                                                                                              |
 | ADMIN_BOOTSTRAP                                      | 默认auto，仅首次创建admin；manual保留/setup，既有管理员不重置                                                                                                                      |
@@ -163,21 +165,26 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 
 ## 备份与升级
 
-各站DB分别做一致性逻辑备份，含核心词典、管理编辑与学习记录；另保留registry/密钥与映射。不要只复制正在写的PG volume。内容/预生成媒体和模型可按固定摘要重新下载，不替代业务DB备份。音频卷还包含本站按需合成文件；保管它可避免重新生成，但媒体来源和WordAudio业务记录随对应站点DB备份。恢复到新DB核验身份、内容pack、进度和统计后再切换。`pg_dump/pg_restore` 与固定PG版本匹配，备份移到另一机器并定期恢复演练。[Postgres备份](https://www.postgresql.org/docs/current/backup-dump.html)
+各站DB分别做一致性逻辑备份，含核心词典、管理编辑与学习记录；另保留registry/密钥与映射。不要只复制正在写的PG volume。内容、预生成媒体和Piper声学模型可按固定摘要重新取得，不替代业务DB备份。音频卷还包含本站按需合成文件；保管它可避免重新生成，但媒体来源和WordAudio业务记录随对应站点DB备份。加密DeepSeek key与群站授权需要同时保管对应认证secret和安装实例身份，数据库密文不是独立可恢复的凭据。恢复到新DB核验身份、内容pack、进度和统计后再切换。`pg_dump/pg_restore` 与固定PG版本匹配，备份移到另一机器并定期恢复演练。[Postgres备份](https://www.postgresql.org/docs/current/backup-dump.html)
 
 默认单站 Compose 的逻辑备份示例，在本地私有目录保留 dump：
 
 ```sh
+set -eu
+umask 077
 mkdir -p .local/backups
-docker compose exec -T postgres sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > .local/backups/nightstudy.dump
-docker compose exec -T postgres pg_restore --list < .local/backups/nightstudy.dump
+chmod 700 .local/backups
+TASK_DUMP=".local/backups/nightstudy-$(date -u +%Y%m%d_%H%M%S).dump"
+docker compose exec -T postgres sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$TASK_DUMP.partial"
+docker compose exec -T postgres pg_restore --list < "$TASK_DUMP.partial" > "$TASK_DUMP.catalog"
+mv "$TASK_DUMP.partial" "$TASK_DUMP"
 ```
 
-第二行完成成功才保留为有效备份；`--list` 仅检查归档可读，不能替代恢复演练。恢复演练创建独立临时 DB，不覆盖原库：
+dump成功且归档目录检查通过才保留最终文件；失败的partial不作为有效备份。`--list` 仅检查归档可读，不能替代恢复演练。保持上述shell中的TASK_DUMP指向该份备份，恢复演练创建独立临时 DB，不覆盖原库：
 
 ```sh
 docker compose exec -T postgres sh -c 'createdb -U "$POSTGRES_USER" nightstudy_restore'
-docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exit-on-error --no-owner -d nightstudy_restore' < .local/backups/nightstudy.dump
+docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exit-on-error --no-owner -d nightstudy_restore' < "$TASK_DUMP"
 ```
 
 多 Realm 的每个业务 DB 单独导出和恢复，外部托管 PG 使用其受控连接与匹配客户端；不要把默认 `$POSTGRES_DB` 的备份当成所有站备份。演练后核对迁移状态、SiteState/siteId、用户/进度/审计计数和一次隔离环境的登录/学习请求，另验证 registry/密钥的安全恢复；不把 dump 提交 Git 或上传公开 issue。
@@ -192,7 +199,7 @@ docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exi
 
 公开linux/amd64镜像经匿名OCI索引访问及VPS空Docker认证配置实际拉取通过；实际响应体SHA与digest头一致。无网络、只读容器核对版本0.5.0-alpha.2、revision2918aa9、私密运行文件不存在、Piper引擎源码和许可摘要及运行版本匹配，音频/模型另在持久卷。索引包含amd64和attestation条目，不宣称arm64发行。
 
-当前固定发行摘要：
+0.5.0-alpha.2已验收的固定发行摘要（不是0.6镜像）：
 
 ```text
 ghcr.io/wudi000888-svg/nightstudy@sha256:1017b3171738e1cf08f9537127cf6f8a79bf242f6e2ef442ff5a6cc8c8b52dc5
@@ -203,6 +210,8 @@ ghcr.io/wudi000888-svg/nightstudy@sha256:1017b3171738e1cf08f9537127cf6f8a79bf242
 [0.4发行流水线](https://github.com/wudi000888-svg/nightstudy/actions/runs/38509383608) 全部通过，发布linux/amd64容器及provenance/SBOM。匿名OCI index请求的digest与实际body SHA一致；VPS以空Docker认证配置实际拉取成功。无网络运行核对version=0.4.0-alpha.1/x64、私有.env与管理员文件不存在、固定引擎源码与许可随镜像保留；大型音频与模型另放持久卷。index另含attestation，不代表arm64镜像。
 
 CI对PR/main运行锁文件安装、格式、双PG17 migration/seed、sites/typecheck/build与一次 `pnpm test`。测试库显式CONTENT_PACK=demo，CONTENT_TEST_DATABASE_URL启用源码内合成内容PG fixture；不重复执行独立CLI夹具。另执行有界tar提取的Python回归；随后验证基础/scale/翻译Compose描述，构建镜像，并在隔离Compose默认ecdict安装完整字典、英美音标与预生成音频，等待最多600秒，核对ready、catalog声明770,611、5书去重8798词的17596音源与两口音IPA完整性，并校验真人/合成样本文件；另启动闭合网关容器，验证无鉴权请求返回401，不依赖真实Google可用性。清理只针对CI隔离project的卷。
+
+0.6新增验收约束以实际数据库为准：先记录原canonical词/义项/词书焦点和非空原文摘要，再安装补充包；检查8,798词的独立中英文解释、manifest对应的8,786词例句与12个源异常、437词组及874条实际音源文件。报告真实的成对义项/焦点数量，不把所有源Sense假装成对，不把补充包条目叠加到770,611词典数量。旧会话、练习题、用户进度与既有音源行保留；这些是验收要求，最终通过记录随具体commit/CI/部署另行更新。
 
 0.3代码86afefa的 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过13文件86项测试、双PG17回归和Compose默认全量安装；明确断言installedDictionary/declaredEntryCount=770611，私密导出后实际登录随机admin，网关健康及无鉴权401通过。US/UK数值和3包数量由本机/VPS验证，未写成CI的独立数值断言。VPS管理员与公网双站42项断言另列，不混用测试环境与生产容量证据。
 

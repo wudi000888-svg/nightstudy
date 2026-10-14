@@ -35,6 +35,8 @@ model User {
   customBooks     Book[]
   bookImports     CustomBookImport[]
   dailyPlans      DailyPlan[]
+  autoKnownWords  AutoKnownWord[]
+
 }
 
 model Session {
@@ -203,6 +205,7 @@ model Word {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   senses          Sense[]
+  examples        WordExample[]
   bookItems       BookItem[]
   userWords       UserWord[]
   progress        StudyProgress[]
@@ -212,6 +215,9 @@ model Word {
   assessmentItems AssessmentItem[]
   audio           WordAudio[]
   dailyPlanWords  DailyPlanWord[]
+  autoKnownWords  AutoKnownWord[]
+  collocations    WordCollocation[] @relation("CollocationHeadword")
+  collocationOf   WordCollocation[] @relation("CollocationPhrase")
 
   @@index([status, difficulty])
 }
@@ -226,6 +232,20 @@ model Sense {
   exampleEn    String @default("")
   exampleZh    String @default("")
   ordinal      Int    @default(0)
+  contentMetadata Json @default("{}")
+
+  @@index([wordId, ordinal])
+}
+
+// Word-level usage examples are independent of dictionary sense alignment.
+model WordExample {
+  id              String @id
+  wordId          String
+  word            Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  exampleEn       String
+  exampleZh       String
+  contentMetadata Json   @default("{}")
+  ordinal         Int    @default(0)
 
   @@index([wordId, ordinal])
 }
@@ -236,6 +256,7 @@ model Book {
   title       String
   description String
   goal        String
+  kind        String             @default("vocabulary")
   status      String             @default("published")
   version     String             @default("demo-2026-10-14")
   ownerId     String?
@@ -246,6 +267,17 @@ model Book {
   updatedAt   DateTime           @updatedAt
 
   @@index([ownerId, status])
+}
+
+model WordCollocation {
+  wordId    String
+  word      Word @relation("CollocationHeadword", fields: [wordId], references: [id], onDelete: Cascade)
+  phraseId  String
+  phrase    Word @relation("CollocationPhrase", fields: [phraseId], references: [id], onDelete: Cascade)
+  ordinal   Int @default(0)
+
+  @@id([wordId, phraseId])
+  @@index([phraseId])
 }
 
 model WordAudio {
@@ -315,10 +347,26 @@ model UserWord {
   note      String   @default("")
   favorite  Boolean  @default(true)
   paused    Boolean  @default(false)
+  graduatedAt DateTime?
   updatedAt DateTime @updatedAt
 
   @@unique([userId, wordId])
   @@index([userId, updatedAt, id])
+}
+
+// Learning-derived familiarity is separate from manual known-word imports.
+model AutoKnownWord {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId        String
+  word          Word      @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  confirmedAt   DateTime
+  revokedAt     DateTime?
+  policyVersion String    @default("fsrs-familiarity-v1")
+
+  @@unique([userId, wordId])
+  @@index([userId, revokedAt])
 }
 
 model StudyProgress {
@@ -415,6 +463,7 @@ model ReviewLog {
   @@unique([userId, commandId])
   @@index([userId, reviewedAt])
   @@index([planId, reviewedAt])
+  @@index([userId, wordId, reviewedAt])
 }
 
 model DailyPlan {
@@ -589,6 +638,25 @@ model RateBucket {
   key       String   @id
   count     Int      @default(1)
   expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model DeepSeekSetting {
+  id            String   @id @default("singleton")
+  enabled       Boolean  @default(false)
+  model         String   @default("deepseek-flash")
+  keyCiphertext String?
+  keyPreview    String?
+  updatedAt     DateTime @updatedAt
+}
+
+model DeepSeekRequestLease {
+  id        String   @id
+  actorId   String
+  siteId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   @@index([expiresAt])
 }

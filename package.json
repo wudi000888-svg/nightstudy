@@ -1,6 +1,6 @@
 {
   "name": "nightstudy",
-  "version": "0.5.0-alpha.2",
+  "version": "0.6.0-alpha.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.25.0",
@@ -24,6 +24,8 @@
     "content:fetch": "tsx scripts/content-fetch.ts",
     "content:import": "tsx scripts/content-import.ts",
     "content:prepare": "tsx scripts/content-prepare.ts",
+    "bilingual:export": "tsx scripts/bilingual-export.ts",
+    "bilingual:prepare": "tsx scripts/bilingual-prepare.ts",
     "phonetics:prepare": "tsx scripts/phonetics-prepare.ts",
     "audio:prepare": "tsx scripts/audio-prepare.ts",
     "test": "vitest run",

@@ -1,0 +1,164 @@
+[
+  {
+    "phrase": "take care of",
+    "verifiedAtUtc": "2026-10-14T12:48:57.383920+00:00",
+    "queryUrl": "https://api.tatoeba.org/v1/sentences?lang=eng&q=%22take+care+of%22&sort=relevance&trans%3Alang=cmn&trans%3Ais_direct=yes&trans%3Ais_unapproved=no&trans%3Ais_orphan=no&is_unapproved=no&is_orphan=no&limit=3",
+    "englishSentence": {
+      "id": 64257,
+      "text": "Take care of yourself.",
+      "lang": "eng",
+      "script": null,
+      "license": "CC BY 2.0 FR",
+      "owner": "CK",
+      "is_unapproved": false
+    },
+    "mandarinSentence": {
+      "id": 510765,
+      "text": "照顾好自己。",
+      "lang": "cmn",
+      "script": "Hans",
+      "license": "CC BY 2.0 FR",
+      "owner": "fucongcong",
+      "is_unapproved": false,
+      "is_direct": true
+    },
+    "englishOriginalUrl": "https://tatoeba.org/en/sentences/show/64257",
+    "mandarinOriginalUrl": "https://tatoeba.org/en/sentences/show/510765",
+    "exactPhrasePresent": true,
+    "snapshotConsistency": {
+      "64257": {
+        "allMatch": true,
+        "snapshotRecord": {
+          "sentenceId": 64257,
+          "lang": "eng",
+          "text": "Take care of yourself.",
+          "owner": "CK",
+          "dateAddedRaw": "\\N",
+          "dateModifiedRaw": "2010-09-30 13:55:03"
+        }
+      },
+      "510765": {
+        "allMatch": true,
+        "snapshotRecord": {
+          "sentenceId": 510765,
+          "lang": "cmn",
+          "text": "照顾好自己。",
+          "owner": "fucongcong",
+          "dateAddedRaw": "2010-09-13 14:26:39",
+          "dateModifiedRaw": "0000-00-00 00:00:00"
+        }
+      }
+    },
+    "linkScope": "Current API direct-link observation; not claimed as a 2026-10-10 link snapshot",
+    "reviewStatus": "pending; not expert-reviewed",
+    "ownerMeaning": "API and detailed export owner; not asserted as independently verified original author"
+  },
+  {
+    "phrase": "look forward to",
+    "verifiedAtUtc": "2026-10-14T12:48:57.386452+00:00",
+    "queryUrl": "https://api.tatoeba.org/v1/sentences?lang=eng&q=%22look+forward+to%22&sort=relevance&trans%3Alang=cmn&trans%3Ais_direct=yes&trans%3Ais_unapproved=no&trans%3Ais_orphan=no&is_unapproved=no&is_orphan=no&limit=3",
+    "englishSentence": {
+      "id": 1565471,
+      "text": "I look forward to it.",
+      "lang": "eng",
+      "script": null,
+      "license": "CC BY 2.0 FR",
+      "owner": "CK",
+      "is_unapproved": false
+    },
+    "mandarinSentence": {
+      "id": 3610746,
+      "text": "我很期待哦。",
+      "lang": "cmn",
+      "script": "Hans",
+      "license": "CC BY 2.0 FR",
+      "owner": "slo_oth",
+      "is_unapproved": false,
+      "is_direct": true
+    },
+    "englishOriginalUrl": "https://tatoeba.org/en/sentences/show/1565471",
+    "mandarinOriginalUrl": "https://tatoeba.org/en/sentences/show/3610746",
+    "exactPhrasePresent": true,
+    "snapshotConsistency": {
+      "1565471": {
+        "allMatch": true,
+        "snapshotRecord": {
+          "sentenceId": 1565471,
+          "lang": "eng",
+          "text": "I look forward to it.",
+          "owner": "CK",
+          "dateAddedRaw": "2012-05-07 19:57:31",
+          "dateModifiedRaw": "2012-05-07 19:57:31"
+        }
+      },
+      "3610746": {
+        "allMatch": true,
+        "snapshotRecord": {
+          "sentenceId": 3610746,
+          "lang": "cmn",
+          "text": "我很期待哦。",
+          "owner": "slo_oth",
+          "dateAddedRaw": "2014-11-06 04:38:20",
+          "dateModifiedRaw": "2020-03-19 17:36:42"
+        }
+      }
+    },
+    "linkScope": "Current API direct-link observation; not claimed as a 2026-10-10 link snapshot",
+    "reviewStatus": "pending; not expert-reviewed",
+    "ownerMeaning": "API and detailed export owner; not asserted as independently verified original author"
+  },
+  {
+    "phrase": "by the way",
+    "verifiedAtUtc": "2026-10-14T12:48:57.387929+00:00",
+    "queryUrl": "https://api.tatoeba.org/v1/sentences?lang=eng&q=%22by+the+way%22&sort=relevance&trans%3Alang=cmn&trans%3Ais_direct=yes&trans%3Ais_unapproved=no&trans%3Ais_orphan=no&is_unapproved=no&is_orphan=no&limit=3",
+    "englishSentence": {
+      "id": 38047,
+      "text": "By the way, are you free tonight?",
+      "lang": "eng",
+      "script": null,
+      "license": "CC BY 2.0 FR",
+      "owner": "CK",
+      "is_unapproved": false
+    },
+    "mandarinSentence": {
+      "id": 343858,
+      "text": "顺便问一句，你今晚有空吗？",
+      "lang": "cmn",
+      "script": "Hans",
+      "license": "CC BY 2.0 FR",
+      "owner": "fucongcong",
+      "is_unapproved": false,
+      "is_direct": true
+    },
+    "englishOriginalUrl": "https://tatoeba.org/en/sentences/show/38047",
+    "mandarinOriginalUrl": "https://tatoeba.org/en/sentences/show/343858",
+    "exactPhrasePresent": true,
+    "snapshotConsistency": {
+      "38047": {
+        "allMatch": true,
+        "snapshotRecord": {
+          "sentenceId": 38047,
+          "lang": "eng",
+          "text": "By the way, are you free tonight?",
+          "owner": "CK",
+          "dateAddedRaw": "\\N",
+          "dateModifiedRaw": "2013-11-30 14:07:56"
+        }
+      },
+      "343858": {
+        "allMatch": true,
+        "snapshotRecord": {
+          "sentenceId": 343858,
+          "lang": "cmn",
+          "text": "顺便问一句，你今晚有空吗？",
+          "owner": "fucongcong",
+          "dateAddedRaw": "2009-12-26 21:16:22",
+          "dateModifiedRaw": "0000-00-00 00:00:00"
+        }
+      }
+    },
+    "linkScope": "Current API direct-link observation; not claimed as a 2026-10-10 link snapshot",
+    "reviewStatus": "pending; not expert-reviewed",
+    "ownerMeaning": "API and detailed export owner; not asserted as independently verified original author"
+  }
+]

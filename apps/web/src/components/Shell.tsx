@@ -20,7 +20,7 @@ import { useApp } from '../AppContext';
 
 const links = [
   { path: '/', label: '自习室', icon: House },
-  { path: '/books', label: '词书', icon: BookOpen },
+  { path: '/books', label: '书架', icon: BookOpen },
   { path: '/learn', label: '今日任务', icon: GraduationCap },
   { path: '/lookup', label: '查词与生词本', icon: Search },
   { path: '/translate', label: '网页翻译', icon: Languages },
@@ -127,8 +127,8 @@ export function Shell() {
         )}
         <Outlet />
         <footer className="page-footer">
-          <span>{site.title} · 开源自习室</span>
-          <span>{site.version} · 本站独立学习空间</span>
+          <span>{site.title}</span>
+          <Link to="/dictionary">词典说明</Link>
         </footer>
       </main>
       <nav className="mobile-tabs" aria-label="移动导航">

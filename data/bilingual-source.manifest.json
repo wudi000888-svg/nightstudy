@@ -1,0 +1,52 @@
+{
+  "version": "bilingual-source-v5",
+  "retrievedAt": "2026-10-14",
+  "purpose": "Independent same-word dictionary languages plus attributed human pairs and assisted original examples; no local MT model used.",
+  "definitionPolicy": "word-source-languages",
+  "selectedTranslationModel": null,
+  "translationModels": {},
+  "modelsUsed": [],
+  "datasets": {
+    "manyThingsEnglishChinese": {
+      "sourceUrl": "https://www.manythings.org/anki/cmn-eng.zip",
+      "sourcePage": "https://www.manythings.org/anki/",
+      "snapshot": "2026-02-13",
+      "bytes": 1386340,
+      "sha256": "d606361aa7312dcdfb15ef4fc51cb1e7ed8bc2dc608a7b192626cd36e8403106",
+      "pairs": 32028,
+      "license": "CC-BY-2.0-FR",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0/fr/",
+      "termsUrl": "https://tatoeba.org/en/terms_of_use",
+      "sourceTextSha256": "d766002332a8f21099afd7427138d44f06bed7486a18f7f0f26f217092667d73",
+      "sourceAboutSha256": "262eaba34251ebb2e7c5d514c5a2b856fe6eec058cee957d22a6c6129947a228",
+      "sourceName": "Tatoeba / ManyThings selection",
+      "ownerPolicy": "Each sentence retains its own export-attributed owner, ID, source URL and original credit line. The owner is not claimed to be a verified historical author.",
+      "relationship": "source-export-pair; not a current API direct-link verification",
+      "chineseScript": "Original mixed simplified and traditional Chinese; no conversion",
+      "mutableUrlWarning": "Fail on checksum changes; preserve the pinned source and original selected credits."
+    }
+  },
+  "lexicalSource": {
+    "pack": "ecdict-bc015ed2e24a7",
+    "lexicalSha256": "4fb034382c6d0e4e236c18fccddbd35d2f2d4cf8de29667bcd002a22213d9fd0",
+    "originalEnglishWordCount": 8729,
+    "originalChineseWordCount": 8798,
+    "wordCount": 8798,
+    "sensePairing": "Source English and Chinese senses may be independent; no ordinal or POS pairing is inferred."
+  },
+  "originalAuthoring": {
+    "author": "NightStudy contributors",
+    "license": "MIT",
+    "review": "pending",
+    "authoringMethod": "Codex-assisted original writing or source-bound bilingual correction",
+    "semanticQualityCertified": false
+  },
+  "historicalEvaluations": "bilingual-evaluation-history.manifest.json",
+  "limitations": [
+    "This pack covers the five built-in books, not all 770611 catalog entries.",
+    "Supplemental English fields only fill exactly empty source-bound targets; original content and identifiers are preserved.",
+    "Examples describe actual word usage but are not certified translations of each focus sense.",
+    "Twelve questionable source spellings retain recorded warnings and no invented usage examples.",
+    "No Collins or Oxford licensed content or branding is included."
+  ]
+}

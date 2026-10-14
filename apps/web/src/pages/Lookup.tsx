@@ -15,6 +15,7 @@ import {
   Loading,
   Notice,
   Panel,
+  WordSaveButton,
   WordView,
   formatDate,
 } from '../components/UI';
@@ -76,19 +77,10 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
     setError(null);
     setBusy(false);
   }, [scope]);
-  const dictionary = useRemote<{
-    installedDictionary: boolean;
-    declaredEntryCount: number;
-    packs: {
-      id: string;
-      version: string;
-      license: string;
-      entryCount: number;
-      phoneticCount: number;
-      definitionZhCount: number;
-      definitionEnCount: number;
-    }[];
-  }>('dictionary-stats', 'dictionary/stats');
+  const selectedCollection = useRemote<{
+    item: Pick<WordbookItem, 'id' | 'wordId' | 'note' | 'favorite' | 'paused'> | null;
+  }>('wordbook-entry', `wordbook/${encodeURIComponent(selected?.id ?? '')}`, !!user && !!selected);
+  const selectedSaved = !!selected && selectedCollection.data?.item?.wordId === selected.id;
   async function choose(word: Word) {
     const request = ++selection.current;
     setSelected(word);
@@ -146,9 +138,13 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
     setBusy(true);
     setError(null);
     try {
-      await post('wordbook', { wordId });
+      if (selectedSaved && selected?.id === wordId)
+        await post(`wordbook/${encodeURIComponent(wordId)}`, {}, 'DELETE');
+      else await post('wordbook', { wordId });
+      if (currentScope.current !== scope) return;
+      await selectedCollection.refetch();
       await client.invalidateQueries({ queryKey: [scope, 'wordbook'] });
-      if (currentScope.current === scope) setNotice('已加入你的生词本。');
+      if (currentScope.current === scope) setNotice('');
     } catch (value) {
       if (currentScope.current === scope) setError(value);
     } finally {
@@ -180,7 +176,7 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
             把一个词，<em>读到有语境。</em>
           </>
         }
-        description="查询本站词库，查看来源音标、已有中文释义和英文解释，选择本站英美发音；音源类型和出处会明确标注。"
+        description="读懂释义，听清发音，在一句语境里记住它。"
       />
       <div className="tab-row">
         <button className={tab === 'lookup' ? 'active' : ''} onClick={() => setTab('lookup')}>
@@ -202,40 +198,6 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
         <TranslationPanel key={translationText} initialText={translationText} />
       ) : tab === 'lookup' ? (
         <>
-          {dictionary.data && (
-            <div className="dictionary-status">
-              <span className="soft-badge">
-                {dictionary.data.installedDictionary ? '词典数据已安装' : '本站已发布内容'}
-              </span>
-              {dictionary.data.installedDictionary && (
-                <span>
-                  安装包记录数 {dictionary.data.declaredEntryCount.toLocaleString()} ·
-                  来自数据包元数据
-                </span>
-              )}
-              <small>按英文单词或前缀查找。选择结果后读取完整释义。</small>
-              {dictionary.data.packs.length > 0 && (
-                <details className="dictionary-pack-details">
-                  <summary>查看数据覆盖与许可</summary>
-                  <p>以下来自安装包元数据，各包可能覆盖相同单词，不能直接相加为本站去重词数。</p>
-                  {dictionary.data.packs.map((pack) => (
-                    <div className="dictionary-pack" key={pack.id}>
-                      <strong>
-                        {pack.id} · {pack.version}
-                      </strong>
-                      <span>
-                        {pack.entryCount.toLocaleString()} 条记录 · 中文释义{' '}
-                        {pack.definitionZhCount.toLocaleString()} 条 · 英文释义{' '}
-                        {pack.definitionEnCount.toLocaleString()} 条 · 读音标注{' '}
-                        {pack.phoneticCount.toLocaleString()} 条
-                      </span>
-                      <small>许可：{pack.license} · 未提供的内容不会补造</small>
-                    </div>
-                  ))}
-                </details>
-              )}
-            </div>
-          )}
           <form
             className="search-bar"
             onSubmit={(event) => {
@@ -293,37 +255,47 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
                 {selected ? (
                   <Panel className="lookup-card">
                     <div className="section-heading">
-                      <span className="soft-badge">
-                        {detailError ? '词条摘要' : '完整词条'}
-                        {!detailBusy && selected.senseCount
-                          ? ` · ${selected.senseCount} 条释义`
-                          : ''}
+                      <span className="lookup-word-label">
+                        {selected.entryKind === 'phrase' ? '词组' : '释义'}
                       </span>
                       <div className="action-row">
                         <button
-                          className="button quiet"
+                          className="icon-button"
+                          aria-label="翻译这个词"
+                          title="翻译这个词"
                           onClick={() => {
                             setTranslationText(selected.lemma);
                             setTab('translation');
                           }}
                         >
-                          <Languages size={16} /> 网页翻译
+                          <Languages size={18} />
                         </button>
-                        <button
-                          className="button quiet"
-                          disabled={busy}
+                        <WordSaveButton
+                          lemma={selected.lemma}
+                          saved={selectedSaved}
+                          busy={busy}
+                          disabled={
+                            !!user &&
+                            (selectedCollection.isFetching ||
+                              !!selectedCollection.error ||
+                              !selectedCollection.data)
+                          }
                           onClick={() => void collect(selected.id)}
-                        >
-                          <Bookmark size={16} /> 加入生词本
-                        </button>
+                        />
                       </div>
                     </div>
                     {detailBusy ? (
                       <Loading text="正在读取完整释义…" />
                     ) : (
                       <>
-                        <ErrorNotice error={detailError} onRetry={() => void choose(selected)} />
-                        {detailError && <Notice>当前显示搜索摘要，完整词条尚未读取。</Notice>}
+                        <ErrorNotice
+                          error={detailError || selectedCollection.error}
+                          onRetry={() => {
+                            void choose(selected);
+                            if (selectedCollection.error) void selectedCollection.refetch();
+                          }}
+                        />
+                        {detailError && <Notice>暂时只能显示简略释义，请重试。</Notice>}
                         <WordView word={selected} />
                       </>
                     )}

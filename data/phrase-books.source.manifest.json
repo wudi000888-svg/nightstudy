@@ -1,0 +1,73 @@
+{
+  "formatVersion": 1,
+  "id": "phrase-books-source-v1",
+  "version": "2026-10-14",
+  "status": "pending-assisted-original-review",
+  "modelsUsed": [],
+  "description": "Existing pinned ECDICT Chinese senses plus independently compiled phrase selection, Codex-assisted original English glosses and bilingual usage examples, and three genuine directly linked Tatoeba English/Chinese pairs. No downloaded or locally run translation model was used.",
+  "ecdict": {
+    "id": "ecdict-bc015ed2e24a7",
+    "version": "bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b",
+    "name": "ECDICT base CSV",
+    "repository": "https://github.com/skywind3000/ECDICT",
+    "sourceUrl": "https://raw.githubusercontent.com/skywind3000/ECDICT/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv",
+    "sourcePage": "https://github.com/skywind3000/ECDICT/blob/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/ecdict.csv",
+    "bytes": 65933428,
+    "sha256": "1a6947e04785db63613a92e14903cdae7954f7e84860b10e68e5c7cbb3f9c3cf",
+    "license": "MIT",
+    "licenseUrl": "https://github.com/skywind3000/ECDICT/blob/bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b/LICENSE",
+    "licenseFile": "content-ecdict.LICENSE.txt",
+    "copyright": "Copyright (c) 2025 Linwei",
+    "permissionEvidence": {
+      "questionUrl": "https://github.com/skywind3000/ECDICT/issues/134#issuecomment-5847668998",
+      "questionSummary": "Whether the dictionary data may be used in a commercial app, bundled for offline lookup, and whether anything beyond the MIT notice is required.",
+      "replyUrl": "https://github.com/skywind3000/ECDICT/issues/134#issuecomment-5902723743",
+      "author": "skywind3000",
+      "authorAssociation": "OWNER",
+      "createdAt": "2026-09-30T02:13:36Z",
+      "reply": "可以用，没有",
+      "verifiedAt": "2026-10-14"
+    }
+  },
+  "selection": {
+    "basicCount": 236,
+    "advancedCount": 201,
+    "uniquePhraseCount": 437,
+    "sourceChineseSenseCount": 527,
+    "maximumTokens": 6,
+    "rule": "Independently compiled common-phrase shortlist, matched exactly against pinned ECDICT. Existing CET4/CET6 space-containing phrase tags yield zero, so these are direction practice books rather than a direct upstream exam-tag list or official complete syllabus.",
+    "bookKind": "phrases",
+    "titles": {
+      "cet4-phrases": "四级方向常用词组",
+      "cet6-phrases": "六级方向常用词组"
+    }
+  },
+  "originalAuthoring": {
+    "author": "NightStudy contributors",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "authoringMethod": "Codex-assisted bilingual writing",
+    "review": "pending",
+    "expertCertification": false,
+    "sourceCorrectionPolicy": "Preserve original text and identifiers. Clearly unreliable sources are hash-bound and excluded from learning; authored paired replacement focus states its correction reason without pretending to be a literal translation."
+  },
+  "Tatoeba": {
+    "sourceName": "Tatoeba",
+    "termsUrl": "https://tatoeba.org/en/terms_of_use",
+    "apiDocumentationUrl": "https://api.tatoeba.org/openapi",
+    "license": "CC-BY-2.0-FR",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0/fr/",
+    "sourceSnapshotDate": "2026-10-10",
+    "englishSnapshotSha256": "1d8c40545b4af2c6531d1a8b64941fa9d0fa3ee5bcc11cb705c8d8c1fd930c84",
+    "mandarinSnapshotSha256": "a8c53945a8806ce7b6e220585294bf2df4c021f2adfe9d0efc49b6db7e9c0af5",
+    "directPairCount": 3,
+    "attributionPolicy": "Retain both sentence IDs, URLs, current owners, licenses, original text SHA, sentence snapshot date and separate link verification date. Owner is not claimed to have been verified as the historical original author. No machine translation is substituted for the direct Chinese sentence.",
+    "scope": "Independent word-level usage, not proof of correspondence to every dictionary sense; community content pending review."
+  },
+  "limitations": [
+    "ECDICT has mixed historical sources; maintainer redistribution permission is not a per-entry third-party rights audit.",
+    "No Collins/Oxford licensed content or branding is provided by this pack.",
+    "Original-authoring and generated examples remain pending review; structural validation does not certify semantics.",
+    "Phrase identities reuse canonical dictionary words and do not reset FSRS or users’ existing settings."
+  ]
+}

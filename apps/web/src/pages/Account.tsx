@@ -76,7 +76,7 @@ export function AuthPage() {
               <Check size={17} /> 一个词，一份自己的记忆进度
             </li>
             <li>
-              <Check size={17} /> 熟词、测验与真实复习分开记录
+              <Check size={17} /> 学过的词和熟悉的词，慢慢积累
             </li>
             <li>
               <Check size={17} /> 本站独立的账户与学习空间
@@ -224,7 +224,7 @@ export function ProfilePage() {
         'PATCH',
       );
       await client.invalidateQueries({ queryKey: [scope] });
-      setNotice('每日总词数计划已保存。已签发任务与真实评价保留，剩余未安排词按新计划调整。');
+      setNotice('计划已保存。已安排的学习组可以继续，其余内容按新目标调整。');
     } catch (value) {
       setError(value);
     } finally {
@@ -285,7 +285,7 @@ export function ProfilePage() {
             今晚，<em>{user.name}。</em>
           </>
         }
-        description={`当前账户属于 ${site.title}。进入其他站点需要在该站独立登录。`}
+        description={`你的学习记录保存在 ${site.title}。换设备登录后，也可以继续。`}
         action={
           <button className="button quiet" onClick={() => void signOut()} disabled={busy}>
             <LogOut size={16} />
@@ -343,7 +343,7 @@ export function ProfilePage() {
                 }}
               >
                 <label className="field">
-                  词汇基线方向
+                  学习方向
                   <select
                     value={draft.goal}
                     onChange={(event) =>
@@ -389,11 +389,11 @@ export function ProfilePage() {
                   <div>
                     <strong>新学来源：{plan.data?.plan.bookTitle ?? '尚未选择词书'}</strong>
                     <p>
-                      先复习本站全部已学词，到期词不足每日总数时再补本书新词。同词当天只计一次；巩固和拼写不重复占总数。
+                      先复习到期的词，再从选好的书里学新词。同词当天只计一次，巩固和拼写不重复占每日目标。
                     </p>
                     <p>
                       当前未安排逾期 {plan.data?.plan.unplannedOverdueCount ?? '—'}{' '}
-                      词；切书或降低目标保留已签发任务。
+                      词；换书或降低目标后，已安排的学习组仍可继续。
                       <Link className="text-link" to="/books">
                         选书并预览计划
                       </Link>
@@ -474,10 +474,10 @@ export function ProfilePage() {
           {syncNote && <p className="fine-print">{syncNote}</p>}
           <div className="profile-links">
             <Link to="/known">
-              熟词导入 / 导出 <ArrowRight size={15} />
+              我的熟词与导入导出 <ArrowRight size={15} />
             </Link>
             <Link to="/assessment">
-              词汇水平基线 <ArrowRight size={15} />
+              词汇水平测验 <ArrowRight size={15} />
             </Link>
             <Link to="/memory">
               个人记忆与反馈 <ArrowRight size={15} />

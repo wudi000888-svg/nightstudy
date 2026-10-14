@@ -33,7 +33,7 @@ USER node
 EXPOSE 3000
 LABEL org.opencontainers.image.title="NightStudy" \
       org.opencontainers.image.source="https://github.com/wudi000888-svg/nightstudy" \
-      org.opencontainers.image.licenses="MIT AND GPL-3.0-or-later"
+      org.opencontainers.image.licenses="MIT AND GPL-3.0-or-later AND LicenseRef-CC-BY-2.0-FR"
 HEALTHCHECK --interval=20s --timeout=5s --start-period=30s --retries=3 \
   CMD node --input-type=module -e "const r=await fetch('http://127.0.0.1:'+process.env.PORT+'/health/ready',{signal:AbortSignal.timeout(3000)});process.exit(r.ok?0:1)"
 CMD ["pnpm", "start"]

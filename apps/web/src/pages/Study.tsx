@@ -5,6 +5,7 @@ import { ArrowRight, CheckCircle2, Clock3, Pause, Play, RefreshCw, RotateCcw } f
 import { useApp, useRemote } from '../AppContext';
 import { api, ApiError, newId, post } from '../lib/api';
 import { command, flushCommands } from '../lib/outbox';
+import { linkStudySession } from '../lib/study-navigation';
 import type { CommandResult, Rating, StudySession } from '../lib/types';
 import {
   Empty,
@@ -177,8 +178,8 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
       );
       if (result.session) {
         linkLoaded.current = `${scope}:${result.session.id}`;
-        setParams({ session: result.session.id });
-      } else setParams({});
+      }
+      linkStudySession(params, result.session?.id ?? null, setParams);
       void client.invalidateQueries({ queryKey: [scope] });
     } catch (value) {
       if (isCurrent(requestScope, requestLife)) {
@@ -292,7 +293,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
       setAnswer('');
       setError(null);
       linkLoaded.current = `${scope}:${result.session.id}`;
-      setParams({ session: result.session.id });
+      linkStudySession(params, result.session.id, setParams);
     } catch (value) {
       if (isCurrent(requestScope, requestLife)) setError(value);
       throw value;
@@ -750,7 +751,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
                   >
                     想不起来，查看答案
                   </button>
-                  <p className="fine-print">拼写单独记录，不再次写入FSRS或增加当天词数。</p>
+                  <p className="fine-print">拼写单独练习，不重复计入今日词数。</p>
                 </form>
               )}
             </Panel>

@@ -2,13 +2,13 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bookmark, Check, Pin, X } from 'lucide-react';
+import { Pin, Star, X } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
 import { api, post } from '../lib/api';
 import { dictionaryText } from '../lib/dictionary';
 import type { Word, WordbookItem } from '../lib/types';
 import { WordCardContext } from '../lib/word-cards';
-import { Empty, ErrorNotice, Loading, Notice, WordView } from './UI';
+import { Empty, ErrorNotice, Loading, Notice, WordSaveButton, WordView } from './UI';
 
 interface ResolvedWord {
   word: Word | null;
@@ -35,6 +35,43 @@ export function withinWordCardBridge(x: number, y: number, source: Bounds, card:
   return false;
 }
 
+export function WordCardContent({ word }: { word: Word }) {
+  return (
+    <WordCardContext.Provider value={null}>
+      <WordView word={word} interactive={false} />
+    </WordCardContext.Provider>
+  );
+}
+
+export function WordCardSummaryText({ word }: { word: Word }) {
+  const sense = word.senses?.find((value) => !!dictionaryText(value.definitionZh));
+  const summarize = (value: string | undefined) => {
+    const text = dictionaryText(value).replace(/\s+/g, ' ').trim();
+    const characters = Array.from(text);
+    return characters.length > 160 ? `${characters.slice(0, 160).join('')}…` : text;
+  };
+  const chinese = summarize(sense?.definitionZh);
+  const english = summarize(sense?.definitionEn);
+  if (!chinese) return null;
+  return (
+    <div className="word-card-summary-text">
+      {sense?.pos && <span className="word-card-pos">{sense.pos}</span>}
+      <div className="word-card-summary-language">
+        <p className="word-card-summary-zh" lang="zh-CN">
+          {chinese}
+        </p>
+      </div>
+      {english && (
+        <div className="word-card-summary-language">
+          <p className="word-card-summary-en" lang="en">
+            {english}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function WordCardProvider({ children }: { children: ReactNode }) {
   const { user, scope } = useApp();
   const queryClient = useQueryClient();
@@ -58,16 +95,7 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
   const titleId = useId();
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<unknown>(null);
-  const [notice, setNotice] = useState('');
   const word = card?.result?.word;
-  const summary = useMemo(() => {
-    const definition = word?.senses
-      ?.map((sense) => dictionaryText(sense.definitionZh).replace(/\s+/g, ' ').trim())
-      .find(Boolean);
-    if (!definition) return '';
-    const characters = Array.from(definition);
-    return characters.length > 160 ? `${characters.slice(0, 160).join('')}…` : definition;
-  }, [word]);
   const collection = useRemote<{
     item: Pick<WordbookItem, 'id' | 'wordId' | 'note' | 'favorite' | 'paused'> | null;
   }>('wordbook-entry', `wordbook/${encodeURIComponent(word?.id ?? '')}`, !!user && !!word);
@@ -91,7 +119,6 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     focusRequested.current = false;
     setCard(null);
     setPinned(false);
-    setNotice('');
     setActionError(null);
     setBusy(false);
     if (restoreFocus && origin.current?.isConnected) origin.current.focus({ preventScroll: true });
@@ -137,19 +164,17 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
   }, [cancelClose]);
   const openWord = useCallback(
     (text: string, anchor: HTMLElement, mode: 'hover' | 'pinned' = 'pinned') => {
-      const recursive = !!panel.current?.contains(anchor);
-      if (mode === 'hover' && pinState.current && !recursive) return;
+      if (panel.current?.contains(anchor)) return;
+      if (mode === 'hover' && pinState.current) return;
       cancelClose();
-      if (!recursive) {
-        origin.current = anchor;
-        hoveredSource.current = anchor;
-        onSource.current = mode === 'hover';
-        insideCard.current = false;
-        reposition();
-      }
+      origin.current = anchor;
+      hoveredSource.current = anchor;
+      onSource.current = mode === 'hover';
+      insideCard.current = false;
+      reposition();
       if (mode === 'pinned') {
         pin();
-        focusRequested.current = !recursive;
+        focusRequested.current = true;
       }
       open.current = true;
       if (activeQuery.current === text) {
@@ -169,7 +194,6 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
       activeQuery.current = text;
       setBusy(false);
       setActionError(null);
-      setNotice('');
       setCard({ queried: text, loading: true, result: null, error: null });
       const load = () => {
         requestTimer.current = undefined;
@@ -270,7 +294,7 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     }
     const content = panel.current?.querySelector('.word-card-scroll');
     if (content) content.scrollTop = 0;
-  }, [card, pinned]);
+  }, [card]);
   async function toggleSaved() {
     if (!user || !word || busy) return;
     const target = word;
@@ -282,8 +306,6 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
       else await post('wordbook', { wordId: target.id });
       await collection.refetch();
       await queryClient.invalidateQueries({ queryKey: [scope, 'wordbook'] });
-      if (generation.current === requestId)
-        setNotice(saved ? '已从本站生词本移除。' : '已加入本站生词本。');
     } catch (error) {
       if (generation.current === requestId) setActionError(error);
     } finally {
@@ -318,12 +340,27 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
             <div className="word-card-panel">
               <div className="word-card-top">
                 <div className="word-card-heading" tabIndex={-1}>
-                  <span className="tiny-label">
-                    {pinned ? '词卡已固定' : '悬停查询 · 点击可固定'}
-                  </span>
-                  <h2 id={titleId}>{card.queried}</h2>
+                  <h2 id={titleId}>{word?.lemma || card.queried}</h2>
                 </div>
                 <div className="word-card-tools">
+                  {word &&
+                    (user ? (
+                      <WordSaveButton
+                        lemma={word.lemma}
+                        saved={saved}
+                        busy={busy}
+                        disabled={collection.isFetching || !!collection.error || !collection.data}
+                        onClick={() => void toggleSaved()}
+                      />
+                    ) : (
+                      <Link
+                        className="icon-button word-save-button"
+                        to="/auth"
+                        aria-label={`登录后收藏 ${word.lemma}`}
+                      >
+                        <Star size={20} />
+                      </Link>
+                    ))}
                   {!pinned && (
                     <button className="icon-button" aria-label="固定词卡" onClick={pin}>
                       <Pin size={17} />
@@ -340,30 +377,11 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
               </div>
               {word && (
                 <div className="word-card-summary">
-                  <p>{summary || '该词条来源暂未提供中文释义。'}</p>
-                  <div className="word-card-bookmark">
-                    {user ? (
-                      <button
-                        className="button ghost"
-                        disabled={
-                          busy || collection.isFetching || !!collection.error || !collection.data
-                        }
-                        onClick={() => void toggleSaved()}
-                      >
-                        {saved ? <Check size={16} /> : <Bookmark size={16} />}
-                        {busy ? '正在保存…' : saved ? '已在生词本 · 移除' : '加入本站生词本'}
-                      </button>
-                    ) : (
-                      <Link className="button ghost" to="/auth">
-                        <Bookmark size={16} />
-                        登录后加入生词本
-                      </Link>
-                    )}
-                  </div>
+                  <WordCardSummaryText word={word} />
                 </div>
               )}
               <div className="word-card-scroll">
-                {card.loading && <Loading text="正在精确查找这个词形…" />}
+                {card.loading && <Loading text="正在查找…" />}
                 <ErrorNotice error={card.error} />
                 {!!card.error && (
                   <button
@@ -377,31 +395,30 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
                 )}
                 {card.result && !card.result.word && (
                   <Empty
-                    title="词典未收录这个词形。"
-                    description="仅显示精确匹配，不会用相近的前缀词替代。"
+                    title="没有找到这个词。"
+                    description="换个拼写试试。"
                     action={
                       <Link
                         className="button ghost"
                         to={`/lookup?q=${encodeURIComponent(card.queried)}`}
                       >
-                        到查词页手动搜索
+                        到查词页搜索
                       </Link>
                     }
                   />
                 )}
                 {word && (
                   <>
-                    <ErrorNotice error={actionError ?? collection.error} />
-                    {notice && <Notice>{notice}</Notice>}
+                    <ErrorNotice
+                      error={actionError ?? collection.error}
+                      onRetry={collection.error ? () => void collection.refetch() : undefined}
+                    />
                     {card.result?.matchType === 'inflection' && (
                       <Notice>
-                        词形 {card.queried} · 词典确认的原形 {card.result.matchedLemma}
+                        {card.queried} → {card.result.matchedLemma}
                       </Notice>
                     )}
-                    <WordView word={word} />
-                    <p className="fine-print word-card-help">
-                      卡内英文可继续查词；点击可固定词卡。按 Esc 或点击外侧回到原文。
-                    </p>
+                    <WordCardContent word={word} />
                   </>
                 )}
               </div>

@@ -135,8 +135,25 @@ export interface Sense {
   sourceRef?: string;
   source?: ContentAttribution;
   exampleSource?: ContentAttribution | null;
+  contentMetadata?: Record<string, unknown>;
+}
+export interface WordExample {
+  id: string;
+  exampleEn: string;
+  exampleZh: string;
+  contentMetadata?: Record<string, unknown>;
 }
 export interface Word {
+  entryKind?: 'single' | 'phrase';
+  dictionaryName?: string;
+  collocations?: {
+    id: string;
+    lemma: string;
+    definitionZh: string;
+    definitionEn: string;
+    pos: string;
+    wordId: string | null;
+  }[];
   id: string;
   status?: string;
   lemma: string;
@@ -167,8 +184,12 @@ export interface Word {
   } | null;
   sources?: { id: string; version: string; license: string; sourceUrl: string }[];
   senses?: Sense[];
+  learningDefinitions?: Sense[];
   senseCount?: number;
   detailAvailable?: boolean;
+  examples?: WordExample[];
+  lexicalWarnings?: { code: string; message: string }[];
+  contentView?: { snapshotVersion: string; currentVersion: string; supplemented: boolean };
 }
 export interface WordAudio {
   id: string;
@@ -193,6 +214,7 @@ export interface Book {
   title: string;
   description: string;
   goal: Goal;
+  kind?: 'vocabulary' | 'phrases';
   version: number | string;
   wordCount: number;
   learnedCount: number;

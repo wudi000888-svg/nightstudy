@@ -6,3 +6,13 @@ prisma/migrations
 .env*
 .local
 work
+data/bilingual-licenses/*-model-card.md
+# Preserve downloaded TranslateGemma metadata and license evidence byte-for-byte.
+data/bilingual-licenses/translategemma-*
+# Generated content records are pinned by their exact UTF-8 bytes.
+data/bilingual-source.manifest.json
+data/bilingual-pack.manifest.json
+data/bilingual.review-queue.json
+data/phrase-books.source.manifest.json
+data/phrase-books.manifest.json
+data/phrase-books.review-queue.json

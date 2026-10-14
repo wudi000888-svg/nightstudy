@@ -1,0 +1,17 @@
+{
+  "id": "phrase-audio-v1",
+  "status": "ready",
+  "version": "2026-10-14-v1",
+  "source": {
+    "url": "https://github.com/wudi000888-svg/nightstudy/releases/download/v0.6.0-alpha.1/nightstudy-phrase-audio-v1.tar.gz",
+    "sizeBytes": 31724594,
+    "sha256": "3bfbef1f5e3c63e8e1b17c51092426c1795f1f43f149107d9a7c6b5e51b9e9b9"
+  },
+  "lemmaCount": 437,
+  "entryCount": 874,
+  "recordedCount": 0,
+  "synthesizedCount": 874,
+  "manifestSha256": "44c71b446dd676575071007b56a752b7c63ed2514df7afe658a2af89b4e53b5d",
+  "sourceManifestSha256": "3dafe3867fc2005ce1cf0be24485e771671121f4cca185521b17b8d381e7489f",
+  "note": "Companion phrase audio made with already cached, verified Piper voices. No translation model was downloaded or run. Existing ready word audio is retained; generated audio is documented on the separate dictionary explanation page."
+}

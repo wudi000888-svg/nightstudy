@@ -68,6 +68,16 @@ jobs:
       - run: pnpm test
       - name: Verify bounded audio archive extraction
         run: python3 scripts/audio-extract.test.py
+      - name: Verify offline bilingual provenance and output boundaries
+        run: |
+          python3 scripts/bilingual-llm.test.py
+          python3 scripts/bilingual-compile.test.py
+          python3 scripts/bilingual-apply-corrections.test.py
+          python3 scripts/bilingual-assemble.test.py
+          python3 scripts/tatoeba-direct-source.test.py
+          python3 scripts/manythings-source.test.py
+          python3 scripts/phrase-compile.test.py
+          node scripts/check-audio-install.mjs --self-test
       - name: Validate Compose descriptors
         run: |
           cp .env.example .env
@@ -88,11 +98,24 @@ jobs:
           AUDIO_PACK: standard
           ADMIN_BOOTSTRAP: auto
         run: |
+          # Capture the pristine canonical catalog before the default initializer
+          # installs bilingual fields. The snapshot contains only IDs and hashes.
+          docker compose up --detach --no-build --wait --wait-timeout 120 postgres
+          docker compose run --rm --no-deps --entrypoint /bin/sh init -ec '
+            pnpm generate
+            pnpm db:deploy
+            pnpm db:seed
+            pnpm db:bootstrap
+            pnpm content:prepare
+            pnpm phonetics:prepare
+            pnpm audio:prepare
+            node scripts/check-audio-install.mjs --snapshot /app/.local/content/bilingual-before.json
+          '
           docker compose up --detach --no-build --wait --wait-timeout 600 app
           curl --fail --silent http://127.0.0.1:5198/health/ready
           curl --fail --silent http://127.0.0.1:5198/api/v2/dictionary/stats > /tmp/nightstudy-catalog.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-catalog.json','utf8'));if(!j.installedDictionary||j.declaredEntryCount!==770611)process.exit(1)"
-          docker compose exec -T app node scripts/check-audio-install.mjs
+          docker compose exec -T app node scripts/check-audio-install.mjs --bilingual-baseline /app/.local/content/bilingual-before.json
           umask 077
           docker compose run --rm --no-deps --entrypoint node init scripts/export-admin-credentials.mjs > /tmp/nightstudy-ci-admin.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-ci-admin.json','utf8'));const c=j.credentials[0];if(j.credentials.length!==1||c.username!=='admin'||c.password.length<32)process.exit(1);const r=await fetch('http://127.0.0.1:5198/api/auth/sign-in/username',{method:'POST',headers:{'Content-Type':'application/json',Origin:'http://127.0.0.1:5198'},body:JSON.stringify({username:c.username,password:c.password})});if(r.status!==200)process.exit(1)"

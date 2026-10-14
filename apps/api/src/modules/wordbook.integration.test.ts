@@ -285,10 +285,11 @@ suite('PostgreSQL complete private wordbook pagination and exact ownership', () 
         favorite: false,
         paused: true,
       },
+      collection: { inWordbook: true, known: null },
     });
     const foreign = await request(`/wordbook/${oldest.id}`, other);
     expect(foreign.statusCode).toBe(200);
-    expect(foreign.json()).toEqual({ item: null });
+    expect(foreign.json()).toEqual({ item: null, collection: { inWordbook: false, known: null } });
     const anonymous = await request(`/wordbook/${oldest.id}`, null);
     expect(anonymous.statusCode).toBe(401);
     expect(anonymous.json().code).toBe('authentication_required');

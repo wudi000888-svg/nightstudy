@@ -26,15 +26,23 @@ const pinnedSource = z.object({
     .positive()
     .max(2 * 1024 ** 3),
 });
-const packSource = z.object({
-  id: z.literal('audio-v1'),
-  status: z.literal('ready'),
-  source: pinnedSource,
-  lemmaCount: z.literal(8798),
-  entryCount: z.literal(17596),
-  sourceManifestSha256: z.string().regex(/^[a-f0-9]{64}$/),
-  manifestSha256: z.string().regex(/^[a-f0-9]{64}$/),
-});
+const packSource = z
+  .object({
+    id: z.enum(['audio-v1', 'phrase-audio-v1']),
+    status: z.literal('ready'),
+    source: pinnedSource,
+    lemmaCount: z.number().int().positive(),
+    entryCount: z.number().int().positive(),
+    sourceManifestSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    manifestSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .refine(
+    (source) =>
+      source.id === 'audio-v1'
+        ? source.lemmaCount === 8798 && source.entryCount === 17596
+        : source.lemmaCount === 437 && source.entryCount === 874,
+    'audio_scope_mismatch',
+  );
 const builtPack = z
   .object({
     schemaVersion: z.literal(1),
@@ -50,7 +58,7 @@ const builtPack = z
         failedCount: z.literal(0),
       })
       .passthrough(),
-    entries: z.array(audioEntry).length(17596),
+    entries: z.array(audioEntry).max(20000),
   })
   .passthrough();
 async function ensureCacheDirectory(directory: string) {
@@ -148,8 +156,8 @@ async function pinnedDownload(filename: string, source: z.infer<typeof pinnedSou
 }
 export async function installAudioFiles(source: z.infer<typeof packSource>) {
   const root = audioCacheRoot(),
-    archive = path.join(root, 'downloads/audio-v1.tar.gz'),
-    marker = path.join(root, 'audio-v1.manifest.json');
+    archive = path.join(root, `downloads/${source.id}.tar.gz`),
+    marker = path.join(root, `${source.id}.manifest.json`);
   await ensureCacheDirectory(path.join(root, 'files'));
   await ensureCacheDirectory(path.join(root, 'licenses'));
   let manifest: z.infer<typeof builtPack> | undefined;
@@ -240,7 +248,7 @@ export async function validateAudioPack(
   if (
     unique.size !== source.entryCount ||
     lemmas.size !== source.lemmaCount ||
-    recorded !== 3 ||
+    recorded !== (source.id === 'audio-v1' ? 3 : 0) ||
     manifest.statistics.lemmaCount !== source.lemmaCount ||
     manifest.statistics.entryCount !== source.entryCount ||
     manifest.statistics.recordedCount !== recorded ||
@@ -300,10 +308,10 @@ export async function importAudioSite(
       );
     }
     await client.query(
-      `INSERT INTO "WordAudio" (id,"wordId",accent,kind,status,"sourceName","sourceUrl",license,attribution,"fileKey","fileSha256","mimeType","createdAt","updatedAt") SELECT 'wa_'||md5(w.id||a.accent),w.id,a.accent,a.kind,'ready',a.source_name,a.source_url,a.license,a.attribution,a.file_key,a.sha,a.mime,NOW(),NOW() FROM audio_import a JOIN "Word" w ON w."normalizedLemma"=a.lemma ON CONFLICT ("wordId",accent) DO UPDATE SET kind=EXCLUDED.kind,status='ready',"sourceName"=EXCLUDED."sourceName","sourceUrl"=EXCLUDED."sourceUrl",license=EXCLUDED.license,attribution=EXCLUDED.attribution,"fileKey"=EXCLUDED."fileKey","fileSha256"=EXCLUDED."fileSha256","mimeType"=EXCLUDED."mimeType","updatedAt"=NOW()`,
+      `INSERT INTO "WordAudio" (id,"wordId",accent,kind,status,"sourceName","sourceUrl",license,attribution,"fileKey","fileSha256","mimeType","createdAt","updatedAt") SELECT 'wa_'||md5(w.id||a.accent),w.id,a.accent,a.kind,'ready',a.source_name,a.source_url,a.license,a.attribution,a.file_key,a.sha,a.mime,NOW(),NOW() FROM audio_import a JOIN "Word" w ON w."normalizedLemma"=a.lemma ON CONFLICT ("wordId",accent) ${source.id === 'phrase-audio-v1' ? 'DO NOTHING' : 'DO UPDATE SET kind=EXCLUDED.kind,status=\'ready\',"sourceName"=EXCLUDED."sourceName","sourceUrl"=EXCLUDED."sourceUrl",license=EXCLUDED.license,attribution=EXCLUDED.attribution,"fileKey"=EXCLUDED."fileKey","fileSha256"=EXCLUDED."fileSha256","mimeType"=EXCLUDED."mimeType","updatedAt"=NOW() WHERE ("WordAudio".kind,"WordAudio".status,"WordAudio"."sourceName","WordAudio"."sourceUrl","WordAudio".license,"WordAudio".attribution,"WordAudio"."fileKey","WordAudio"."fileSha256","WordAudio"."mimeType") IS DISTINCT FROM (EXCLUDED.kind,EXCLUDED.status,EXCLUDED."sourceName",EXCLUDED."sourceUrl",EXCLUDED.license,EXCLUDED.attribution,EXCLUDED."fileKey",EXCLUDED."fileSha256",EXCLUDED."mimeType")'}`,
     );
     await client.query(
-      `INSERT INTO "ContentPack" (id,version,status,"sourceUrl",sha256,license,"entryCount","phoneticCount","definitionZhCount","definitionEnCount","tagCounts","installedAt","updatedAt") VALUES ($1,'audio-v1','ready',$2,$3,'Per-entry MIT/CC-BY-SA-3.0/CC-BY-3.0-US',$4,0,0,0,$5::jsonb,NOW(),NOW()) ON CONFLICT (id) DO UPDATE SET status='ready',"sourceUrl"=EXCLUDED."sourceUrl",sha256=EXCLUDED.sha256,"entryCount"=EXCLUDED."entryCount","tagCounts"=EXCLUDED."tagCounts","updatedAt"=NOW()`,
+      `INSERT INTO "ContentPack" (id,version,status,"sourceUrl",sha256,license,"entryCount","phoneticCount","definitionZhCount","definitionEnCount","tagCounts","installedAt","updatedAt") VALUES ($1,$1,'ready',$2,$3,'Per-entry MIT/CC-BY-SA-3.0/CC-BY-3.0-US',$4,0,0,0,$5::jsonb,NOW(),NOW()) ON CONFLICT (id) DO UPDATE SET status='ready',"sourceUrl"=EXCLUDED."sourceUrl",sha256=EXCLUDED.sha256,"entryCount"=EXCLUDED."entryCount","tagCounts"=EXCLUDED."tagCounts","updatedAt"=NOW() WHERE ("ContentPack".status,"ContentPack"."sourceUrl","ContentPack".sha256,"ContentPack"."entryCount","ContentPack"."tagCounts") IS DISTINCT FROM (EXCLUDED.status,EXCLUDED."sourceUrl",EXCLUDED.sha256,EXCLUDED."entryCount",EXCLUDED."tagCounts")`,
       [
         source.id,
         source.source.url,
@@ -359,6 +367,13 @@ async function main() {
       }
     const manifest = await installAudioFiles(source);
     for (const site of readConfig().sites) await importAudioSite(site, manifest, source);
+    if (process.env.CONTENT_PACK !== 'demo') {
+      const phrases = packSource.parse(
+        JSON.parse(await fs.readFile('data/phrase-audio.manifest.json', 'utf8')),
+      );
+      const phraseManifest = await installAudioFiles(phrases);
+      for (const site of readConfig().sites) await importAudioSite(site, phraseManifest, phrases);
+    }
   }
 }
 if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url))

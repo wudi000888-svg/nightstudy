@@ -1,5 +1,7 @@
 # Google 在线翻译与 VPS 网关
 
+本文描述用户侧Google网页入口及兼容网关。0.6可选DeepSeek是本站管理员的缺项预览工具，地址、凭据与调用边界独立；它不替代本入口，不自动入库，也不是默认学习依赖。设置和费用说明见 [AI_CONFIGURATION.md](AI_CONFIGURATION.md)。默认词级双语内容不使用本地翻译模型。
+
 NightStudy 的翻译面板可展示 Google 的在线翻译结果，并提供带原文的官方网页入口。Google 网页当前返回 `X-Frame-Options: SAMEORIGIN`，不能在本站 iframe 中直接加载；本项目不删除它的安全响应头、不复制 Google 登录页。
 
 站内结果使用固定 `https://translate.googleapis.com/translate_a/single` 的网页兼容接口。这不是受支持的Google Cloud Translation API，可能变更、限流或停止服务。失败返回明确错误，用户仍可打开官方网页；系统不把离线词义冒充在线结果。默认部署只开启网页入口，配置VPS网关后才尝试站内结果。当前选择保留Google官方网页入口和已部署的私密备用网关，暂不接入收费Cloud API。

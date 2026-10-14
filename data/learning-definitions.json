@@ -1,0 +1,58 @@
+[
+  {
+    "normalizedLemma": "jew",
+    "senseId": "content-ecdict-92c4f5cfaa686db46c05d31789b89b8fadc15a5e1869731951f35cda20e5b1c6",
+    "sourceTextSha256": "1dce3864b03cd27e92dff050f895ba4a3a5a54606d7789975a39d14c0d11ebda",
+    "definitionZh": "犹太人；犹太教信徒",
+    "definitionEn": "A person belonging to the Jewish people or practising Judaism.",
+    "author": "NightStudy contributors",
+    "license": "MIT",
+    "kind": "original-authoring",
+    "review": "pending",
+    "authoringMethod": "Codex-assisted usage correction",
+    "reason": "Source wording mixes unlabelled stereotypes or outdated terms into ordinary learning meanings. Preserve the stored source; show independent usage guidance.",
+    "usageEvidenceUrl": "https://www.collinsdictionary.com/us/dictionary/english/jew"
+  },
+  {
+    "normalizedLemma": "jew",
+    "senseId": "content-ecdict-3d7f204c0a9ba38e1fc6bf3c016433e33b4cafa1400166fea557d4673d2290b5",
+    "sourceTextSha256": "768792b410fa24d3d35831d5c27d3892e54abaed8e22212daadfd00241fc9508",
+    "definitionZh": "[冒犯用法，勿用于日常表达] 以族群刻板印象表示欺骗或压价",
+    "definitionEn": "An offensive verb based on a stereotype, used to refer to cheating or bargaining down.",
+    "author": "NightStudy contributors",
+    "license": "MIT",
+    "kind": "original-authoring",
+    "review": "pending",
+    "authoringMethod": "Codex-assisted usage correction",
+    "reason": "Source wording mixes unlabelled stereotypes or outdated terms into ordinary learning meanings. Preserve the stored source; show independent usage guidance.",
+    "usageEvidenceUrl": "https://www.collinsdictionary.com/us/dictionary/english/jew"
+  },
+  {
+    "normalizedLemma": "negro",
+    "senseId": "content-ecdict-2f752eebf1f0e4e04c13e4f9ac1dcfc53c27206e432d95c85f91d67e573843cc",
+    "sourceTextSha256": "337ddf54b42b32562d9a8764eb736f65e23b5c08e9571bb1d1c5700bc0ea4b1d",
+    "definitionZh": "[过时且可能冒犯] 对黑人的旧称",
+    "definitionEn": "An outdated, potentially offensive term formerly used to refer to a Black person.",
+    "author": "NightStudy contributors",
+    "license": "MIT",
+    "kind": "original-authoring",
+    "review": "pending",
+    "authoringMethod": "Codex-assisted usage correction",
+    "reason": "Source wording mixes unlabelled stereotypes or outdated terms into ordinary learning meanings. Preserve the stored source; show independent usage guidance.",
+    "usageEvidenceUrl": "https://www.oxfordlearnersdictionaries.com/definition/english/negro"
+  },
+  {
+    "normalizedLemma": "negro",
+    "senseId": "content-ecdict-408eda52422936a840c0b67e6ee2abb5a96fd8b97e7d7172e3a0bda389e59176",
+    "sourceTextSha256": "30a420b51a51fc4a4574f0e6d9f4b425f7e6675c0702857a2e8120cd53abc4ab",
+    "definitionZh": "[过时且可能冒犯] 旧时用于表示与黑人有关",
+    "definitionEn": "An outdated, potentially offensive adjective formerly used in reference to Black people.",
+    "author": "NightStudy contributors",
+    "license": "MIT",
+    "kind": "original-authoring",
+    "review": "pending",
+    "authoringMethod": "Codex-assisted usage correction",
+    "reason": "Source wording mixes unlabelled stereotypes or outdated terms into ordinary learning meanings. Preserve the stored source; show independent usage guidance.",
+    "usageEvidenceUrl": "https://www.oxfordlearnersdictionaries.com/definition/english/negro"
+  }
+]

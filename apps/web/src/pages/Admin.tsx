@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   BookOpen,
@@ -10,13 +10,22 @@ import {
   MessageSquare,
   Settings2,
   Network,
+  Sparkles,
 } from 'lucide-react';
 import { AdminBooks } from '../components/AdminBooks';
 import { AdminConfirm, type AdminConfirmation } from '../components/AdminConfirm';
 import { AdminSystem } from '../components/AdminSystem';
 import { AdminFleet } from '../components/AdminFleet';
+import { DeepSeekSettings } from '../components/DeepSeekSettings';
 import { useApp, useRemote } from '../AppContext';
-import { post } from '../lib/api';
+import { ApiError, post } from '../lib/api';
+import {
+  adminWordPatch,
+  adminWordTarget,
+  loadAdminWord,
+  type AdminWordTarget,
+  type CandidateSourceStatus,
+} from '../lib/admin-word-editor';
 import type { PageInfo, Word, Sense } from '../lib/types';
 import {
   Dialog,
@@ -43,10 +52,15 @@ interface Announcement {
   status: string;
 }
 export function AdminPage() {
+  const { scope } = useApp();
+  return <AdminPageContent key={scope} />;
+}
+function AdminPageContent() {
   const { user, site } = useApp();
   const isAdmin = user?.role === 'admin';
   const location = useLocation();
-  const section = location.pathname.split('/')[2] ?? 'overview';
+  const requestedSection = location.pathname.split('/')[2] ?? 'overview';
+  const section = requestedSection === 'words' ? 'content' : requestedSection;
   const tab = [
     'overview',
     'users',
@@ -55,6 +69,7 @@ export function AdminPage() {
     'announcements',
     'system',
     'fleet',
+    'ai',
   ].includes(section)
     ? section
     : 'overview';
@@ -81,12 +96,67 @@ export function AdminPage() {
     isAdmin,
   );
   const [editing, setEditing] = useState<Word | null>(null);
+  const [editorTarget, setEditorTarget] = useState<AdminWordTarget | null>(null);
+  const [editorLoading, setEditorLoading] = useState(false);
+  const [editorError, setEditorError] = useState<unknown>(null);
+  const [editorConflict, setEditorConflict] = useState(false);
+  const [sourceStatus, setSourceStatus] = useState<CandidateSourceStatus>('unbound');
   const [sense, setSense] = useState<Sense | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState('');
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementBody, setAnnouncementBody] = useState('');
+  const editorRequest = useRef(0);
+  const editorAbort = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
+  const savingWord = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      editorAbort.current?.abort();
+    };
+  }, []);
+  async function openEditor(target: AdminWordTarget) {
+    const request = ++editorRequest.current;
+    editorAbort.current?.abort();
+    const controller = new AbortController();
+    editorAbort.current = controller;
+    setEditorTarget(target);
+    setEditing(null);
+    setSense(null);
+    setEditorError(null);
+    setEditorConflict(false);
+    setSourceStatus('unbound');
+    setEditorLoading(true);
+    try {
+      const result = await loadAdminWord(target, controller.signal);
+      if (!mounted.current || request !== editorRequest.current) return;
+      setEditing(result.word);
+      setSense(result.sense);
+      setSourceStatus(result.sourceStatus);
+      if (target.senseId && !result.sense)
+        setEditorError(new Error('指定义项不属于这个词，请重新选择原始义项。'));
+    } catch (value) {
+      if (mounted.current && request === editorRequest.current) setEditorError(value);
+    } finally {
+      if (mounted.current && request === editorRequest.current) setEditorLoading(false);
+    }
+  }
+  function closeEditor() {
+    if (savingWord.current) return;
+    ++editorRequest.current;
+    editorAbort.current?.abort();
+    setEditorTarget(null);
+    setEditing(null);
+    setSense(null);
+  }
+  useEffect(() => {
+    if (!isAdmin || tab !== 'content') return;
+    const target = adminWordTarget(location.search);
+    if (target) void openEditor(target);
+  }, [isAdmin, tab, location.search]);
   async function toggleUser(value: AdminUser) {
     setBusy(true);
     setError(null);
@@ -101,29 +171,32 @@ export function AdminPage() {
     }
   }
   async function saveWord() {
-    if (!editing || !sense) return;
+    if (!editing || !sense || editorConflict || savingWord.current || editorLoading) return;
+    const request = editorRequest.current;
+    savingWord.current = true;
     setBusy(true);
-    setError(null);
+    setEditorError(null);
     try {
       await post(
-        `admin/words/${editing.id}`,
-        {
-          status: editing.status === 'archived' ? 'archived' : 'published',
-          senseId: sense.id,
-          definitionZh: sense.definitionZh,
-          definitionEn: sense.definitionEn ?? '',
-          exampleEn: sense.exampleEn ?? '',
-          exampleZh: sense.exampleZh ?? '',
-        },
+        `admin/words/${encodeURIComponent(editing.id)}`,
+        adminWordPatch(editing, sense),
         'PATCH',
       );
       await words.refetch();
+      if (!mounted.current || request !== editorRequest.current) return;
+      setEditorTarget(null);
       setEditing(null);
+      setSense(null);
       setNotice('词条已保存，新的学习组会使用更新内容。');
     } catch (value) {
-      setError(value);
+      if (mounted.current && request === editorRequest.current) {
+        setEditorError(value);
+        if (value instanceof ApiError && (value.status === 403 || value.status === 409))
+          setEditorConflict(true);
+      }
     } finally {
-      setBusy(false);
+      savingWord.current = false;
+      if (mounted.current) setBusy(false);
     }
   }
   async function publishAnnouncement() {
@@ -193,6 +266,7 @@ export function AdminPage() {
           { id: 'announcements', label: '公告', icon: MessageSquare },
           { id: 'system', label: '系统与更新', icon: Settings2 },
           { id: 'fleet', label: '群站管理', icon: Network },
+          { id: 'ai', label: 'AI 内容辅助', icon: Sparkles },
         ].map(({ id, label, icon: Icon }) => (
           <Link
             key={id}
@@ -209,6 +283,7 @@ export function AdminPage() {
       {notice && <Notice>{notice}</Notice>}
       {tab === 'system' && <AdminSystem />}
       {tab === 'fleet' && <AdminFleet />}
+      {tab === 'ai' && <DeepSeekSettings />}
       {tab === 'overview' && (
         <>
           {overview.isPending ? (
@@ -334,14 +409,8 @@ export function AdminPage() {
                     <td>
                       <button
                         className="button quiet"
-                        onClick={() => {
-                          setEditing(value);
-                          setSense(
-                            value.senses?.find((item) => item.definitionZh?.trim()) ??
-                              value.senses?.[0] ??
-                              null,
-                          );
-                        }}
+                        disabled={busy}
+                        onClick={() => void openEditor({ wordId: value.id })}
                       >
                         编辑
                       </button>
@@ -433,11 +502,53 @@ export function AdminPage() {
         </div>
       )}
       <Dialog
-        open={!!editing}
+        open={!!editorTarget}
         title={`编辑 ${editing?.lemma ?? '词条'}`}
-        onClose={() => setEditing(null)}
+        onClose={closeEditor}
       >
-        {sense && (
+        {editorLoading && <Loading text="正在读取完整原始义项…" />}
+        <ErrorNotice error={editorError} />
+        {editorTarget && !editorLoading && (
+          <button
+            type="button"
+            className="button quiet"
+            disabled={busy}
+            onClick={() =>
+              void openEditor({ ...editorTarget, senseId: sense?.id ?? editorTarget.senseId })
+            }
+          >
+            重新载入原义项（丢弃未保存修改）
+          </button>
+        )}
+        {sourceStatus === 'changed' && (
+          <Notice>候选依据的原义已改变，请重新生成预览。这里显示最新原始内容，未填入候选。</Notice>
+        )}
+        {sourceStatus === 'unverifiable' && (
+          <Notice>暂未确认候选与当前原义一致，请重新预览后校对。这里未填入候选。</Notice>
+        )}
+        {editing && !editorLoading && (
+          <label className="field">
+            选择原始义项
+            <select
+              value={sense?.id ?? ''}
+              disabled={busy}
+              onChange={(event) => {
+                const selected = editing.senses?.find((item) => item.id === event.target.value);
+                setSense(selected ? { ...selected } : null);
+                if (!editorConflict) setEditorError(null);
+              }}
+            >
+              <option value="">请选择义项</option>
+              {editing.senses?.map((item, index) => (
+                <option key={item.id} value={item.id}>
+                  {index + 1}. {item.pos || '未标词性'} ·{' '}
+                  {(item.definitionZh || item.definitionEn || '空义项').slice(0, 100)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {editing && sense && !editorLoading && (
           <form
             className="form-stack"
             onSubmit={(event) => {
@@ -445,15 +556,29 @@ export function AdminPage() {
               void saveWord();
             }}
           >
+            <div className="management-card">
+              <strong>当前原始义项 · {sense.pos || '未标词性'}</strong>
+              <p>
+                中文：
+                {editing.senses?.find((item) => item.id === sense.id)?.definitionZh || '未填写'}
+              </p>
+              <p>
+                英文：
+                {editing.senses?.find((item) => item.id === sense.id)?.definitionEn || '未填写'}
+              </p>
+              <p className="fine-print">以下修改仅在点击“人工保存内容”后写入这个义项。</p>
+            </div>
             <label className="field">
               内容状态
               <select
-                value={editing?.status ?? 'published'}
+                value={editing.status}
+                disabled={busy}
                 onChange={(event) =>
                   editing && setEditing({ ...editing, status: event.target.value })
                 }
               >
                 <option value="published">发布</option>
+                <option value="draft">草稿</option>
                 <option value="archived">归档</option>
               </select>
             </label>
@@ -462,7 +587,7 @@ export function AdminPage() {
               <textarea
                 value={sense.definitionZh}
                 onChange={(event) => setSense({ ...sense, definitionZh: event.target.value })}
-                required
+                disabled={busy}
                 rows={2}
               />
             </label>
@@ -470,29 +595,33 @@ export function AdminPage() {
               英文释义
               <textarea
                 value={sense.definitionEn ?? ''}
+                disabled={busy}
                 onChange={(event) => setSense({ ...sense, definitionEn: event.target.value })}
                 rows={2}
               />
             </label>
             <label className="field">
-              英文例句
+              该义项的英文例句
               <textarea
                 value={sense.exampleEn ?? ''}
+                disabled={busy}
                 onChange={(event) => setSense({ ...sense, exampleEn: event.target.value })}
                 rows={2}
               />
             </label>
             <label className="field">
-              中文例句
+              该义项的中文例句
               <textarea
                 value={sense.exampleZh ?? ''}
+                disabled={busy}
                 onChange={(event) => setSense({ ...sense, exampleZh: event.target.value })}
                 rows={2}
               />
             </label>
-            <button className="button primary" disabled={busy}>
+            <p className="fine-print">这里保存所选义项的例句，不会新增或替换独立词级用法例句。</p>
+            <button className="button primary" disabled={busy || editorConflict}>
               <Save size={16} />
-              保存内容
+              人工保存内容
             </button>
           </form>
         )}

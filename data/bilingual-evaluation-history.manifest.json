@@ -1,0 +1,272 @@
+{
+  "version": "bilingual-source-v4",
+  "retrievedAt": "2026-10-14",
+  "purpose": "Source pins and provenance; not an installed content pack or a claim of completed translation",
+  "datasets": {
+    "tatoebaEnglish": {
+      "sourceUrl": "https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences_detailed.tsv.bz2",
+      "snapshot": "2026-10-10",
+      "lastModified": "Sat, 10 Oct 2026 06:29:32 GMT",
+      "bytes": 34937122,
+      "sha256": "1d8c40545b4af2c6531d1a8b64941fa9d0fa3ee5bcc11cb705c8d8c1fd930c84",
+      "language": "eng",
+      "license": "CC-BY-2.0-FR",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0/fr/",
+      "termsUrl": "https://tatoeba.org/en/terms_of_use",
+      "downloadDocumentationUrl": "https://tatoeba.org/en/downloads",
+      "fields": ["sentenceId", "language", "text", "username", "dateAdded", "dateModified"],
+      "attribution": "Per selected sentence: creator username, sentence ID and source URL; preserve export license and mark translation adaptations",
+      "mutableUrlWarning": "Weekly URL changes. A checksum mismatch must fail; retain selected source records and attribution in the published content pack."
+    },
+    "tatoebaChinese": {
+      "sourceUrl": "https://downloads.tatoeba.org/exports/per_language/cmn/cmn_sentences_detailed.tsv.bz2",
+      "snapshot": "2026-10-10",
+      "bytes": 1722861,
+      "sha256": "a8c53945a8806ce7b6e220585294bf2df4c021f2adfe9d0efc49b6db7e9c0af5",
+      "language": "cmn",
+      "license": "CC-BY-2.0-FR",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0/fr/",
+      "usage": "Downloaded for optional direct-link pair research; no pair is inferred from shared words or sentence ordering."
+    }
+  },
+  "translationModels": {
+    "zh-en": {
+      "repository": "Helsinki-NLP/opus-mt-zh-en",
+      "revision": "cf109095479db38d6df799875e34039d4938aaa6",
+      "license": "CC-BY-4.0",
+      "author": "Language Technology Research Group at the University of Helsinki",
+      "modelCardUrl": "https://huggingface.co/Helsinki-NLP/opus-mt-zh-en/raw/cf109095479db38d6df799875e34039d4938aaa6/README.md",
+      "modelCardFile": "bilingual-licenses/opus-mt-zh-en-model-card.md",
+      "modelCardSha256": "7f4b7f90672cd55b85b213bbe21f4b2d0c92327e885734b7e86b019feb145a6b",
+      "weights": {
+        "url": "https://huggingface.co/Helsinki-NLP/opus-mt-zh-en/resolve/cf109095479db38d6df799875e34039d4938aaa6/pytorch_model.bin",
+        "bytes": 312087009,
+        "sha256": "9d8ceb91d103ef89400c9d9d62328b4858743cf8924878aee3b8afc594242ce0"
+      },
+      "outputClassification": "machine-translation; pending-review; does not establish sense equivalence",
+      "candidateRejected": true,
+      "selected": false,
+      "rejection": {
+        "sampleWordCount": 9,
+        "date": "2026-10-14",
+        "reason": "Local bilingual diagnostic showed meaning-changing mistranslations, factual errors and unrelated decoder output. Rejected output must not enter the published content pack.",
+        "scope": "Pipeline candidate rejection; original model cards and licenses retained as historical source evidence."
+      }
+    },
+    "en-zh": {
+      "repository": "Helsinki-NLP/opus-mt-en-zh",
+      "revision": "408d9bc410a388e1d9aef112a2daba955b945255",
+      "license": "Apache-2.0",
+      "author": "Language Technology Research Group at the University of Helsinki",
+      "modelCardUrl": "https://huggingface.co/Helsinki-NLP/opus-mt-en-zh/raw/408d9bc410a388e1d9aef112a2daba955b945255/README.md",
+      "modelCardFile": "bilingual-licenses/opus-mt-en-zh-model-card.md",
+      "modelCardSha256": "83eee2a6598751f746a057e10d5c9dfd71d6b0cf0146f9e6c1bb3ebd6e90959b",
+      "weights": {
+        "url": "https://huggingface.co/Helsinki-NLP/opus-mt-en-zh/resolve/408d9bc410a388e1d9aef112a2daba955b945255/pytorch_model.bin",
+        "bytes": 312087009,
+        "sha256": "69a1d6ec829cee349360b3b677ac0aa99a7d88822d1a6578370029efffdca3f5"
+      },
+      "outputClassification": "machine-translation; pending-review; does not establish sense equivalence",
+      "targetLanguageToken": ">>cmn_Hans<<",
+      "candidateRejected": true,
+      "selected": false,
+      "rejection": {
+        "sampleWordCount": 9,
+        "date": "2026-10-14",
+        "reason": "Local bilingual diagnostic showed meaning-changing mistranslations, factual errors and unrelated decoder output. Rejected output must not enter the published content pack.",
+        "scope": "Pipeline candidate rejection; original model cards and licenses retained as historical source evidence."
+      }
+    },
+    "qwen3-4b-instruct-2507-4bit": {
+      "repository": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+      "revision": "50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b",
+      "license": "Apache-2.0",
+      "author": "Qwen Team",
+      "selected": false,
+      "candidateRejected": true,
+      "qualityValidation": "rejected-local-diagnostic",
+      "approvedPromptVersions": [],
+      "rejectedPromptVersions": [
+        "nightstudy-contextual-gloss-v1",
+        "nightstudy-contextual-gloss-v2",
+        "nightstudy-contextual-gloss-v3"
+      ],
+      "directions": ["zh-en", "en-zh"],
+      "modelCardUrl": "https://huggingface.co/mlx-community/Qwen3-4B-Instruct-2507-4bit/raw/50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b/README.md",
+      "modelCardFile": "bilingual-licenses/qwen3-4b-instruct-2507-4bit-model-card.md",
+      "modelCardSha256": "7b17ce562d7ea121c86d2ffdf660eed3726ac5b52cacfa9f1de11a65969f5657",
+      "weights": {
+        "file": "model.safetensors",
+        "url": "https://huggingface.co/mlx-community/Qwen3-4B-Instruct-2507-4bit/resolve/50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b/model.safetensors",
+        "bytes": 2263022417,
+        "sha256": "2a73c6c248601ab904e035548abd8e6abb65ea27dcb5f342fb0a8910eb44173f",
+        "digestEvidence": "Hugging Face fixed-revision model API LFS metadata; download verification is performed in the content-build environment."
+      },
+      "config": {
+        "url": "https://huggingface.co/mlx-community/Qwen3-4B-Instruct-2507-4bit/raw/50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b/config.json",
+        "bytes": 938,
+        "sha256": "574349e5a343236546fda55e4744a76e181f534182d7dc60ff1bad7e7a502849",
+        "quantizationBits": 4,
+        "groupSize": 64
+      },
+      "baseModel": {
+        "repository": "Qwen/Qwen3-4B-Instruct-2507",
+        "evidenceRevision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+        "modelCardUrl": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/raw/cdbee75f17c01a7cc42f958dc650907174af0554/README.md",
+        "modelCardFile": "bilingual-licenses/qwen3-4b-instruct-2507-base-model-card.md",
+        "modelCardSha256": "8e3dd0c3b5b11897cc71092ccfe517bb7a9783479baa3665aad73c8d1a2041cd",
+        "license": "Apache-2.0",
+        "licenseUrl": "https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507/raw/cdbee75f17c01a7cc42f958dc650907174af0554/LICENSE",
+        "licenseFile": "bilingual-licenses/qwen3-4b-instruct-2507-Apache-2.0.txt",
+        "licenseBytes": 11343,
+        "licenseSha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+        "mode": "non-thinking-only"
+      },
+      "conversion": {
+        "publisher": "mlx-community",
+        "format": "MLX",
+        "tool": "mlx-lm",
+        "toolVersion": "0.26.2",
+        "originalBaseRevisionDisclosed": false,
+        "note": "The upstream conversion card names the base repository but does not pin the conversion input commit. The base evidence revision above pins the inspected model card and license, not an asserted conversion input revision."
+      },
+      "contentBuild": {
+        "engine": "mlx-lm",
+        "engineVersion": "0.31.3",
+        "execution": "offline native Apple Silicon GPU; bounded batches",
+        "deployment": "Compiled selected content only; no model weights bundled or persistent production model inference."
+      },
+      "outputClassification": "machine-translation; pending-review; local benchmark required before publication; no automatic sense equivalence",
+      "promptRejectionReason": "Versions 1, 2, and 3 failed semantic quality validation. No unreviewed Qwen output is approved for the content-build batch; the independently corrected nine-word diagnostic is limited to isolated UI QA.",
+      "rejection": {
+        "date": "2026-10-14",
+        "sampleWordCount": 9,
+        "extendedEarlySourceFieldSampleCount": 80,
+        "sampleScope": "Additional source-field samples drawn only from completed early alphabetic A entries; not a random whole-catalog quality estimate.",
+        "reason": "Repeated meaning-changing mistranslations and omitted source meanings/qualifications in dictionary glosses. Neither the v1/v2 raw outputs nor the v3 prototype are approved for the published content pack.",
+        "diagnosticOnly": "An independently corrected nine-word sample is retained for isolated UI validation. This does not approve the unreviewed model output."
+      }
+    },
+    "translategemma-4b-it-4bit": {
+      "repository": "mlx-community/translategemma-4b-it-4bit",
+      "revision": "5788ec08c047f3f2e17808101b8d9566ac930d58",
+      "license": "LicenseRef-Gemma",
+      "author": "Google",
+      "selected": false,
+      "candidateRejected": true,
+      "qualityValidation": "rejected-local-diagnostic",
+      "approvedPromptVersions": [],
+      "directions": ["zh-en", "en-zh"],
+      "modelCardUrl": "https://huggingface.co/mlx-community/translategemma-4b-it-4bit/raw/5788ec08c047f3f2e17808101b8d9566ac930d58/README.md",
+      "modelCardFile": "bilingual-licenses/translategemma-4b-mlx-model-card.md",
+      "modelCardSha256": "ad0e6bbffb1b7840a42eda394d64df67a2e25ad7f5e07ef4fceebb09ea8ad231",
+      "weights": {
+        "file": "model.safetensors",
+        "url": "https://huggingface.co/mlx-community/translategemma-4b-it-4bit/resolve/5788ec08c047f3f2e17808101b8d9566ac930d58/model.safetensors",
+        "bytes": 2183295977,
+        "sha256": "113acb0c29997a3015af84bec2c8f967cb7b15f8959d1c26b9628b921e324c40",
+        "digestEvidence": "Fixed-revision Hugging Face LFS metadata; actual downloaded weights must be independently verified before inference."
+      },
+      "config": {
+        "url": "https://huggingface.co/mlx-community/translategemma-4b-it-4bit/raw/5788ec08c047f3f2e17808101b8d9566ac930d58/config.json",
+        "bytes": 2815,
+        "sha256": "033e1d370b223272e880fc9ba20c570f8464be7ada7b6177d2c8e5be9a10f90c",
+        "evidenceFile": "bilingual-licenses/translategemma-4b-mlx-config.json"
+      },
+      "baseModel": {
+        "repository": "google/translategemma-4b-it",
+        "evidenceRevision": "10042cb0e6e7fdce748996a71dc3dc432a4e0c89",
+        "license": "LicenseRef-Gemma",
+        "termsUrl": "https://ai.google.dev/gemma/terms",
+        "prohibitedUsePolicyUrl": "https://ai.google.dev/gemma/prohibited_use_policy",
+        "rawModelCardAnonymousStatus": 401,
+        "publicModelCardFile": "bilingual-licenses/translategemma-4b-official-public-model-card.html",
+        "templateEvidence": "Pinned upstream and converted public Git blob IDs match; see evidence snapshot. No access-gate acceptance or bypass."
+      },
+      "conversion": {
+        "publisher": "mlx-community",
+        "format": "MLX",
+        "tool": "mlx-lm",
+        "toolVersion": "0.29.1",
+        "originalBaseRevisionDisclosed": false,
+        "note": "The separately inspected official base revision is an evidence pin, not an asserted original conversion input commit."
+      },
+      "contentBuild": {
+        "engine": "mlx-lm",
+        "engineVersion": "0.31.3",
+        "execution": "Offline native Apple Silicon; bounded text-only batches",
+        "deployment": "Compiled lexical content only. Model weights and model-serving endpoints are not distributed in the application."
+      },
+      "evidenceFile": "bilingual-licenses/translategemma-evidence.json",
+      "evidenceSha256": "91a30c120b321bcf24a1b3d2597d16173e9b95bd835056a52d37c0bd324d678f",
+      "outputClassification": "Machine translation; pending review; a whitelist is not a claim of semantic quality. Actual benchmark required before publication.",
+      "licenseNote": "Gemma custom terms, not Apache-2.0 or MIT. Outputs are excluded from Model Derivatives and Google does not claim output rights under the inspected terms; original translated-source rights still apply.",
+      "rejectedPromptVersions": ["nightstudy-translategemma-v1"],
+      "rejection": {
+        "date": "2026-10-14",
+        "sampleWordCount": 9,
+        "sampleSourceFieldCount": 60,
+        "reason": "Observed wrong technical domains, missing senses, grammatical-role changes, unrelated Spanish fragments and incorrect alternative/set relations. Raw outputs are excluded; structural validation is not semantic quality approval.",
+        "extendedStressWordCount": 20,
+        "extendedStressSourceFieldCount": 147,
+        "diagnosticOnly": "The older corrected nine-word Qwen sample remains confined to isolated UI QA."
+      }
+    },
+    "qwen3.5-9b-4bit": {
+      "repository": "mlx-community/Qwen3.5-9B-4bit",
+      "revision": "8b2b98c00a6b4d291155e4890773ca8f769aee53",
+      "license": "Apache-2.0",
+      "author": "Qwen Team",
+      "selected": true,
+      "candidateRejected": false,
+      "qualityValidation": "pending-local-benchmark",
+      "approvedPromptVersions": [],
+      "directions": ["zh-en", "en-zh"],
+      "weights": {
+        "sha256": "988aa8e10c478a7bcb59e1c222079fcc34d4d507c7b86e8724b7d5fe9b15b710",
+        "digestKind": "sha256-canonical-weight-files-v1",
+        "bytes": 5950221072,
+        "files": [
+          {
+            "file": "model-00001-of-00002.safetensors",
+            "bytes": 5349771222,
+            "sha256": "a68b87558c6ef43f74c2bd63ce7e9092ceddc3101f3def0030774bae5f42aadd"
+          },
+          {
+            "file": "model-00002-of-00002.safetensors",
+            "bytes": 600449850,
+            "sha256": "b0a770bf8469c7f3f18756a0e0283f1c1174344a83e059a4e483f6af4907352d"
+          }
+        ],
+        "digestEvidence": "SHA256 of the ordered files array serialized as UTF-8 JSON with sorted object keys and compact separators. Every actual shard must independently match its pinned byte count and SHA256 before inference."
+      },
+      "conversion": {
+        "publisher": "mlx-community",
+        "format": "MLX",
+        "tool": "mlx-vlm",
+        "toolVersion": "0.3.12",
+        "originalBaseRevisionDisclosed": false
+      },
+      "baseModel": {
+        "repository": "Qwen/Qwen3.5-9B",
+        "evidenceRevision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+        "license": "Apache-2.0",
+        "note": "Independent model-card/license evidence revision, not an asserted conversion input commit."
+      },
+      "contentBuild": {
+        "engine": "mlx-lm",
+        "engineVersion": "0.31.3",
+        "execution": "Offline native Apple Silicon, bounded text-only batches, enable_thinking=False",
+        "deployment": "Only compiled lexical outputs; no model weights or model-serving endpoint in the application."
+      },
+      "outputClassification": "machine-translation; pending-review; actual benchmark required before a prompt identity is accepted"
+    }
+  },
+  "alignmentPolicy": {
+    "definitions": "Translate each existing Sense independently from its own nonempty language. Never pair independent English and Chinese dictionary rows by position or POS.",
+    "examples": "Exact canonical lemma usage at word level, not a verified correspondence to a dictionary Sense.",
+    "missingExamples": "Separately labelled newly generated/original examples, pending review; never fabricate corpus sentence IDs/authors."
+  },
+  "selectedTranslationModel": null,
+  "status": "historical-evaluation-only; not used in published no-model content"
+}

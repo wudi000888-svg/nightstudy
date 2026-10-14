@@ -46,21 +46,19 @@ export function TaskOverview({
     <div className={`task-overview ${compact ? 'compact' : ''}`}>
       <Panel className="task-today-card">
         <div className="section-heading">
-          <span className="tiny-label">
-            今日任务 · {plan.localDate} · {plan.timeZone}
-          </span>
+          <span className="tiny-label">今日任务 · {plan.localDate.slice(5).replace('-', '/')}</span>
           <span className="soft-badge">
             <Clock3 size={12} /> {plan.dailyTotalGoal} 词 / 天
           </span>
         </div>
         <h3>
           <span>{plan.completedUnique}</span>
-          <small> / {plan.dailyTotalGoal} 个不同词已评价</small>
+          <small> / {plan.dailyTotalGoal} 个词已练习</small>
         </h3>
         <div
           className="task-daily-progress"
           role="progressbar"
-          aria-label="今日已评价不同词"
+          aria-label="今日已练习词数"
           aria-valuemin={0}
           aria-valuemax={Math.max(plan.dailyTotalGoal, plan.completedUnique)}
           aria-valuenow={plan.completedUnique}
@@ -72,8 +70,8 @@ export function TaskOverview({
           />
         </div>
         <p>
-          已评价新学 {plan.completedNew} · 复习 {plan.completedReview}
-          。同词的巩固与拼写不重复占每天总数。
+          新学 {plan.completedNew} · 复习 {plan.completedReview}
+          。当天同一个词只计一次，巩固与拼写不重复占每日目标。
         </p>
         <div className="task-plan-split">
           <span>
@@ -87,7 +85,7 @@ export function TaskOverview({
         </div>
         {onContinue ? (
           <button className="text-link" onClick={onContinue} disabled={!canContinue}>
-            {plan.activeTaskId ? '继续已保存任务' : '查看今日任务'}
+            {plan.activeTaskId ? '继续上次学习' : '查看今日任务'}
             <ArrowRight size={15} />
           </button>
         ) : (
@@ -99,7 +97,7 @@ export function TaskOverview({
                 : '/learn'
             }
           >
-            {plan.activeTaskId ? '继续已保存任务' : '查看今日任务'}
+            {plan.activeTaskId ? '继续上次学习' : '查看今日任务'}
             <ArrowRight size={15} />
           </Link>
         )}
@@ -125,21 +123,23 @@ export function TaskOverview({
             </strong>
           </div>
           <div>
-            <span>等待同步</span>
+            <span>待保存</span>
             <strong>
               {pending}
               <small>操作</small>
             </strong>
           </div>
         </div>
-        <p>巩固与拼写可能涉及同一个词，数量不相加。等待同步的操作尚未算作服务端完成。</p>
-        <div className="task-overdue">
-          <Clock3 size={16} />
-          <div>
-            <strong>{plan.unplannedOverdueCount} 个逾期词尚未安排</strong>
-            <small>今日额度优先给复习；不足部分继续保留，可主动安排额外复习。</small>
+        <p>巩固和拼写可能来自同一个词。待保存的练习，可在恢复连接后继续同步。</p>
+        {plan.unplannedOverdueCount > 0 && (
+          <div className="task-overdue">
+            <Clock3 size={16} />
+            <div>
+              <strong>{plan.unplannedOverdueCount} 个逾期词尚未安排</strong>
+              <small>今日额度优先给复习；不足部分继续保留，可主动安排额外复习。</small>
+            </div>
           </div>
-        </div>
+        )}
       </Panel>
     </div>
   );
@@ -162,7 +162,7 @@ export function TaskForecast({
             <CalendarDays size={20} /> 复习负担，提前看清。
           </h2>
         </div>
-        <span className="fine-print">{timeZone ?? '计划时区'} · 每日04:00交接</span>
+        <span className="fine-print">每日凌晨4点开始新一天</span>
       </div>
       <div className="task-forecast-days">
         {forecast.days.map((day, index) => (
@@ -182,7 +182,7 @@ export function TaskForecast({
         ))}
       </div>
       <p className="fine-print">
-        基于当前真实到期日期，假设后续尚未复习：当天到期与此前逾期结转互不重叠，同词可能出现在后续多天，不能跨日相加。后续评价会改变安排；图中不计未来新学词。
+        每天包含当天到期和此前未复习的词，同一个词可能出现在多天，不要把七天数字相加。复习后安排会更新，图中未计入未来的新词。
       </p>
     </Panel>
   );

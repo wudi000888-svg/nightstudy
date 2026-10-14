@@ -43,6 +43,12 @@
 
 音标工具在 `.local/content/phonetics` 分别保留source.tsv、固定SHA256 manifest、NOTICE及原许可全文，大源文件不进入Git或应用镜像。音标自动/半自动处理可能有误，不包含商业原声录音。数据来源、修改与再分发说明见 [PHONETICS.md](docs/PHONETICS.md)。
 
+## 双语内容与例句
+
+新增精选例句来自 Tatoeba 固定英语导出，依据 **CC-BY-2.0-FR**（法国版）逐句保留作者用户名、句子编号、原句链接和许可；中文机器翻译属于改编，保留原来源并说明修改。为准确区分法国版，容器声明使用 `LicenseRef-CC-BY-2.0-FR`，其准确许可全文和来源保存在 [bilingual-licenses](data/bilingual-licenses) 及 [来源manifest](data/bilingual-source.manifest.json)。应用MIT不重新许可社区语料。
+
+Helsinki-NLP 的中英两个方向模型分别为 CC-BY-4.0 和 Apache-2.0，不混同许可。固定卡片、原始权重SHA和模型作者留存；模型用于独立离线制作任务，发行源码/运行镜像不含这些模型权重，也不以模型许可覆盖原文许可。少量缺口例句是NightStudy贡献者的Codex辅助原创，依据MIT分发，明确生成与待校对。范围、质量边界和逐字段来源见 [双语内容说明](docs/BILINGUAL_CONTENT.md)。
+
 ## 设计参考
 
 产品保留雨夜学习方向，界面和资源重新实现。多站部署方案只参考通用工程原则，见 [参考证据](docs/architecture/multisite-reference.md)；不复制 guangyue-panel 的代理业务、产品标识或代码。其许可证不由本仓库 MIT 重新授权。

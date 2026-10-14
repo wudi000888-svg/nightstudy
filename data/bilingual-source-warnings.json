@@ -1,0 +1,122 @@
+[
+  {
+    "normalizedLemma": "attent",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "来源标注为古体词；暂未确认适合现代自然英语的用法，不将其当作 attentive 自动造句。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "flourishment",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "来源词形较罕见，尚未核实适用语域与标准拼写；不把 flourishing 或 prosperity 的用法直接移植到该词形。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "handtruck",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "尚未核实 handtruck 这一闭合拼写；常见 hand truck 不满足原词形 literal 要求，暂留空待校对。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "outskirt",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "词典收录该单数词形但标为通常用复数；常见自然句采用 outskirts，不为满足 literal 要求强造单数句。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "pp",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "PP 可代表多个不同缩写，来源同时混列邮政、语法及计算机义项；缺少明确语境，不虚构统一标准用法。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "reservior",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "疑似 reservoir 的字母顺序错误；保留原词条待源数据校对，不把错误拼写写入标准例句。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "vitamine",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "来源是 vitamin 的历史拼写，暂未确认适合当前学习语域的自然用法，不以历史拼写冒充现代标准词形。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "cance",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "来源仅列人名，尚未确认该词形的常规英语用法；不以虚构人物姓名替代词形核验。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "eg",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "常见“例如”缩写为 e.g.；当前尚未确认本源条目无句点 eg 形式的规范用法，不以不同字面形式替代原词编句。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "erm",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "该源条目列出多个专业缩写义项，尚未确认具体展开形式；不把它当作口语停顿词编句。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "n't",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "该形式是依附否定缩约词的片段，不能独立构成自然词形；不拆写完整缩约词来满足字面边界。"
+      }
+    ]
+  },
+  {
+    "normalizedLemma": "uptodate",
+    "examples": [],
+    "warnings": [
+      {
+        "code": "source-spelling-unverified",
+        "message": "尚未确认无连字符的 uptodate 作为普通英语形容词的规范用法；不把 up-to-date 擅自改写成该原词形。"
+      }
+    ]
+  }
+]

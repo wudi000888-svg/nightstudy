@@ -1,0 +1,138 @@
+{
+  "formatVersion": 1,
+  "retrievedAtUTC": "2026-10-14T09:19:57.508641+00:00",
+  "scope": "Anonymous public metadata and license text only; no weights download, GPU inference, account credentials or license-acceptance action.",
+  "model": {
+    "repository": "mlx-community/translategemma-4b-it-4bit",
+    "revision": "5788ec08c047f3f2e17808101b8d9566ac930d58",
+    "upstreamRepository": "google/translategemma-4b-it",
+    "upstreamRevision": "10042cb0e6e7fdce748996a71dc3dc432a4e0c89",
+    "licenseTag": "LicenseRef-Gemma",
+    "conversionRuntime": "mlx-lm 0.29.1",
+    "candidateRuntime": "mlx-lm 0.31.3",
+    "qualityValidation": "pending",
+    "weights": {
+      "fileName": "model.safetensors",
+      "bytes": 2183295977,
+      "sha256": "113acb0c29997a3015af84bec2c8f967cb7b15f8959d1c26b9628b921e324c40",
+      "evidence": "Publisher LFS metadata; file not downloaded or independently hashed by this research task."
+    },
+    "tokenizerVocabulary": {
+      "fileName": "tokenizer.json",
+      "bytes": 33384568,
+      "sha256": "4667f2089529e8e7657cfb6d1c19910ae71ff5f28aa7ab2ff2763330affad795",
+      "evidence": "Publisher LFS metadata; full vocabulary not stored in repository."
+    }
+  },
+  "officialRawModelCard": {
+    "sourceUrl": "https://huggingface.co/google/translategemma-4b-it/raw/10042cb0e6e7fdce748996a71dc3dc432a4e0c89/README.md",
+    "anonymousHttpStatus": 401,
+    "note": "No access-gate acceptance or bypass; the publicly rendered model card and pinned public API/tree metadata are preserved instead."
+  },
+  "sources": [
+    {
+      "file": "translategemma-4b-mlx-config.json",
+      "sourceUrl": "https://huggingface.co/mlx-community/translategemma-4b-it-4bit/raw/5788ec08c047f3f2e17808101b8d9566ac930d58/config.json",
+      "bytes": 2815,
+      "sha256": "033e1d370b223272e880fc9ba20c570f8464be7ada7b6177d2c8e5be9a10f90c",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-4b-mlx-tokenizer-config.json",
+      "sourceUrl": "https://huggingface.co/mlx-community/translategemma-4b-it-4bit/raw/5788ec08c047f3f2e17808101b8d9566ac930d58/tokenizer_config.json",
+      "httpStatus": 200,
+      "bytes": 1155413,
+      "sha256": "120c4a25aed6436edaac2e3966c9aa026bc13b5f7d3d9a81fc7afe2569b9e28b"
+    },
+    {
+      "file": "translategemma-4b-mlx-chat-template.jinja",
+      "sourceUrl": "https://huggingface.co/mlx-community/translategemma-4b-it-4bit/raw/5788ec08c047f3f2e17808101b8d9566ac930d58/chat_template.jinja",
+      "bytes": 16982,
+      "sha256": "5e85514635b80a62b64c9982810bfdfbdd482be9a59ed12c25ded2bf3aabddaf",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-4b-mlx-generation-config.json",
+      "sourceUrl": "https://huggingface.co/mlx-community/translategemma-4b-it-4bit/raw/5788ec08c047f3f2e17808101b8d9566ac930d58/generation_config.json",
+      "bytes": 128,
+      "sha256": "1bf6761ba6159ba03953656905638ce2811ef05127fe3e1745ba14a2daa03763",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-4b-mlx-special-tokens-map.json",
+      "sourceUrl": "https://huggingface.co/mlx-community/translategemma-4b-it-4bit/raw/5788ec08c047f3f2e17808101b8d9566ac930d58/special_tokens_map.json",
+      "bytes": 662,
+      "sha256": "2f7b0adf4fb469770bb1490e3e35df87b1dc578246c5e7e6fc76ecf33213a397",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-4b-mlx-model-card.md",
+      "sourceUrl": "https://huggingface.co/mlx-community/translategemma-4b-it-4bit/raw/5788ec08c047f3f2e17808101b8d9566ac930d58/README.md",
+      "bytes": 1209,
+      "sha256": "ad0e6bbffb1b7840a42eda394d64df67a2e25ad7f5e07ef4fceebb09ea8ad231",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-4b-mlx-api.json",
+      "sourceUrl": "https://huggingface.co/api/models/mlx-community/translategemma-4b-it-4bit/revision/5788ec08c047f3f2e17808101b8d9566ac930d58?blobs=true",
+      "bytes": 23327,
+      "sha256": "64d385d979eeaa5a481413938dc9472b74af29c9d6c4eb9c64caa44e3aa257c5",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-4b-official-api.json",
+      "sourceUrl": "https://huggingface.co/api/models/google/translategemma-4b-it/revision/10042cb0e6e7fdce748996a71dc3dc432a4e0c89?blobs=true",
+      "bytes": 24465,
+      "sha256": "9bdbdcc67d0e5d8ba310f851236f9075653dbb21a849587d0b33bc03aa8dcc82",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-4b-official-tree.json",
+      "sourceUrl": "https://huggingface.co/api/models/google/translategemma-4b-it/tree/10042cb0e6e7fdce748996a71dc3dc432a4e0c89?expand=true",
+      "bytes": 15660,
+      "sha256": "9b1552ab4e238a6e250d7a38fb72f70b1b8c7fe61ffcb66b7fdf0eecbe39b272",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-4b-mlx-tree.json",
+      "sourceUrl": "https://huggingface.co/api/models/mlx-community/translategemma-4b-it-4bit/tree/5788ec08c047f3f2e17808101b8d9566ac930d58?expand=true",
+      "bytes": 3622,
+      "sha256": "9067c8fec9741dfebc7c6af705c9ecb564addb70dbc909bcafebb51706072826",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-4b-official-public-model-card.html",
+      "sourceUrl": "https://huggingface.co/google/translategemma-4b-it",
+      "bytes": 400251,
+      "sha256": "6b19ebffd33cadc2435d48f7c0d7e8f8ff5f847fc7b417272e54f2177d681146",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-Gemma-Terms-2026-04-01.txt",
+      "sourceUrl": "https://r.jina.ai/https://ai.google.dev/gemma/terms",
+      "bytes": 10623,
+      "sha256": "2f7d169abb175dce1116d0e9aff5f19b30174457e03c62b3451faac1d91729d2",
+      "httpStatus": 200
+    },
+    {
+      "file": "translategemma-Gemma-Prohibited-Use-Policy.txt",
+      "sourceUrl": "https://r.jina.ai/https://ai.google.dev/gemma/prohibited_use_policy",
+      "bytes": 8136,
+      "sha256": "8b8920924aa084ce0682a3c82912c4e07d9222c69e2ca0bc53cdaf8ae5df2cd6",
+      "httpStatus": 200
+    }
+  ],
+  "upstreamTemplateEquality": {
+    "evidence": "Pinned public tree Git blob OID equality; no gated base artifact download.",
+    "file": "chat_template.jinja",
+    "officialGitBlobOid": "d571968f9770221512d29627697012202451983c",
+    "quantizedGitBlobOid": "d571968f9770221512d29627697012202451983c"
+  },
+  "configurationNote": "Stored runtime config/tokenizer config are the pinned MLX conversion files, not byte-identical upstream base configs. The unchanged upstream chat template is confirmed by public tree metadata. Full tokenizer vocabulary is represented by publisher LFS checksum metadata, not vendored.",
+  "notice": {
+    "file": "TRANSLATEGEMMA_NOTICE.md",
+    "bytes": 3629,
+    "sha256": "8617f4c3ede37c809e6d21ac86f5de0968de9918399efe2c0a5ce7194bfb3500",
+    "authoredSummary": true
+  }
+}

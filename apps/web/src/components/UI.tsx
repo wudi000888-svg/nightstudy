@@ -1,8 +1,8 @@
-import { type ReactNode, useEffect, useId, useRef } from 'react';
-import { AlertCircle, ArrowRight, LoaderCircle, X, MoonStar } from 'lucide-react';
+import { Fragment, type ReactNode, useEffect, useId, useRef } from 'react';
+import { AlertCircle, ArrowRight, LoaderCircle, Star, X, MoonStar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { errorText } from '../lib/api';
-import type { Word } from '../lib/types';
+import type { Sense, Word } from '../lib/types';
 import { AudioButton } from './Pronunciation';
 import { dictionaryText } from '../lib/dictionary';
 import { InteractiveEnglish } from './InteractiveEnglish';
@@ -32,6 +32,37 @@ export function Heading({
 }
 export function Panel({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <section className={`panel ${className}`}>{children}</section>;
+}
+export function WordSaveButton({
+  lemma,
+  saved,
+  busy = false,
+  disabled = false,
+  onClick,
+}: {
+  lemma: string;
+  saved: boolean;
+  busy?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`icon-button word-save-button${saved ? ' saved' : ''}`}
+      disabled={busy || disabled}
+      aria-label={busy ? '正在保存' : saved ? `从生词本移除 ${lemma}` : `收藏 ${lemma}`}
+      aria-pressed={saved}
+      title={saved ? '取消收藏' : '收藏'}
+      onClick={onClick}
+    >
+      {busy ? (
+        <LoaderCircle size={19} className="spin" />
+      ) : (
+        <Star size={20} fill={saved ? 'currentColor' : 'none'} />
+      )}
+    </button>
+  );
 }
 export function Loading({ text = '正在读取你的记录…' }: { text?: string }) {
   return (
@@ -90,130 +121,379 @@ export function LoginPrompt() {
     />
   );
 }
+function fieldMetadata(metadata: Record<string, unknown> | undefined, field: string) {
+  const value = metadata?.[field];
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+export function ContentTags({
+  metadata,
+  field,
+}: {
+  metadata?: Record<string, unknown>;
+  field: string;
+}) {
+  const source = fieldMetadata(metadata, field);
+  if (!source) return null;
+  const kind =
+    source.kind === 'machine-translation'
+      ? '机器翻译'
+      : source.kind === 'generated'
+        ? field.startsWith('example')
+          ? '生成例句'
+          : '机器生成'
+        : source.kind === 'original-authoring'
+          ? '原创翻译'
+          : null;
+  if (!kind && source.review !== 'pending') return null;
+  return (
+    <span className="content-statuses" lang="zh-CN">
+      {kind && (
+        <span
+          className={`content-status ${source.kind === 'original-authoring' ? 'authored' : 'machine'}`}
+        >
+          {kind}
+        </span>
+      )}
+      {source.review === 'pending' && <span className="content-status pending">待校对</span>}
+    </span>
+  );
+}
+function MetadataSources({
+  metadata,
+  fields,
+}: {
+  metadata?: Record<string, unknown>;
+  fields: { key: string; label: string; present: boolean }[];
+}) {
+  return (
+    <>
+      {fields.map(({ key, label, present }) => {
+        const source = present && fieldMetadata(metadata, key);
+        if (!source) return null;
+        const kind =
+          source.kind === 'machine-translation'
+            ? '机器翻译'
+            : source.kind === 'generated'
+              ? '生成内容'
+              : source.kind === 'corpus'
+                ? '语料来源'
+                : source.kind === 'original-authoring'
+                  ? '原创翻译'
+                  : '来源信息';
+        return (
+          <div className="content-field-source" key={key}>
+            <p className="source-line">
+              {label} · {kind}
+              {source.review === 'pending' ? ' · 待校对' : ''}
+              {typeof source.license === 'string' ? ` · ${source.license}` : ''}
+            </p>
+            {source.kind !== 'original-authoring' && typeof source.model === 'string' && (
+              <p className="source-line">模型 · {source.model}</p>
+            )}
+            {source.kind !== 'original-authoring' && typeof source.modelAuthor === 'string' && (
+              <p className="source-line">模型作者 · {source.modelAuthor}</p>
+            )}
+            {source.kind !== 'original-authoring' && typeof source.modelLicense === 'string' && (
+              <p className="source-line">模型许可 · {source.modelLicense}</p>
+            )}
+            {source.kind !== 'original-authoring' &&
+              typeof source.modelUrl === 'string' &&
+              sourceLink(source.modelUrl) && (
+                <a
+                  className="text-link"
+                  href={sourceLink(source.modelUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  查看模型信息 ↗
+                </a>
+              )}
+            {typeof source.originalAuthor === 'string' && (
+              <p className="source-line">原作者 · {source.originalAuthor}</p>
+            )}
+            {typeof source.author === 'string' && (
+              <p className="source-line">作者 · {source.author}</p>
+            )}
+            {typeof source.translationAuthor === 'string' && (
+              <p className="source-line">译文作者 · {source.translationAuthor}</p>
+            )}
+            {typeof source.authoringMethod === 'string' && (
+              <p className="source-line">编写方式 · {source.authoringMethod}</p>
+            )}
+            {(typeof source.sourceSentenceId === 'string' ||
+              typeof source.sourceSentenceId === 'number') && (
+              <p className="source-line">来源句编号 · {source.sourceSentenceId}</p>
+            )}
+            {typeof source.sourceUrl === 'string' && sourceLink(source.sourceUrl) && (
+              <a
+                className="text-link"
+                href={sourceLink(source.sourceUrl)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                查看{label}来源 ↗
+              </a>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+function BilingualExample({
+  english,
+  chinese,
+  interactive,
+}: {
+  english: string;
+  chinese: string;
+  interactive: boolean;
+}) {
+  return (
+    <blockquote
+      className="bilingual-example"
+      aria-label={english && chinese ? '中英例句对照' : english ? '英文例句' : '中文例句'}
+    >
+      {english && (
+        <div className="bilingual-cell" lang="en">
+          <p className="example-en">
+            <InteractiveEnglish text={english} enabled={interactive} />
+          </p>
+        </div>
+      )}
+      {chinese && (
+        <div className="bilingual-cell" lang="zh-CN">
+          <p className="example-zh">{chinese}</p>
+        </div>
+      )}
+    </blockquote>
+  );
+}
+function isNativeEnglishSense(sense: Sense) {
+  const source = fieldMetadata(sense.contentMetadata, 'definitionEn');
+  return (
+    !!dictionaryText(sense.definitionEn) &&
+    !dictionaryText(sense.definitionZh) &&
+    source?.kind !== 'machine-translation' &&
+    source?.kind !== 'generated' &&
+    source?.sourceLanguage !== 'zh'
+  );
+}
 export function WordView({
   word,
   focusSenseId,
   hideMeanings = false,
+  interactive = true,
 }: {
   word: Word;
   focusSenseId?: string;
   hideMeanings?: boolean;
+  interactive?: boolean;
 }) {
-  const senses = [...(hideMeanings ? [] : (word.senses ?? []))]
-    .filter((sense) => (sense.definitionZh ?? '').trim() || sense.definitionEn?.trim())
-    .sort((a, b) => Number(b.id === focusSenseId) - Number(a.id === focusSenseId));
+  const availableSenses = (hideMeanings ? [] : (word.senses ?? [])).filter((sense) =>
+    [sense.definitionZh, sense.definitionEn, sense.exampleEn, sense.exampleZh].some(
+      (value) => !!dictionaryText(value),
+    ),
+  );
+  const primarySense =
+    availableSenses.find((sense) => sense.id === focusSenseId) ||
+    availableSenses.find((sense) => !!dictionaryText(sense.definitionZh)) ||
+    availableSenses[0];
+  const normalizePos = (pos: string | undefined) => (pos || '').toLowerCase().replace(/[.\s]/g, '');
+  // Independent dictionary English senses are kept separate: shared POS does not prove
+  // a one-to-one translation relationship with the focused Chinese definition.
+  const englishSenses =
+    primarySense &&
+    dictionaryText(primarySense.definitionZh) &&
+    !dictionaryText(primarySense.definitionEn)
+      ? availableSenses
+          .filter((sense) => sense !== primarySense && isNativeEnglishSense(sense))
+          .sort(
+            (a, b) =>
+              Number(!!primarySense.pos && normalizePos(b.pos) === normalizePos(primarySense.pos)) -
+              Number(!!primarySense.pos && normalizePos(a.pos) === normalizePos(primarySense.pos)),
+          )
+      : [];
+  const senses = primarySense
+    ? [
+        primarySense,
+        ...availableSenses.filter(
+          (sense) => sense !== primarySense && !englishSenses.includes(sense),
+        ),
+      ]
+    : [];
   const sourceTranscription =
     word.phonetic || word.phonetics?.find((entry) => entry.region === 'unspecified')?.text;
+  const examples = hideMeanings
+    ? []
+    : (word.examples ?? []).filter(
+        (example) => dictionaryText(example.exampleEn) || dictionaryText(example.exampleZh),
+      );
+  const collocations = hideMeanings
+    ? []
+    : (word.collocations ?? []).filter((entry) => dictionaryText(entry.lemma));
+  const exampleSection =
+    examples.length > 0 ? (
+      <section className="word-examples" aria-label="单词用法例句">
+        <div className="word-example-list">
+          {examples.map((example) => (
+            <div className="word-example" key={example.id}>
+              <BilingualExample
+                english={dictionaryText(example.exampleEn)}
+                chinese={dictionaryText(example.exampleZh)}
+                interactive={interactive}
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+    ) : null;
+  const englishSection =
+    englishSenses.length > 0 ? (
+      <section className="word-english-explanations" aria-label="英文解释">
+        <h3>英文解释</h3>
+        {englishSenses.map((sense) => (
+          <div className="english-explanation" key={sense.id}>
+            {sense.pos && <span className="sense-pos">{sense.pos}</span>}
+            <p className="meaning-en" lang="en">
+              <InteractiveEnglish text={dictionaryText(sense.definitionEn)} enabled={interactive} />
+            </p>
+            {(dictionaryText(sense.exampleEn) || dictionaryText(sense.exampleZh)) && (
+              <BilingualExample
+                english={dictionaryText(sense.exampleEn)}
+                chinese={dictionaryText(sense.exampleZh)}
+                interactive={interactive}
+              />
+            )}
+          </div>
+        ))}
+      </section>
+    ) : null;
+  const collocationSection =
+    collocations.length > 0 ? (
+      <section className="word-collocations" aria-label="词组搭配">
+        <h3>常用搭配</h3>
+        <div className="collocation-list">
+          {collocations.map((entry) => (
+            <div className="collocation-entry" key={entry.id}>
+              <p className="collocation-lemma" lang="en">
+                <InteractiveEnglish text={entry.lemma} enabled={interactive} />
+              </p>
+              {entry.pos && <span className="collocation-pos">{entry.pos}</span>}
+              {dictionaryText(entry.definitionZh) && (
+                <p lang="zh-CN">{dictionaryText(entry.definitionZh)}</p>
+              )}
+              {dictionaryText(entry.definitionEn) && (
+                <p className="collocation-definition" lang="en">
+                  <InteractiveEnglish
+                    text={dictionaryText(entry.definitionEn)}
+                    enabled={interactive}
+                  />
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+    ) : null;
   return (
     <div className="word-content">
       <div className="word-title-row">
         <div>
           <h2 className="word-title">{word.lemma}</h2>
+          {!!dictionaryText(word.dictionaryName) && (
+            <span className="word-dictionary-name">{dictionaryText(word.dictionaryName)}</span>
+          )}
           {!word.phoneticUs && !word.phoneticUk && !!sourceTranscription && (
-            <>
-              <div className="phonetic">
-                <span title="词库读音标注，未区分英美">{sourceTranscription}</span>
-              </div>
-              <span className="phonetic-caption">词库音标 · 来源未分型</span>
-            </>
+            <div className="phonetic">
+              <span>{sourceTranscription}</span>
+            </div>
           )}
         </div>
         <AudioButton word={word} />
       </div>
       {senses.length > 0 && (
         <div className="meanings">
-          {senses.map((sense, index) => (
-            <div className="sense" key={sense.id}>
-              <span className="tiny-label">
-                {sense.pos || '词义'}
-                {sense.id === focusSenseId ? ' · 当前重点' : ` · 释义 ${index + 1}`}
-              </span>
-              {dictionaryText(sense.definitionZh) && (
-                <p className="meaning-zh">
-                  <InteractiveEnglish text={dictionaryText(sense.definitionZh)} />
-                </p>
-              )}
-              {dictionaryText(sense.definitionEn) && (
-                <p className="meaning-en">
-                  <InteractiveEnglish text={dictionaryText(sense.definitionEn)} />
-                </p>
-              )}
-              {sense.exampleEn?.trim() && (
-                <blockquote>
-                  <p>
-                    <InteractiveEnglish text={dictionaryText(sense.exampleEn)} />
-                  </p>
-                  {dictionaryText(sense.exampleZh) && (
-                    <small>
-                      <InteractiveEnglish text={dictionaryText(sense.exampleZh)} />
-                    </small>
+          {senses.map((sense, index) => {
+            const definitionZh = dictionaryText(sense.definitionZh);
+            const definitionEn = dictionaryText(sense.definitionEn);
+            const exampleEn = dictionaryText(sense.exampleEn);
+            const exampleZh = dictionaryText(sense.exampleZh);
+            const characters = Array.from((definitionZh || definitionEn).replace(/\s+/g, ' '));
+            const shortSummary =
+              characters.length > 100
+                ? `${characters.slice(0, 100).join('')}…`
+                : characters.join('');
+            const heading = <span className="sense-pos">{sense.pos || '词义'}</span>;
+            const content = (
+              <>
+                <div
+                  className="bilingual-definition"
+                  aria-label={
+                    definitionZh && definitionEn
+                      ? '中英释义对照'
+                      : definitionZh
+                        ? '中文释义'
+                        : '英文释义'
+                  }
+                >
+                  {definitionZh && (
+                    <div className="bilingual-cell" lang="zh-CN">
+                      <p className="meaning-zh">{definitionZh}</p>
+                    </div>
                   )}
-                  {sense.exampleSource && (
-                    <small className="source-line">
-                      语境来源 · {sense.exampleSource.reference}
-                      {sense.exampleSource.license ? ` · ${sense.exampleSource.license}` : ''}
-                    </small>
-                  )}
-                </blockquote>
-              )}
-              {(sense.source || sense.sourceRef) && (
-                <p className="source-line">
-                  释义来源 · {sense.source?.reference || sense.sourceRef}
-                  {sense.source?.license ? ` · ${sense.source.license}` : ''}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      {!hideMeanings && word.senses && senses.length === 0 && (
-        <p className="fine-print">该词条来源暂未提供可展示的释义。</p>
-      )}
-      {!hideMeanings && (word.source?.reference || word.sourceRef) && (
-        <div className="word-source-detail">
-          <p className="source-line">内容来源 · {word.source?.reference || word.sourceRef}</p>
-          {word.source?.license && (
-            <p className="source-line">主来源许可 · {word.source.license}</p>
-          )}
-          {word.source?.wordHasSiteEdits && (
-            <p className="source-line">
-              本站编辑记录 · {word.source.siteEditVersion || word.contentVersion}（词条级记录）
-            </p>
-          )}
-          {sourceLink(word.source?.sourceUrl) && (
-            <a
-              className="text-link"
-              href={sourceLink(word.source?.sourceUrl)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              查看来源信息 ↗
-            </a>
-          )}
-          {!!word.sources?.length && (
-            <details className="dictionary-pack-details">
-              <summary>查看来源与许可 · {word.sources.length} 个数据包</summary>
-              {word.sources.map((source) => (
-                <div className="dictionary-pack" key={source.id}>
-                  <strong>{source.id}</strong>
-                  <span>
-                    版本 {source.version} · 许可 {source.license}
-                  </span>
-                  {sourceLink(source.sourceUrl) && (
-                    <a
-                      className="text-link"
-                      href={sourceLink(source.sourceUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      数据包来源 ↗
-                    </a>
+                  {definitionEn && (
+                    <div className="bilingual-cell" lang="en">
+                      <p className="meaning-en">
+                        <InteractiveEnglish text={definitionEn} enabled={interactive} />
+                      </p>
+                    </div>
                   )}
                 </div>
-              ))}
-            </details>
-          )}
+                {(exampleEn || exampleZh) && (
+                  <BilingualExample
+                    english={exampleEn}
+                    chinese={exampleZh}
+                    interactive={interactive}
+                  />
+                )}
+              </>
+            );
+            return index === 0 ? (
+              <Fragment key={`${word.id}:${sense.id}`}>
+                <div className="sense">
+                  {heading}
+                  {content}
+                </div>
+                {englishSection}
+                {exampleSection}
+                {collocationSection}
+              </Fragment>
+            ) : (
+              <details className="sense sense-collapsed" key={`${word.id}:${sense.id}`}>
+                <summary>
+                  <span className="sense-summary-top">
+                    {heading}
+                    <span className="sense-expand-icon" aria-hidden="true">
+                      ⌄
+                    </span>
+                  </span>
+                  <span className="sense-summary-text">{shortSummary || '展开查看例句'}</span>
+                </summary>
+                <div className="sense-expanded">{content}</div>
+              </details>
+            );
+          })}
         </div>
+      )}
+      {!hideMeanings && senses.length === 0 && <p className="fine-print">暂无释义。</p>}
+      {senses.length === 0 && (
+        <>
+          {exampleSection}
+          {collocationSection}
+        </>
       )}
     </div>
   );

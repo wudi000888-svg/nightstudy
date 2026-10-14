@@ -1,9 +1,20 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { KnownImport } from '@prisma/client';
+import type { KnownImport, Prisma } from '@prisma/client';
 import { Readable } from 'node:stream';
 import { HttpError, requireUser, type ContextResolver } from '../context.js';
-import { parse, id, normalize, obj, json, transact } from './shared.js';
+import {
+  parse,
+  id,
+  normalize,
+  obj,
+  json,
+  transact,
+  wordInclude,
+  wordDto,
+  progressDto,
+} from './shared.js';
+import { decodeCursor, pageInfo } from './pagination.js';
 
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
@@ -98,6 +109,66 @@ export function csvCell(value: string): string {
   return `"${safe.replace(/"/g, '""')}"`;
 }
 export async function registerKnown(app: FastifyInstance, getContext: ContextResolver) {
+  app.get('/known-words', async (req) => {
+    const ctx = await getContext(req),
+      user = requireUser(ctx);
+    const query = parse(
+      z
+        .object({
+          limit: z.coerce.number().int().min(1).max(100).default(50),
+          cursor: z.string().min(1).max(1200).optional(),
+        })
+        .strict(),
+      req.query,
+    );
+    const scope = `known-words:${ctx.siteId}:${user.id}`;
+    const after = decodeCursor(scope, query.cursor, 'string');
+    const where: Prisma.WordWhereInput = {
+      status: 'published',
+      OR: [
+        { claims: { some: { userId: user.id, import: { status: 'confirmed' } } } },
+        { autoKnownWords: { some: { userId: user.id, revokedAt: null } } },
+      ],
+    };
+    return ctx.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.word.findMany({
+          where: { ...where, ...(after ? { id: { gt: after } } : {}) },
+          include: {
+            ...wordInclude,
+            claims: {
+              where: { userId: user.id, import: { status: 'confirmed' } },
+              select: { createdAt: true },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+            autoKnownWords: {
+              where: { userId: user.id, revokedAt: null },
+              select: { confirmedAt: true },
+            },
+            progress: { where: { userId: user.id } },
+          },
+          orderBy: { id: 'asc' },
+          take: query.limit + 1,
+        });
+        const total = await tx.word.count({ where });
+        const result = pageInfo(rows, query.limit, total, scope, (row) => row.id);
+        return {
+          items: result.items.map((word) => ({
+            wordId: word.id,
+            word: wordDto(word),
+            origin: word.claims.length ? 'manual' : 'automatic',
+            knownAt: (
+              word.claims[0]?.createdAt ?? word.autoKnownWords[0]!.confirmedAt
+            ).toISOString(),
+            progress: progressDto(word.progress[0] ?? null),
+          })),
+          page: result.page,
+        };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
+  });
   app.post('/known-words/imports', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx),
@@ -245,22 +316,33 @@ export async function registerKnown(app: FastifyInstance, getContext: ContextRes
         : JSON.stringify(metadata).slice(0, -1) + ',"rows":[';
       for (;;) {
         const page = await ctx.prisma.$queryRaw<
-          { wordId: string; lemma: string; claimedAt: Date }[]
+          { wordId: string; lemma: string; knownAt: Date; manual: boolean }[]
         >`
-          SELECT c."wordId", w."lemma", MAX(c."createdAt") AS "claimedAt"
-          FROM "KnownClaim" c JOIN "KnownImport" i ON i."id" = c."importId"
-          JOIN "Word" w ON w."id" = c."wordId"
-          WHERE c."userId" = ${user.id} AND i."status" = 'confirmed' AND c."wordId" > ${cursor}
-          GROUP BY c."wordId", w."lemma" ORDER BY c."wordId" ASC LIMIT 1000
+          WITH sources AS (
+            SELECT c."wordId", c."createdAt" AS "knownAt", true AS manual
+            FROM "KnownClaim" c JOIN "KnownImport" i ON i."id" = c."importId"
+            WHERE c."userId" = ${user.id} AND i."status" = 'confirmed'
+            UNION ALL
+            SELECT a."wordId", a."confirmedAt" AS "knownAt", false AS manual
+            FROM "AutoKnownWord" a WHERE a."userId" = ${user.id} AND a."revokedAt" IS NULL
+          )
+          SELECT s."wordId", w."lemma",
+            COALESCE(MAX(s."knownAt") FILTER (WHERE s.manual), MAX(s."knownAt")) AS "knownAt",
+            BOOL_OR(s.manual) AS manual
+          FROM sources s JOIN "Word" w ON w."id" = s."wordId"
+          WHERE s."wordId" > ${cursor}
+          GROUP BY s."wordId", w."lemma" ORDER BY s."wordId" ASC LIMIT 1000
         `;
         for (const entry of page) {
           const row = {
             wordId: entry.wordId,
             lemma: entry.lemma,
             language: 'en',
-            familiarity: 'claimed_known',
-            source: 'user_claim',
-            claimedAt: entry.claimedAt.toISOString(),
+            familiarity: entry.manual ? 'claimed_known' : 'automatic_known',
+            source: entry.manual ? 'user_claim' : 'fsrs_reviews',
+            origin: entry.manual ? 'manual' : 'automatic',
+            knownAt: entry.knownAt.toISOString(),
+            ...(entry.manual ? { claimedAt: entry.knownAt.toISOString() } : {}),
           };
           yield query.format === 'csv'
             ? [row.wordId, row.lemma, row.language, row.familiarity].map(csvCell).join(',') + '\r\n'

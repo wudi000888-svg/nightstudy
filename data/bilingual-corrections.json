@@ -1,0 +1,222 @@
+[
+  {
+    "normalizedLemma": "abandon",
+    "senseId": "content-ecdict-c76eb713173c193c5a8f706551d89e742b79a307864328a093558d8ee7117eab",
+    "field": "definitionEn",
+    "sourceText": "放弃, 抛弃, 遗弃, 使屈从, 沉溺, 放纵",
+    "sourceTextSha256": "0a01bac13596e5c8838e3547cc938f359e569906364894ecae2ceed9ea313fb8",
+    "value": "give up; discard; forsake; cause to submit; give oneself over to; indulge",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "纠正沉溺被译为drown，并保留原有各含义。"
+  },
+  {
+    "normalizedLemma": "abandon",
+    "senseId": "content-ecdict-ee09fccb689b38229d3db49e275f1763e1fe1be7ec780e20220544f9ad67ff2e",
+    "field": "definitionEn",
+    "sourceText": "放任, 无拘束, 狂热",
+    "sourceTextSha256": "42325f52293010977bab040343e2f411b95b16a92500e7e344edb11474a18861",
+    "value": "lack of restraint; freedom from constraint; fervour",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "保留名词义，纠正neglect及形容词替代。"
+  },
+  {
+    "normalizedLemma": "abandon",
+    "senseId": "content-ecdict-2a5eb0c5758e685cd53150618f3045a1ed1df3beabb980c30473f40651cd6bcb",
+    "field": "definitionZh",
+    "sourceText": "the trait of lacking restraint or control; reckless freedom from inhibition or worry",
+    "sourceTextSha256": "fdaf149b6e4b94332eadcd9710b57d02588c720bf2b3c1b652e6d49117353949",
+    "value": "缺乏克制或控制的特性；不顾约束或忧虑的放纵与无拘无束。",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "保留特性及限定，不加入动词放弃义。"
+  },
+  {
+    "normalizedLemma": "abandon",
+    "senseId": "content-ecdict-0f858ce549a452ee78e6391f8b3ed136b2a02ff641b307e2cb45ed7b0e7b0aa1",
+    "field": "definitionZh",
+    "sourceText": "give up with the intent of never claiming again",
+    "sourceTextSha256": "519bf43cd2e8a24c6f79f9aa8b74b1c26d43ff1146a356acf248b3886089cc77",
+    "value": "放弃，并打算不再索回。",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "保留不再索回的意图。"
+  },
+  {
+    "normalizedLemma": "apple",
+    "senseId": "content-ecdict-f418b6158f30a67ed332d6fee05d2d2b96fd99db881cd388633135ad30094397",
+    "field": "definitionEn",
+    "sourceText": "苹果, 家伙",
+    "sourceTextSha256": "bc40052813943fa52a537773799ac85f4cc04e53195a847d5c072b708cc73344",
+    "value": "apple; fellow",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "补回漏译的家伙义。"
+  },
+  {
+    "normalizedLemma": "apple",
+    "senseId": "content-ecdict-afc6d45081e7b7d3cd5dda66ce36f5ee8047a08765e5bd9a02167029cb15070f",
+    "field": "definitionEn",
+    "sourceText": "[医] 苹果",
+    "sourceTextSha256": "ec86cc9fa487652e78c6f3bf366770b8515f9613669e876198ebd12957f91097",
+    "value": "[Medicine] apple",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "保留医学领域标签和普通名词词形。"
+  },
+  {
+    "normalizedLemma": "computer",
+    "senseId": "content-ecdict-b1c242eaa4cd1ecd5ccaf4ab8cbf6ccfc3815c6a17907508cfa481f09b06456a",
+    "field": "definitionEn",
+    "sourceText": "[计] 计算机",
+    "sourceTextSha256": "fd45edada7ce4b1045fda9701f84565b9aa366b816f8e4607d300cc9fcd8a738",
+    "value": "[Computing] computer",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "补回源释义中的计算机领域标签。"
+  },
+  {
+    "normalizedLemma": "i",
+    "senseId": "content-ecdict-8351cd48c1d95b3180000f8cb439ebaaecd685f5d66803ced914bc34fda15666",
+    "field": "definitionEn",
+    "sourceText": "[计] 电流, 中断, 指令, 指示符",
+    "sourceTextSha256": "3cb5a51321d9e198c9ae4ee392c46983f0590e291fc3ae981c1d271aeb104c27",
+    "value": "[Computing] electric current; interrupt; instruction; indicator",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "纠正领域标签并保留四项原义。"
+  },
+  {
+    "normalizedLemma": "quiet",
+    "senseId": "content-ecdict-53a17561ca2c25e70dec666eec04cd2924e407467d98e5209e70c5275c14d2db",
+    "field": "definitionEn",
+    "sourceText": "安静, 闲适, 平静",
+    "sourceTextSha256": "ea21dc51d546ef06566e6fdc4ca51a3e4679e8e7d19496714deeb0373e81f183",
+    "value": "quiet; repose; calm",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "保留名词义，纠正leisurely形容词替代。"
+  },
+  {
+    "normalizedLemma": "quiet",
+    "senseId": "content-ecdict-2ae70ad3e69415ab83fde996120f12604823bbbc61e119a73c7778aca9e6a9d6",
+    "field": "definitionZh",
+    "sourceText": "characterized by an absence or near absence of agitation or activity",
+    "sourceTextSha256": "af0878d9e317402183d4f82d13a4ce7b25779cc189c18eeb0af9bafb7a926f47",
+    "value": "以没有或几乎没有骚动或活动为特征的。",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "补回原文的特征及程度限定。"
+  },
+  {
+    "normalizedLemma": "quiet",
+    "senseId": "content-ecdict-e863114cef82ddbace1575715c6ee4462c9e7cce61b0e55d1624497f1beae1f9",
+    "field": "definitionZh",
+    "sourceText": "of the sun characterized by a low level of surface phenomena like sunspots e.g.",
+    "sourceTextSha256": "2fb9db6bf9a36e20bd2ea2f8c429300eaef282a3fee624075c384031a00502f6",
+    "value": "（指太阳）表面活动现象（如太阳黑子）较少的。",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "补回太阳表面现象及黑子例示，不展开截断原文。"
+  },
+  {
+    "normalizedLemma": "rain",
+    "senseId": "content-ecdict-7a88a1fdfe2adf8b47d42dcb4651cba70391ee6591f505c611c0b96e38d68503",
+    "field": "definitionEn",
+    "sourceText": "雨, 下雨, 雨天",
+    "sourceTextSha256": "f8d17ec65df6c6a256c8a46303ce74ffa5edb68010211178a165bca5240e5205",
+    "value": "rain; raining; a rainy day",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "保留原文三项含义。"
+  },
+  {
+    "normalizedLemma": "rain",
+    "senseId": "content-ecdict-d7a2d56358f751636008e66a394112273869991151aa92f55b112c41cc70fefc",
+    "field": "definitionEn",
+    "sourceText": "下雨",
+    "sourceTextSha256": "024b2708ed8e3ffc2b64f9ed416c06ecada0c8accb9b77f388e33e32d7301189",
+    "value": "to rain",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "移除原文没有的补充说明。"
+  },
+  {
+    "normalizedLemma": "rain",
+    "senseId": "content-ecdict-3e50755ddaa0bd303362491e25ff7cb924f9d88f268a3ff7a7fc2432104b733f",
+    "field": "definitionZh",
+    "sourceText": "water falling in drops from vapor condensed in the atmosphere",
+    "sourceTextSha256": "e413218e71ce6eb12a51bc73c7e32229afd3c4d07c7744ab4b3124728bbe5d54",
+    "value": "大气中水蒸气凝结后，以水滴形式降落的水。",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "明确凝结和降落关系。"
+  },
+  {
+    "normalizedLemma": "rain",
+    "senseId": "content-ecdict-4fdfe825085902fbdc7e174eb9637e42289d2d6cc254d3394116923afe7e61f6",
+    "field": "definitionZh",
+    "sourceText": "drops of fresh water that fall as precipitation from clouds",
+    "sourceTextSha256": "07ebe1c38b7381354a8edd05c4071ca057b706301c4fcdbe2b895414136e1da5",
+    "value": "从云中作为降水落下的淡水滴。",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "明确降水来源和淡水限定。"
+  },
+  {
+    "normalizedLemma": "water",
+    "senseId": "content-ecdict-5c348eda1cec6ac2a0873c59108f7cb31cb6d9ec29756fa8ef1869b384572ad0",
+    "field": "definitionEn",
+    "sourceText": "水的, 水上的, 水生的, 含水的",
+    "sourceTextSha256": "03b64e814a194204de289f75ea127dd873841bbe6cbb3d96611411a21a9ce77a",
+    "value": "relating to water; on water; aquatic; containing water",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "保留完整形容词义，替代不自然的词缀串。"
+  },
+  {
+    "normalizedLemma": "window",
+    "senseId": "content-ecdict-5082e579b299f12635441902ed6cc0e169a7906a2172901e1fca6aa145227dda",
+    "field": "definitionEn",
+    "sourceText": "给...开窗",
+    "sourceTextSha256": "4fd073cc19709f545d59625058d5aaf02caba2897883d7a92e1618ff82342972",
+    "value": "fit with a window; make a window in",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "区别装窗、开设窗洞与打开现有窗户。"
+  },
+  {
+    "normalizedLemma": "window",
+    "senseId": "content-ecdict-88abfbc2a81820d36247c209b6176a676dad1fc1f3068b554deb45adb93faff8",
+    "field": "definitionZh",
+    "sourceText": "a framework of wood or metal that contains a glass windowpane and is built into a wall or roof to admit light or air",
+    "sourceTextSha256": "70874fb525b3b1e0dc0d0acf28800e05f6f8c0a85aea8671ef643f39c98c265a",
+    "value": "装在墙壁或屋顶上、嵌有玻璃窗格并用于透光或通风的木制或金属框架。",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "补回原文被省略的材质、位置及功能。"
+  },
+  {
+    "normalizedLemma": "window",
+    "senseId": "content-ecdict-56dbcec1bc21db5d919e0a3e6bfd79e0679e29d6eddef593f18655b9cf05ca9f",
+    "field": "definitionZh",
+    "sourceText": "a transparent panel (as of an envelope) inserted in an otherwise opaque material",
+    "sourceTextSha256": "688befab6eab689fcecafd7dc39c34478096a681c3046214e7747173d202cafd",
+    "value": "嵌在原本不透明的材料中的透明片（如信封上的透明窗口）。",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "纠正透明片和不透明材料的关系。"
+  },
+  {
+    "normalizedLemma": "rain",
+    "field": "exampleZh",
+    "exampleEn": "I may go out if the rain lets up.",
+    "sourceText": "I may go out if the rain lets up.",
+    "sourceTextSha256": "02613f6c5805c0b237d592c08cce31cadf0c5ffcc52685fb0b504c154d9a775c",
+    "value": "如果雨势减弱，我可能会出去。",
+    "author": "NightStudy contributors",
+    "authoringMethod": "Codex-assisted bilingual correction",
+    "reason": "lets up表示雨势减弱，不强行改变条件为雨完全停止。"
+  }
+]

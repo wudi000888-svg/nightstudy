@@ -306,7 +306,12 @@ async function snapshot(ctx: RequestContext) {
     typeof coverage?.words === 'number'
       ? coverage.words
       : packs
-          .filter((pack) => !['phonetics', 'audio'].includes(String(obj(pack.tagCounts).kind)))
+          .filter(
+            (pack) =>
+              !['phonetics', 'audio', 'bilingual', 'phrase-books'].includes(
+                String(obj(pack.tagCounts).kind),
+              ),
+          )
           .reduce((sum, pack) => sum + pack.entryCount, 0);
   return {
     site: {

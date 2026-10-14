@@ -6,16 +6,36 @@ import {
   type Sense,
   type StudyProgress,
   type WordAudio,
+  type WordExample,
 } from '@prisma/client';
 import { z } from 'zod';
 import { createEmptyCard, fsrs, Rating, type Card } from 'ts-fsrs';
 import { HttpError } from '../context.js';
+import { contentCoverage, senseLexicalWarnings } from './content-presentation.js';
+import { learningDefinitionView } from './learning-definitions.js';
 
 export type Db = PrismaClient | Prisma.TransactionClient;
-export type WordWithSenses = Word & { senses: Sense[]; audio?: WordAudio[] };
+export type WordWithSenses = Word & {
+  senses: Sense[];
+  audio?: WordAudio[];
+  examples?: WordExample[];
+  collocations?: {
+    wordId: string;
+    phraseId: string;
+    ordinal: number;
+    phrase: Word & { senses: Sense[] };
+  }[];
+};
 export const wordInclude = {
   senses: { orderBy: { ordinal: 'asc' as const } },
   audio: { where: { status: 'ready' }, orderBy: { accent: 'asc' as const } },
+  examples: { orderBy: [{ ordinal: 'asc' as const }, { id: 'asc' as const }] },
+  collocations: {
+    where: { phrase: { status: 'published' } },
+    orderBy: [{ ordinal: 'asc' as const }, { phraseId: 'asc' as const }],
+    take: 8,
+    include: { phrase: { include: { senses: { orderBy: { ordinal: 'asc' as const } } } } },
+  },
 };
 export const scheduler = fsrs({ request_retention: 0.9, enable_fuzz: false });
 export const ratingValues = {
@@ -59,10 +79,70 @@ export function hydrateCard(value: unknown): Card {
 export function freshCard(now = new Date()): Card {
   return createEmptyCard(now);
 }
-export function wordDto(word: WordWithSenses) {
+export function learningSense(sense: Sense) {
+  const quality = obj(obj(sense.contentMetadata).lexicalQuality);
+  const field = quality.field;
+  if (
+    quality.excludeFromLearning !== true ||
+    !['definitionZh', 'definitionEn'].includes(String(field))
+  )
+    return true;
+  const source = field === 'definitionZh' ? sense.definitionZh : sense.definitionEn;
+  return (
+    quality.sourceTextSha256 !== crypto.createHash('sha256').update(source, 'utf8').digest('hex')
+  );
+}
+export function displayPos(sense: Sense) {
+  if (sense.pos.trim()) return sense.pos;
+  const metadata = obj(sense.contentMetadata);
+  const authored = obj(metadata.authoredDisplayPosSource);
+  const pos = metadata.authoredDisplayPos;
+  return authored.kind === 'original-authoring' &&
+    typeof pos === 'string' &&
+    [
+      'phr. v.',
+      'prep. phr.',
+      'adv. phr.',
+      'adj. phr.',
+      'conj. phr.',
+      'det. phr.',
+      'pron. phr.',
+      'modal phr.',
+    ].includes(pos)
+    ? pos
+    : '';
+}
+export function selectLearningSense(senses: Sense[], focusSenseId?: string | null) {
+  const available = senses.filter(learningSense).map(learningDefinitionView);
+  return (
+    available.find((sense) => sense.id === focusSenseId && sense.definitionZh.trim()) ??
+    available.find((sense) => sense.definitionZh.trim())
+  );
+}
+export function wordDto(word: WordWithSenses, includeHeldSources = false) {
+  const senses = includeHeldSources
+    ? word.senses
+    : word.senses.filter(learningSense).map(learningDefinitionView);
   return {
     id: word.id,
     lemma: word.lemma,
+    entryKind: /\s/.test(word.normalizedLemma) ? 'phrase' : 'single',
+    dictionaryName: word.sourceRef?.startsWith('pack:ecdict') ? '英汉词典' : 'NightStudy',
+    collocations: (word.collocations ?? [])
+      .map(({ phrase }) => {
+        const sense =
+          phrase.senses.filter(learningSense).find((s) => s.definitionZh && s.definitionEn) ??
+          phrase.senses.filter(learningSense).find((s) => s.definitionZh);
+        return {
+          id: phrase.id,
+          wordId: phrase.id,
+          lemma: phrase.lemma,
+          pos: sense ? displayPos(sense) : '',
+          definitionZh: sense?.definitionZh ?? '',
+          definitionEn: sense?.definitionEn ?? '',
+        };
+      })
+      .filter((item) => item.definitionZh || item.definitionEn),
     phonetic: word.phonetic,
     phoneticUs: word.phoneticUs,
     phoneticUk: word.phoneticUk,
@@ -72,6 +152,18 @@ export function wordDto(word: WordWithSenses) {
     goalTags: word.goalTags,
     contentVersion: word.contentVersion,
     sourceRef: word.sourceRef,
+    senseCount: senses.length,
+    learningExclusions: word.senses
+      .filter((sense) => !learningSense(sense))
+      .map((sense) => ({ id: sense.id, ...obj(obj(sense.contentMetadata).lexicalQuality) })),
+    contentCoverage: contentCoverage(senses, word.examples),
+    lexicalWarnings: senseLexicalWarnings(word.senses),
+    examples: (word.examples ?? []).map((example) => ({
+      id: example.id,
+      exampleEn: example.exampleEn,
+      exampleZh: example.exampleZh,
+      contentMetadata: obj(example.contentMetadata),
+    })),
     audio: (word.audio ?? []).map((audio) => ({
       id: audio.id,
       accent: audio.accent,
@@ -84,14 +176,29 @@ export function wordDto(word: WordWithSenses) {
       attribution: audio.attribution,
       mimeType: audio.mimeType,
     })),
-    senses: word.senses.map((s) => ({
+    senses: senses.map((s) => ({
       id: s.id,
-      pos: s.pos,
+      pos: displayPos(s),
       definitionZh: s.definitionZh,
       definitionEn: s.definitionEn,
       exampleEn: s.exampleEn,
       exampleZh: s.exampleZh,
+      contentMetadata: obj(s.contentMetadata),
     })),
+    ...(includeHeldSources
+      ? {
+          learningDefinitions: word.senses
+            .map(learningDefinitionView)
+            .filter((sense, index) => sense !== word.senses[index])
+            .map((sense) => ({
+              id: sense.id,
+              pos: sense.pos,
+              definitionZh: sense.definitionZh,
+              definitionEn: sense.definitionEn,
+              contentMetadata: sense.contentMetadata,
+            })),
+        }
+      : {}),
   };
 }
 export function progressDto(progress: StudyProgress | null) {

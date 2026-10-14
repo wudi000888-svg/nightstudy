@@ -74,7 +74,7 @@ export function MemoryChart({ data, horizon }: { data: Curve; horizon: number })
     return (
       <Empty
         title="这个范围暂时没有有效预测点。"
-        description="预测只使用服务器返回的可用记忆状态。"
+        description="完成学习和复习后，再来看看记忆的变化。"
       />
     );
   return (
@@ -82,7 +82,7 @@ export function MemoryChart({ data, horizon }: { data: Curve; horizon: number })
       className="memory-chart"
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label={`未来 ${horizon} 天不再复习时的记忆预测，基于 ${data.coverage.eligible} 个有真实状态的词`}
+      aria-label={`未来 ${horizon} 天不再复习时的记忆预测，基于 ${data.coverage.eligible} 个已学习的词`}
     >
       <defs>
         <linearGradient id="retention-band" x2="0" y2="1">
@@ -124,7 +124,7 @@ export function MemoryChart({ data, horizon }: { data: Curve; horizon: number })
         .map((point) => (
           <circle key={point.day} cx={x(point.day)} cy={y(point.retention)} r="3.5" fill="#e9b36d">
             <title>
-              {point.day}天 · 模型预计回忆率 {Math.round(point.retention * 100)}%
+              {point.day}天 · 预计回忆率 {Math.round(point.retention * 100)}%
             </title>
           </circle>
         ))}
@@ -195,7 +195,7 @@ export function MemoryPage() {
             <p>首次学习发生在今天</p>
           </Panel>
           <Panel className="metric">
-            <span>今日复习评价</span>
+            <span>今日复习</span>
             <strong>
               {stats.data.today.reviews}
               <small>次</small>
@@ -233,11 +233,11 @@ export function MemoryPage() {
           </div>
         </div>
         {curve.isPending ? (
-          <Loading text="正在读取你的真实记忆状态…" />
+          <Loading text="正在打开你的记忆曲线…" />
         ) : !data || data.empty ? (
           <Empty
             title="你的曲线，还需要一点真实记录。"
-            description="先完成学习和回忆评价。只有熟词导入时，不会生成个人FSRS曲线。"
+            description="先完成学习和复习。只有导入的熟词，还不足以生成记忆预测。"
             action={
               <Link className="button primary" to="/learn">
                 开始一组学习 <ArrowRight size={16} />
@@ -249,7 +249,7 @@ export function MemoryPage() {
             <div className="chart-legend">
               <span>
                 <i className="legend-line" />
-                模型平均预测
+                平均记忆预测
               </span>
               {data.coverage.eligible > 1 && (
                 <span>
@@ -263,10 +263,8 @@ export function MemoryPage() {
             </div>
             <MemoryChart data={data} horizon={horizon} />
             <p className="fine-print">
-              截至 {formatDate(data.asOf)} ·
-              少量初学状态使用初始参数，不能代表已校准的长期个人能力。
+              截至 {formatDate(data.asOf)} · 记录还少时，预测仅供参考；复习后会随你的表现更新。
             </p>
-            {data.disclaimer && <p className="fine-print">{data.disclaimer}</p>}
           </>
         )}
       </Panel>
@@ -293,7 +291,7 @@ export function MemoryPage() {
               ))}
             </div>
           ) : (
-            <p className="muted">间隔回忆样本不足，暂不拟合实测曲线。</p>
+            <p className="muted">复习记录还少，继续学习后再来看。</p>
           )}
           {data?.observations.length ? (
             <div className="observation-list">
@@ -319,9 +317,9 @@ export function MemoryPage() {
         <Panel>
           <div className="panel-title">
             <Clock3 size={19} />
-            <h2>真实学习活动</h2>
+            <h2>学习足迹</h2>
           </div>
-          <p>图中每一根柱都来自本站记录，不填补没有发生的学习。</p>
+          <p>看看最近两周的新学和复习。</p>
           {stats.data?.trends.some((day) => day.newWords || day.reviews) ? (
             <div className="activity-bars" aria-label="真实学习活动趋势">
               {stats.data.trends.slice(-14).map((day) => {
@@ -355,7 +353,7 @@ export function MemoryPage() {
               打开到期复习 <ArrowRight size={15} />
             </Link>
             <Link to="/assessment">
-              测一点自己的词汇基线 <ArrowRight size={15} />
+              测一测词汇水平 <ArrowRight size={15} />
             </Link>
           </div>
         </Panel>

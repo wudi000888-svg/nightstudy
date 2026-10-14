@@ -9,6 +9,7 @@ import {
   settings,
   wordInclude,
   wordDto,
+  selectLearningSense,
   progressDto,
   json,
   obj,
@@ -24,6 +25,8 @@ import {
   type Db,
 } from './shared.js';
 import { visibleBookWhere } from './book-access.js';
+import { supplementIssuedWord } from './content-presentation.js';
+import { applyFamiliarityPolicy, collectionState } from './collection-state.js';
 import {
   ensureDailyPlan,
   planView,
@@ -57,12 +60,14 @@ export function sessionDto(
   session: FullSession,
   progress: StudyProgress[] = [],
   deferredUntil: Date | null = null,
+  currentWords: ReadonlyMap<string, ReturnType<typeof wordDto>> = new Map(),
 ) {
   const items = session.items.map((item) => {
     const snapshot = obj(item.contentSnapshot),
       question = obj(item.questionJson);
     const latest = progress.find((x) => x.wordId === item.wordId);
     const visible = item.revealed || session.phase === 'practice' || session.status === 'completed';
+    const currentWord = visible ? currentWords.get(item.wordId) : undefined;
     return {
       id: item.id,
       wordId: item.wordId,
@@ -78,7 +83,9 @@ export function sessionDto(
           ? question.taskBucket
           : (session.plan?.words.find((word) => word.wordId === item.wordId)?.bucket ?? null),
       word: visible
-        ? snapshot
+        ? currentWord
+          ? supplementIssuedWord(snapshot, currentWord, item.wordId)
+          : snapshot
         : {
             id: item.wordId,
             lemma: snapshot.lemma,
@@ -124,15 +131,33 @@ async function readSession(db: Db, userId: string, sessionId: string) {
   return session;
 }
 async function sessionView(db: Db, userId: string, session: FullSession) {
-  const progress = await db.studyProgress.findMany({
-    where: { userId, wordId: { in: session.items.map((x) => x.wordId) } },
-  });
-  const deferred = await db.dailyPlanWord.findFirst({
-    where: { activeSessionId: session.id, deferredUntil: { not: null }, plan: { userId } },
-    orderBy: { deferredUntil: 'desc' },
-    select: { deferredUntil: true },
-  });
-  return sessionDto(session, progress, deferred?.deferredUntil ?? null);
+  const visibleIds = session.items
+    .filter(
+      (item) => item.revealed || session.phase === 'practice' || session.status === 'completed',
+    )
+    .map((item) => item.wordId);
+  const [progress, deferred, currentWords] = await Promise.all([
+    db.studyProgress.findMany({
+      where: { userId, wordId: { in: session.items.map((x) => x.wordId) } },
+    }),
+    db.dailyPlanWord.findFirst({
+      where: { activeSessionId: session.id, deferredUntil: { not: null }, plan: { userId } },
+      orderBy: { deferredUntil: 'desc' },
+      select: { deferredUntil: true },
+    }),
+    visibleIds.length
+      ? db.word.findMany({
+          where: { id: { in: visibleIds }, status: 'published' },
+          include: wordInclude,
+        })
+      : Promise.resolve([]),
+  ]);
+  return sessionDto(
+    session,
+    progress,
+    deferred?.deferredUntil ?? null,
+    new Map(currentWords.map((word) => [word.id, wordDto(word)])),
+  );
 }
 type PendingReservation = {
   bookId: string | null;
@@ -307,12 +332,12 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
         bucket: 'new' | 'review',
         focusSenseId: string | null = null,
       ) => {
-        if (chosen.length < size && !chosen.some((item) => item.word.id === word.id))
+        const focus = selectLearningSense(word.senses, focusSenseId);
+        if (focus && chosen.length < size && !chosen.some((item) => item.word.id === word.id))
           chosen.push({
             word,
             bucket,
-            focusSenseId:
-              focusSenseId ?? word.senses.find((sense) => sense.definitionZh.trim())?.id ?? null,
+            focusSenseId: focus.id,
           });
       };
       if (extra) {
@@ -391,6 +416,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
                   word: {
                     id: { notIn: ids },
                     claims: { none: { userId: user.id, import: { status: 'confirmed' } } },
+                    autoKnownWords: { none: { userId: user.id, revokedAt: null } },
                   },
                 },
               ],
@@ -415,6 +441,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
                           {
                             claims: { some: { userId: user.id, import: { status: 'confirmed' } } },
                           },
+                          { autoKnownWords: { some: { userId: user.id, revokedAt: null } } },
                         ],
                       },
                     },
@@ -574,6 +601,14 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
           session: await sessionView(tx, user.id, session),
           plan: await planView(tx, user.id, await ensureDailyPlan(tx, user.id)),
           ...(latest ? { progress: progressDto(latest) } : {}),
+          ...(item
+            ? {
+                collection: {
+                  ...(await collectionState(tx, user.id, item.wordId)),
+                  transition: null,
+                },
+              }
+            : {}),
           duplicate: true,
         };
       }
@@ -589,6 +624,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
           session: await sessionView(tx, user.id, session),
         });
       let nextProgress: StudyProgress | null = null;
+      let collection: Awaited<ReturnType<typeof applyFamiliarityPolicy>> | undefined;
       let result: Record<string, unknown> | undefined;
       if (input.action === 'reveal') {
         if (session.phase !== 'recall' || item.rated)
@@ -662,6 +698,14 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
             planId: ratingPlan.id,
           },
         });
+        collection = await applyFamiliarityPolicy(
+          tx,
+          user.id,
+          item.wordId,
+          input.rating,
+          outcome.card,
+          now,
+        );
         await tx.sessionItem.update({
           where: { id: item.id },
           data: { rated: true, status: 'rated', progressRevision: nextProgress.revision },
@@ -714,6 +758,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
         session: await sessionView(tx, user.id, session),
         plan: await planView(tx, user.id, await ensureDailyPlan(tx, user.id)),
         ...(nextProgress ? { progress: progressDto(nextProgress) } : {}),
+        ...(collection ? { collection } : {}),
         ...(result ? { result } : {}),
         duplicate: false,
       };

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoaderCircle, Square, Volume2 } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
-import { ApiError, errorText, mountUrl, post } from '../lib/api';
+import { ApiError, mountUrl, post } from '../lib/api';
 import type { Word, WordAudio } from '../lib/types';
 
 type Selection = 'US' | 'UK' | 'device-US' | 'device-UK';
@@ -185,7 +185,7 @@ export function AudioButton({ word }: { word: Word }) {
       );
       if (!mounted.current || wordIdentity.current !== targetId) return;
       setPrepared(result.pronunciation);
-      setPrepareNote('补齐完成，点击美式或英式喇叭播放。');
+      setPrepareNote('发音已准备好，请再点一下喇叭。');
       await refreshSources(false);
     } catch (error) {
       if (!mounted.current || wordIdentity.current !== targetId) return;
@@ -203,8 +203,8 @@ export function AudioButton({ word }: { word: Word }) {
   ) {
     const codecError = audio.error?.code === 3 || audio.error?.code === 4;
     let message = codecError
-      ? '此音源未能在浏览器中解码，请重试或明确选择设备合成。'
-      : '本站音频读取未完成，请检查网络后重试。';
+      ? '浏览器暂时无法播放这段发音，请重试。'
+      : '发音未能载入，请检查网络后重试。';
     try {
       const response = await fetch(mountUrl(source.url), {
         method: 'HEAD',
@@ -213,21 +213,20 @@ export function AudioButton({ word }: { word: Word }) {
       if (!response.ok) {
         const diagnostic = await fetch(mountUrl(source.url), { credentials: 'include' });
         const detail = (await diagnostic.json().catch(() => ({}))) as { code?: string };
-        if (detail.code === 'audio_asset_invalid')
-          message = '本站音源的文件格式或校验未通过，请联系管理员检查源文件。';
+        if (detail.code === 'audio_asset_invalid') message = '这段发音暂时不可用，请稍后重试。';
         else if (detail.code === 'audio_asset_unavailable')
-          message = '本站音源文件暂不可用，请补齐源文件后重试。';
-        else if (detail.code === 'audio_not_ready')
-          message = '这份音源尚未就绪，请刷新本站音源或补齐合成发音。';
-        else message = `本站音源暂时无法读取（HTTP ${diagnostic.status}），请稍后重试。`;
+          message = '这段发音暂时不可用，请稍后重试。';
+        else if (detail.code === 'audio_not_ready') message = '发音尚未准备好，请稍后重试。';
+        else message = '暂时无法读取发音，请稍后重试。';
       }
     } catch {
-      message = '本站音源无法连接，请检查网络后重试。';
+      message = '网络未连接，请恢复连接后重试。';
     }
     update(requestId, { phase: 'error', text: message });
   }
   function play(next: Selection) {
     if (preparingServer) return;
+    setPrepareNote('');
     if (playing && activeSelection.current === next) {
       stop();
       return;
@@ -241,7 +240,7 @@ export function AudioButton({ word }: { word: Word }) {
     const device = next.startsWith('device-');
     const selectedAudio = region === 'UK' ? audioUk : audioUs;
     const accentName = region === 'UK' ? '英式' : '美式';
-    const soundName = selectedAudio?.kind === 'recorded' ? '真人录音' : '服务器合成发音';
+    const soundName = '发音';
     const language = region === 'UK' ? 'en-GB' : 'en-US';
     const voice = voices
       .filter((value) => value.lang.replace('_', '-').toLowerCase() === language.toLowerCase())
@@ -250,7 +249,7 @@ export function AudioButton({ word }: { word: Word }) {
     if (!device && selectedAudio) {
       const audio = new Audio(mountUrl(selectedAudio.url));
       element.current = audio;
-      setPlayback({ phase: 'preparing', text: `正在读取${accentName}${soundName}…` });
+      setPlayback({ phase: 'preparing', text: `正在载入${accentName}${soundName}…` });
       audio.onplaying = () => {
         window.clearTimeout(timeout.current);
         update(requestId, { phase: 'playing', text: `正在播放${accentName}${soundName}。` });
@@ -261,13 +260,13 @@ export function AudioButton({ word }: { word: Word }) {
       };
       audio.onerror = () => {
         window.clearTimeout(timeout.current);
-        update(requestId, { phase: 'error', text: '本站音频未能播放，正在核对来源状态…' });
+        update(requestId, { phase: 'error', text: '发音未能播放，请稍候…' });
         void explainAudioFailure(audio, selectedAudio, requestId);
       };
       timeout.current = window.setTimeout(() => {
         update(requestId, {
           phase: 'error',
-          text: '本站音频尚未开始播放，请重试或选择设备合成发音。',
+          text: '发音暂未开始播放，请再点一下喇叭。',
         });
         if (generation.current === requestId) {
           generation.current++;
@@ -278,7 +277,7 @@ export function AudioButton({ word }: { word: Word }) {
         window.clearTimeout(timeout.current);
         update(requestId, {
           phase: 'error',
-          text: '浏览器未能播放本站音频，请检查声音权限或选择设备合成发音。',
+          text: '浏览器未能播放发音，请再点一下喇叭。',
         });
       });
       return;
@@ -286,7 +285,7 @@ export function AudioButton({ word }: { word: Word }) {
     if (!device) {
       setPlayback({
         phase: 'error',
-        text: `本站尚未提供${accentName}音源，可补齐或明确选择设备合成备用。`,
+        text: `暂无${accentName}发音。`,
       });
       return;
     }
@@ -328,6 +327,18 @@ export function AudioButton({ word }: { word: Word }) {
       update(requestId, { phase: 'error', text: '设备发音不可用，请检查系统语音设置。' });
     }
   }
+  const canPrepare = !!user && !!info?.generationAvailable && hasUsIpa && hasUkIpa;
+  const preparationError = prepareError
+    ? prepareError instanceof ApiError && prepareError.code === 'audio_preparing'
+      ? '发音准备中，请稍后再试。'
+      : prepareError instanceof ApiError && prepareError.status === 429
+        ? '请稍后再试。'
+        : '暂时无法准备发音，请稍后重试。'
+    : '';
+  const failure =
+    preparationError ||
+    (playback.phase === 'error' ? playback.text : '') ||
+    (pronunciation.error && !audioUs && !audioUk ? '暂时无法读取发音。' : '');
   return (
     <div className="audio-control pronunciation-control">
       <div className="pronunciation-lines">
@@ -338,161 +349,48 @@ export function AudioButton({ word }: { word: Word }) {
             info?.phonetics?.find((entry) => entry.region === accent)?.ipa ||
             (accent === 'US' ? word.phoneticUs : word.phoneticUk);
           const name = accent === 'US' ? '美式' : '英式';
-          const kind = audio?.kind === 'recorded' ? '真人录音' : '服务器合成';
+          const waiting = preparingServer || (active && playback.phase === 'preparing');
           return (
             <div className="pronunciation-row" key={accent}>
               <button
                 type="button"
                 className="audio-button pronunciation-speaker"
-                disabled={preparingServer || !audio}
+                disabled={preparingServer || (!audio && !canPrepare)}
                 aria-label={
                   active
                     ? `停止 ${word.lemma} ${name}发音`
-                    : `播放 ${word.lemma} ${name}${audio ? kind : '音源未就绪'}`
+                    : !audio && !canPrepare
+                      ? `暂无 ${word.lemma} ${name}发音`
+                      : `播放 ${word.lemma} ${name}发音`
                 }
+                title={!audio && !canPrepare ? `暂无${name}发音` : `${name}发音`}
                 aria-pressed={active}
-                onClick={() => play(accent)}
+                onClick={() => (audio ? play(accent) : void prepareSources())}
               >
-                {active && playback.phase === 'preparing' ? (
-                  <LoaderCircle size={18} className="spin" />
+                <span className="pronunciation-accent">{accent}</span>
+                {waiting ? (
+                  <LoaderCircle size={16} className="spin" />
                 ) : active ? (
-                  <Square size={16} />
+                  <Square size={14} />
                 ) : (
-                  <Volume2 size={18} />
+                  <Volume2 size={16} />
                 )}
               </button>
-              <div className="pronunciation-ipa">
-                <span>
-                  <small>{name}</small> {ipa || '暂无此口音音标'}
-                </span>
-                <small className="pronunciation-kind">
-                  {audio ? kind : pronunciation.isPending ? '正在检查音源…' : '暂无本站音源'}
-                </small>
-              </div>
+              <span className="pronunciation-ipa">{ipa || '暂无音标'}</span>
             </div>
           );
         })}
       </div>
-      {playback.text && (
-        <small role="status" className={playback.phase === 'error' ? 'rose-text' : ''}>
-          {playback.text}
-        </small>
-      )}
-      {pronunciation.isPending && <small role="status">正在检查本站英美音源…</small>}
-      {pronunciation.error && (
-        <small className="rose-text">本站音源资料暂未更新成功，可重试或选择设备合成。</small>
-      )}
-      <details className="pronunciation-license">
-        <summary>音标与音源出处</summary>
-        {(['US', 'UK'] as const).map((accent) => {
-          const audio = accent === 'US' ? audioUs : audioUk;
-          const ipaSource =
-            info?.phonetics?.find((entry) => entry.region === accent)?.sourceRef ||
-            word.phoneticSource;
-          return (
-            <div className="pronunciation-attribution" key={accent}>
-              <small>
-                {accent === 'US' ? '美式' : '英式'} ·{' '}
-                {audio
-                  ? `${audio.kind === 'recorded' ? '真人录音' : '服务器合成'} · ${audio.sourceName} · ${audio.license}`
-                  : '本站音源尚未就绪'}
-              </small>
-              {ipaSource && <small>音标来源 · {ipaSource}</small>}
-              {audio?.attribution && <small>{audio.attribution}</small>}
-              {sourceLink(audio?.sourceUrl) && (
-                <a
-                  className="text-link"
-                  href={sourceLink(audio?.sourceUrl)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  查看音源许可与来源 ↗
-                </a>
-              )}
-            </div>
-          );
-        })}
-      </details>
-      <details
-        className="pronunciation-device"
-        open={device || playback.phase === 'error' || undefined}
-      >
-        <summary>设备合成（备用）</summary>
-        <div className="pronunciation-actions">
-          <select
-            aria-label={`${word.lemma} 设备合成口音`}
-            value={deviceRegion}
-            disabled={preparingServer}
-            onChange={(event) => {
-              if (device && playing) stop();
-              setDeviceRegion(event.target.value as 'US' | 'UK');
-            }}
-          >
-            <option value="US">美式设备语音</option>
-            <option value="UK">英式设备语音</option>
-          </select>
-          <button
-            type="button"
-            className="audio-button"
-            disabled={preparingServer || !supported || !deviceVoice}
-            aria-label={
-              device && playing
-                ? `停止 ${word.lemma} 设备合成发音`
-                : `播放 ${word.lemma} ${deviceRegion === 'US' ? '美式' : '英式'}设备合成发音`
-            }
-            aria-pressed={device && playing}
-            onClick={() => play(`device-${deviceRegion}`)}
-          >
-            {device && playback.phase === 'preparing' ? (
-              <LoaderCircle size={16} className="spin" />
-            ) : device && playing ? (
-              <Square size={16} />
-            ) : (
-              <Volume2 size={17} />
-            )}
-            <span>{device && playing ? '停止' : '播放'}</span>
-          </button>
-        </div>
-        <small>
-          {!supported
-            ? '此浏览器未提供语音合成。'
-            : !voicesReady
-              ? '正在读取设备英语语音…'
-              : deviceVoice
-                ? `设备合成 · ${deviceVoice.name}`
-                : '设备未安装此口音英语语音，请选择另一口音。'}
-        </small>
-      </details>
-      {user && info?.generationAvailable && (!audioUs || !audioUk) && (
-        <div className="pronunciation-prepare">
-          <button
-            className="button ghost"
-            disabled={preparingServer || !hasUsIpa || !hasUkIpa}
-            onClick={() => void prepareSources()}
-          >
-            {preparingServer ? <LoaderCircle size={15} className="spin" /> : <Volume2 size={15} />}
-            {preparingServer ? `正在补齐 · 已等待${prepareSeconds}秒` : '补齐本站英美合成发音'}
-          </button>
-          <small>生成两个口音通常需要几秒。这里生成的是服务器合成音源，来源会明确标记。</small>
-          {(!hasUsIpa || !hasUkIpa) && (
-            <small>词库仍缺美式或英式IPA，补齐来源音标后才能生成两类口音。</small>
-          )}
-        </div>
-      )}
-      {!!prepareError && (
-        <small role="alert" className="rose-text">
-          {errorText(prepareError)}
-        </small>
-      )}
+      <span className="sr-only" role="status">
+        {preparingServer
+          ? `正在准备发音，已等待${prepareSeconds}秒。`
+          : prepareNote || playback.text || (pronunciation.isPending ? '正在载入发音。' : '')}
+      </span>
       {prepareNote && <small role="status">{prepareNote}</small>}
-      {(!!prepareError || !!pronunciation.error) && (
-        <button
-          className="button quiet"
-          disabled={preparingServer || pronunciation.isFetching}
-          onClick={() => void refreshSources()}
-        >
-          刷新本站音源后重试
-        </button>
+      {failure && (
+        <small className="rose-text" role="alert">
+          {failure}
+        </small>
       )}
     </div>
   );

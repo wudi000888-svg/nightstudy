@@ -177,26 +177,33 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
       user = requireUser(ctx);
     const prefs = await settings(ctx.prisma, user.id),
       timeZone = prefs.timeZone;
-    const [logs, intervals, totalLearned, totalReviews, totalRatings, claims] = await Promise.all([
-      ctx.prisma.reviewLog.findMany({
-        where: { userId: user.id },
-        orderBy: { reviewedAt: 'desc' },
-        take: 20000,
-        include: { plan: { select: { localDate: true } } },
-      }),
-      ctx.prisma.activityInterval.findMany({
-        where: { userId: user.id },
-        orderBy: { startAt: 'desc' },
-        take: 20000,
-      }),
-      ctx.prisma.studyProgress.count({ where: { userId: user.id, firstLearnedAt: { not: null } } }),
-      ctx.prisma.reviewLog.count({ where: { userId: user.id, wasNew: false } }),
-      ctx.prisma.reviewLog.count({ where: { userId: user.id } }),
-      ctx.prisma.knownClaim.findMany({
-        where: { userId: user.id, import: { status: 'confirmed' } },
-        select: { wordId: true },
-      }),
-    ]);
+    const [logs, intervals, totalLearned, totalReviews, totalRatings, claims, automatic] =
+      await Promise.all([
+        ctx.prisma.reviewLog.findMany({
+          where: { userId: user.id },
+          orderBy: { reviewedAt: 'desc' },
+          take: 20000,
+          include: { plan: { select: { localDate: true } } },
+        }),
+        ctx.prisma.activityInterval.findMany({
+          where: { userId: user.id },
+          orderBy: { startAt: 'desc' },
+          take: 20000,
+        }),
+        ctx.prisma.studyProgress.count({
+          where: { userId: user.id, firstLearnedAt: { not: null } },
+        }),
+        ctx.prisma.reviewLog.count({ where: { userId: user.id, wasNew: false } }),
+        ctx.prisma.reviewLog.count({ where: { userId: user.id } }),
+        ctx.prisma.knownClaim.findMany({
+          where: { userId: user.id, import: { status: 'confirmed' } },
+          select: { wordId: true },
+        }),
+        ctx.prisma.autoKnownWord.findMany({
+          where: { userId: user.id, revokedAt: null },
+          select: { wordId: true },
+        }),
+      ]);
     const [plans, firstPlan] = await Promise.all([
       ctx.prisma.dailyPlan.findMany({
         where: { userId: user.id, endsAt: { gte: intervals.at(-1)?.startAt ?? new Date() } },
@@ -298,6 +305,7 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
       if (!buckets.get(anchor.toISOString().slice(0, 10))?.checkedIn) break;
       streak++;
     }
+    const manualKnownIds = new Set(claims.map((claim) => claim.wordId));
     return {
       today: getDay(today),
       timeZone: activePlan?.timeZone ?? timeZone,
@@ -305,7 +313,11 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
       totalLearned,
       totalReviews,
       totalRatings,
-      knownClaimCount: new Set(claims.map((c) => c.wordId)).size,
+      knownClaimCount: new Set([...claims, ...automatic].map((c) => c.wordId)).size,
+      knownManualCount: manualKnownIds.size,
+      knownAutomaticCount: new Set(
+        automatic.map((c) => c.wordId).filter((id) => !manualKnownIds.has(id)),
+      ).size,
       activeDays: [...buckets.values()].filter((x) => x.checkedIn).length,
       streak,
       trends,

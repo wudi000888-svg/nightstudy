@@ -13,6 +13,7 @@ import {
   progressDto,
   normalize,
   obj,
+  json,
   transact,
   audit,
   type Db,
@@ -21,6 +22,9 @@ import {
 import { decodeCursor, pageInfo } from './pagination.js';
 import { visibleBookWhere } from './book-access.js';
 import { learningPreferencesInput, updateLearningPreferences } from './learning-preferences.js';
+import { summarySenses } from './content-presentation.js';
+import { collectionState } from './collection-state.js';
+import { lockLearningPreferences } from './tasks.js';
 
 const pageQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
@@ -44,8 +48,13 @@ function packDto(pack: ContentPack) {
     installedAt: pack.installedAt.toISOString(),
   };
 }
-export function catalogWordDto(word: WordWithSenses, packs: ContentPack[] = [], summary = false) {
-  const dto = wordDto(word);
+export function catalogWordDto(
+  word: WordWithSenses,
+  packs: ContentPack[] = [],
+  summary = false,
+  includeHeldSources = false,
+) {
+  const dto = wordDto(word, includeHeldSources);
   const sourcePack = packs.find((pack) => word.sourceRef === `pack:${pack.id}`);
   const wordHasSiteEdits = /^(?:edit|authored)-/.test(word.contentVersion);
   const dictionaryPack = packs.find((pack) => pack.id.startsWith('ecdict-'));
@@ -82,17 +91,20 @@ export function catalogWordDto(word: WordWithSenses, packs: ContentPack[] = [], 
       exampleSource:
         !sense.exampleEn && !sense.exampleZh
           ? null
-          : dictionary
-            ? {
-                kind: 'site-authored',
-                reference: 'Site-authored example',
-                packId: null,
-                license: null,
-                sourceUrl: null,
-                wordHasSiteEdits,
-                siteEditVersion: wordHasSiteEdits ? word.contentVersion : null,
-              }
-            : source,
+          : Object.keys(obj(sense.contentMetadata.exampleEn)).length ||
+              Object.keys(obj(sense.contentMetadata.exampleZh)).length
+            ? null
+            : dictionary
+              ? {
+                  kind: 'site-authored',
+                  reference: 'Site-authored example',
+                  packId: null,
+                  license: null,
+                  sourceUrl: null,
+                  wordHasSiteEdits,
+                  siteEditVersion: wordHasSiteEdits ? word.contentVersion : null,
+                }
+              : source,
     };
   });
   const sources = packs.filter(
@@ -100,12 +112,14 @@ export function catalogWordDto(word: WordWithSenses, packs: ContentPack[] = [], 
       pack === sourcePack ||
       (pack.id.startsWith('ecdict-') &&
         word.senses.some((sense) => sense.id.startsWith('content-ecdict-'))) ||
-      word.phoneticSource.includes(pack.id),
+      word.phoneticSource.includes(pack.id) ||
+      word.senses.some((sense) => obj(sense.contentMetadata).packId === pack.id) ||
+      (word.examples ?? []).some((example) => obj(example.contentMetadata).packId === pack.id),
   );
   return {
     ...dto,
-    senses: summary ? senses.slice(0, 3) : senses,
-    senseCount: word.senses.length,
+    senses: summary ? summarySenses(senses) : senses,
+    senseCount: dto.senseCount,
     detailAvailable: true,
     phonetics: [
       ...(word.phoneticUs
@@ -208,7 +222,10 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
             ...baseWhere,
             word: {
               status: 'published',
-              claims: { some: { userId: ctx.user.id, import: { status: 'confirmed' } } },
+              OR: [
+                { claims: { some: { userId: ctx.user.id, import: { status: 'confirmed' } } } },
+                { autoKnownWords: { some: { userId: ctx.user.id, revokedAt: null } } },
+              ],
             },
           })
         : [],
@@ -222,6 +239,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         title: b.title,
         description: b.description,
         goal: b.goal,
+        kind: b.kind,
         version: b.version,
         wordCount: count(totals, b.id),
         learnedCount: count(learned, b.id),
@@ -260,6 +278,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         id: book.id,
         title: book.title,
         goal: book.goal,
+        kind: book.kind,
         description: book.description,
         version: book.version,
         visibility: book.ownerId ? 'private' : 'public',
@@ -336,9 +355,29 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
       installedDictionary: packs.some((pack) => pack.id.startsWith('ecdict-')),
       countBasis: 'installed-pack-metadata',
       declaredEntryCount: packs
-        .filter((pack) => !['phonetics', 'audio'].includes(String(obj(pack.tagCounts).kind)))
+        .filter(
+          (pack) =>
+            !['phonetics', 'audio', 'bilingual', 'phrase-books'].includes(
+              String(obj(pack.tagCounts).kind),
+            ),
+        )
         .reduce((sum, pack) => sum + pack.entryCount, 0),
       packs: packs.map(packDto),
+    };
+  });
+  app.get('/dictionary/credits', async (req) => {
+    const ctx = await getContext(req);
+    const { q } = parse(z.object({ q: z.string().max(160).default('') }), req.query);
+    const packs = await readyPacks(ctx.prisma);
+    const word = q.trim()
+      ? await ctx.prisma.word.findFirst({
+          where: { normalizedLemma: normalize(q), status: 'published' },
+          include: wordInclude,
+        })
+      : null;
+    return {
+      packs: packs.map(packDto),
+      word: word ? catalogWordDto(word, packs, false, true) : null,
     };
   });
   app.get('/words/:id', async (req) => {
@@ -405,6 +444,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
       ctx.prisma.userWord.findMany({
         where: {
           userId: user.id,
+          graduatedAt: null,
           ...(after
             ? {
                 OR: [
@@ -418,7 +458,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
         take: query.limit + 1,
       }),
-      ctx.prisma.userWord.count({ where: { userId: user.id } }),
+      ctx.prisma.userWord.count({ where: { userId: user.id, graduatedAt: null } }),
     ]);
     const result = pageInfo(rows, query.limit, total, scope, (row) =>
       JSON.stringify({ updatedAt: row.updatedAt.toISOString(), id: row.id }),
@@ -443,11 +483,11 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
     const ctx = await getContext(req),
       user = requireUser(ctx);
     const { wordId } = parse(z.object({ wordId: id }), req.params);
-    const item = await ctx.prisma.userWord.findUnique({
-      where: { userId_wordId: { userId: user.id, wordId } },
+    const item = await ctx.prisma.userWord.findFirst({
+      where: { userId: user.id, wordId, graduatedAt: null },
       select: { id: true, wordId: true, note: true, favorite: true, paused: true },
     });
-    return { item };
+    return { item, collection: await collectionState(ctx.prisma, user.id, wordId) };
   });
   app.post('/wordbook', async (req) => {
     const ctx = await getContext(req),
@@ -458,12 +498,27 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
       );
     if (!(await ctx.prisma.word.findFirst({ where: { id: input.wordId, status: 'published' } })))
       throw new HttpError(404, 'word_not_found');
-    const item = await ctx.prisma.userWord.upsert({
-      where: { userId_wordId: { userId: user.id, wordId: input.wordId } },
-      create: { userId: user.id, wordId: input.wordId, note: input.note ?? '' },
-      update: { favorite: true, ...(input.note !== undefined ? { note: input.note } : {}) },
+    return transact(ctx.prisma, async (tx) => {
+      await lockLearningPreferences(tx, user.id);
+      const existing = await tx.userWord.findUnique({
+        where: { userId_wordId: { userId: user.id, wordId: input.wordId } },
+      });
+      if (existing && !existing.graduatedAt)
+        return { item: existing, added: false, alreadySaved: true };
+      const item = existing
+        ? await tx.userWord.update({
+            where: { id: existing.id },
+            data: {
+              graduatedAt: null,
+              favorite: true,
+              ...(input.note !== undefined ? { note: input.note } : {}),
+            },
+          })
+        : await tx.userWord.create({
+            data: { userId: user.id, wordId: input.wordId, note: input.note ?? '' },
+          });
+      return { item, added: true, alreadySaved: false };
     });
-    return { item };
   });
   app.patch('/wordbook/:wordId', async (req) => {
     const ctx = await getContext(req),
@@ -479,18 +534,24 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         .strict(),
       req.body,
     );
-    const existing = await ctx.prisma.userWord.findUnique({
-      where: { userId_wordId: { userId: user.id, wordId: params.wordId } },
+    return transact(ctx.prisma, async (tx) => {
+      await lockLearningPreferences(tx, user.id);
+      const existing = await tx.userWord.findFirst({
+        where: { userId: user.id, wordId: params.wordId, graduatedAt: null },
+      });
+      if (!existing) throw new HttpError(404, 'wordbook_item_not_found');
+      return { item: await tx.userWord.update({ where: { id: existing.id }, data: input }) };
     });
-    if (!existing) throw new HttpError(404, 'wordbook_item_not_found');
-    return { item: await ctx.prisma.userWord.update({ where: { id: existing.id }, data: input }) };
   });
   app.delete('/wordbook/:wordId', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx),
       params = parse(z.object({ wordId: id }), req.params);
-    await ctx.prisma.userWord.deleteMany({ where: { userId: user.id, wordId: params.wordId } });
-    return { deleted: true, progressRetained: true };
+    return transact(ctx.prisma, async (tx) => {
+      await lockLearningPreferences(tx, user.id);
+      await tx.userWord.deleteMany({ where: { userId: user.id, wordId: params.wordId } });
+      return { deleted: true, progressRetained: true };
+    });
   });
   app.get('/announcements', async (req) => {
     const ctx = await getContext(req);
@@ -686,10 +747,21 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
     ]);
     const pagination = pageInfo(rows, query.limit, total, scope, (row) => row.normalizedLemma);
     return {
-      items: pagination.items.map((word) => catalogWordDto(word, packs, true)),
+      items: pagination.items.map((word) => catalogWordDto(word, packs, true, true)),
       page: pagination.page,
       matchMode: 'prefix',
     };
+  });
+  app.get('/admin/words/:id', async (req) => {
+    const ctx = await getContext(req);
+    requireAdmin(ctx);
+    const params = parse(z.object({ id }), req.params);
+    const [word, packs] = await Promise.all([
+      ctx.prisma.word.findUnique({ where: { id: params.id }, include: wordInclude }),
+      readyPacks(ctx.prisma),
+    ]);
+    if (!word) throw new HttpError(404, 'word_not_found');
+    return { word: catalogWordDto(word, packs, false, true) };
   });
   app.patch('/admin/words/:id', async (req) => {
     const ctx = await getContext(req),
@@ -700,7 +772,8 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         .object({
           status: z.enum(['published', 'archived']).optional(),
           senseId: id.optional(),
-          definitionZh: z.string().trim().min(1).max(4000).optional(),
+          expectedContentVersion: z.string().max(200).optional(),
+          definitionZh: z.string().trim().max(4000).optional(),
           definitionEn: z.string().trim().max(4000).optional(),
           exampleEn: z.string().max(2000).optional(),
           exampleZh: z.string().max(2000).optional(),
@@ -711,11 +784,46 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
     return transact(ctx.prisma, async (tx) => {
       const word = await tx.word.findUnique({ where: { id: params.id }, include: wordInclude });
       if (!word) throw new HttpError(404, 'word_not_found');
-      const { status, senseId, ...senseData } = input;
+      if (
+        input.expectedContentVersion !== undefined &&
+        input.expectedContentVersion !== word.contentVersion
+      )
+        throw new HttpError(409, 'word_content_changed', '词条已被更新，请重新载入后校对');
+      const {
+        status,
+        senseId,
+        expectedContentVersion: _expectedContentVersion,
+        ...senseData
+      } = input;
       if (Object.keys(senseData).length) {
         const sense = word.senses.find((x) => x.id === (senseId ?? word.senses[0]?.id));
         if (!sense) throw new HttpError(400, 'sense_not_in_word');
-        await tx.sense.update({ where: { id: sense.id }, data: senseData });
+        if (
+          !(senseData.definitionZh ?? sense.definitionZh).trim() &&
+          !(senseData.definitionEn ?? sense.definitionEn).trim()
+        )
+          throw new HttpError(400, 'sense_definition_required', '请至少保留一项中文或英文释义');
+        const contentMetadata = { ...obj(sense.contentMetadata) };
+        for (const [field, value] of Object.entries(senseData)) {
+          if (!(typeof value === 'string' && value.trim())) {
+            delete contentMetadata[field];
+            continue;
+          }
+          if (sense[field as keyof typeof sense] === value) continue;
+          contentMetadata[field] = { kind: 'site-authored', review: 'source' };
+          // Replacing a meaning does not resolve a warning about the canonical spelling.
+          if (field === 'definitionZh' && Array.isArray(contentMetadata.lexicalWarnings)) {
+            const warnings = contentMetadata.lexicalWarnings.filter(
+              (warning) => obj(warning).code !== 'source-meaning-unverified',
+            );
+            if (warnings.length) contentMetadata.lexicalWarnings = warnings;
+            else delete contentMetadata.lexicalWarnings;
+          }
+        }
+        await tx.sense.update({
+          where: { id: sense.id },
+          data: { ...senseData, contentMetadata: json(contentMetadata) },
+        });
       }
       const updated = await tx.word.update({
         where: { id: word.id },

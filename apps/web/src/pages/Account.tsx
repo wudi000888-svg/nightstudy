@@ -32,10 +32,14 @@ export function AuthPage() {
     }
     setBusy(true);
     try {
-      await auth(
-        mode === 'login' ? 'sign-in/email' : 'sign-up/email',
-        mode === 'login' ? { email, password } : { name, email, password },
-      );
+      const identifier = email.trim();
+      if (mode === 'register') {
+        await auth('sign-up/email', { name, email: identifier, password });
+      } else if (identifier.includes('@')) {
+        await auth('sign-in/email', { email: identifier, password });
+      } else {
+        await auth('sign-in/username', { username: identifier, password });
+      }
       await refresh();
       setPassword('');
       setConfirm('');
@@ -126,13 +130,16 @@ export function AuthPage() {
                   </label>
                 )}
                 <label className="field">
-                  邮箱
+                  {mode === 'login' ? '邮箱或管理员账号' : '邮箱'}
                   <input
                     required
-                    type="email"
+                    type={mode === 'login' ? 'text' : 'email'}
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    autoComplete="email"
+                    autoComplete={mode === 'login' ? 'username' : 'email'}
+                    placeholder={mode === 'login' ? '邮箱地址，或管理员账号 admin' : '你的邮箱地址'}
+                    autoCapitalize="none"
+                    spellCheck={false}
                   />
                 </label>
                 <label className="field">
@@ -485,7 +492,7 @@ export function SetupPage() {
       {site.initialized || done ? (
         <Empty
           title="本站已经完成初始化。"
-          description="请使用已创建的账户登录。"
+          description="请使用本站管理员或已创建的学习账户登录。自动安装的管理员凭据保存在部署服务器，不会显示在网页中。"
           action={
             <Link className="button primary" to="/auth">
               去登录 <ArrowRight size={16} />

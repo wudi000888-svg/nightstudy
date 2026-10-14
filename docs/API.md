@@ -1,6 +1,6 @@
 # Alpha API 契约
 
-对应 `0.2.0-alpha.1` 新工程。本文按当前代码描述接口；本机验证与尚未执行的平台验证见 [README](../README.md)。业务前缀是 `<basePath>/api/v2`；下表省略此前缀。root 站点 `basePath` 为空，子路径站点如 `/school-a`。认证使用 `<basePath>/api/auth`，初始化使用 `<basePath>/setup`。
+对应 `0.3.0-alpha.1` 源码契约；本轮自动管理员、群站与检测更新的完整测试/CI/VPS验收尚待记录，旧0.2结果单列于 [README](../README.md)。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。root的basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
 
 请求由可信 Host 与规范 basePath 选择 operator 配置的 Realm，随后只访问该站独立认证/业务 PG DB。客户端不能通过 `siteId`、`userId`、数据库 URL 参数切换身份。真正互不信任的站点使用不同 origin；同 origin 子路径属于同一信任域。
 
@@ -8,7 +8,7 @@
 
 业务请求返回 JSON；写请求必须使用 `Content-Type: application/json`。浏览器携带本站 session Cookie，使用 `credentials: include`。Cookie 是 host-only、HttpOnly、SameSite=Lax，每站独立 prefix/path；HTTPS 生产站启用 Secure。应用拒绝不可信 Origin 及显式 cross-site 写请求，不允许任意 CORS 来源。
 
-应用层 PG 原子限流以 site/IP/分钟计数：认证和初始化 30 次，普通 API 600 次。429 返回 `Retry-After: 60`。这不是已实测容量数字。Better Auth 还有自己的附加限流及错误格式。
+应用PG原子限流以site/IP/分钟计数：认证、初始化与配对票据兑换30次，普通API600次，429返回Retry-After。数字是请求门槛，不是实测容量；Better Auth另有附加限流。
 
 默认 socket profile 只按明确可信代理 CIDR 解析客户端 IP；Realm 始终取 wire Host，不接受 X-Forwarded-Host 切换站点。Render Blueprint 的 render-public profile 要求平台标记与受控公网入口，使用经单值 IP 校验的 CF-Connecting-IP；缺失、无效或链值的 API/初始化请求返回403 `trusted_client_ip_required`，固定根 health 探测例外。该 profile 不适用于私网服务或自托管。认证内部 IP 头由服务器覆盖，不能由客户端自行声明。
 
@@ -18,19 +18,22 @@
 
 ## 站点初始化与登录
 
-| 方法与路径                     | 访问         | 契约                                                                                                       |
-| ------------------------------ | ------------ | ---------------------------------------------------------------------------------------------------------- |
-| `GET /health/live`             | 无认证       | 进程存活，返回 status/version；固定根路径                                                                  |
-| `GET /health/ready`            | 无认证       | 固定根路径，不依赖业务 Host/basePath；检查全部配置 Realm 的 DB 与 SiteState，返回 status/siteCount/version |
-| `GET /api/v2/site`             | 访客         | siteId/title/basePath/publicUrl/version/contentVersion/initialized/registrationOpen                        |
-| `POST /setup`                  | 初始化口令   | token、email、name、password；创建本站首位 admin，201；再次初始化 409                                      |
-| `POST /api/auth/sign-up/email` | 注册开放时   | name/email/password，普通用户注册；客户端不能设置 role                                                     |
-| `POST /api/auth/sign-in/email` | 访客         | email/password；建立本站 session                                                                           |
-| `POST /api/auth/sign-out`      | 当前 session | JSON 空对象，退出                                                                                          |
-| `GET /api/auth/get-session`    | 当前 Cookie  | Better Auth 原生 session 响应                                                                              |
-| `GET /api/v2/me`               | 任意         | `{ user, siteId }`，未登录 user=null；user 只有 id/name/email/role                                         |
+| 方法与路径                        | 访问         | 契约                                                                                                       |
+| --------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------- |
+| `GET /health/live`                | 无认证       | 进程存活，返回 status/version；固定根路径                                                                  |
+| `GET /health/ready`               | 无认证       | 固定根路径，不依赖业务 Host/basePath；检查全部配置 Realm 的 DB 与 SiteState，返回 status/siteCount/version |
+| `GET /api/v2/site`                | 访客         | siteId/title/basePath/publicUrl/version/contentVersion/initialized/registrationOpen                        |
+| `POST /setup`                     | 初始化口令   | token、email、name、password；创建本站首位 admin，201；再次初始化 409                                      |
+| `POST /api/auth/sign-up/email`    | 注册开放时   | name（1–80字）/email/password，普通用户注册；客户端不能设置 role                                           |
+| `POST /api/auth/sign-in/email`    | 访客         | email/password；建立本站 session                                                                           |
+| `POST /api/auth/sign-in/username` | 访客         | username/password；自动管理员用户名admin                                                                   |
+| `POST /api/auth/sign-out`         | 当前 session | JSON 空对象，退出                                                                                          |
+| `GET /api/auth/get-session`       | 当前 Cookie  | Better Auth 原生 session 响应                                                                              |
+| `GET /api/v2/me`                  | 任意         | `{ user, siteId }`，未登录 user=null；user 只有 id/name/email/role                                         |
 
-表中 `/api/v2`、`/api/auth`、`/setup` 均添加本站 basePath，health 固定根路径，子路径专用安装也可探测。初始化前 operator 必须已完成迁移与 seed。token 至少 32 字符，name 1–80 字符，password 8–128 字符；不提供固定默认管理员或默认密码。初始化操作在 DB 事务与锁内保护，成功后使用登录接口登录。当前没有邮件找回、邮箱验证、OAuth 或通用管理员提升权限接口。
+0.3的db:prepare默认ADMIN_BOOTSTRAP=auto：仅首次创建用户名admin与本站独立随机密码，私密初始文件由operator交付，未通过API提供密码。候选先持久化再事务创建，已有管理员不重置。初始文件不随之后改密更新。单站INITIAL_ADMIN_PASSWORD/EMAIL可私有覆盖，Render密码由平台generateValue保管；详见 [部署文档](DEPLOYMENT.md#初始管理员凭据)。
+
+表中认证/API/setup添加本站basePath，health固定根路径。ADMIN_BOOTSTRAP=manual跳过自动创建，使用/setup的私有token（至少32字符）、name1–80、password8–128；已有初始化返回409。自动与手动初始化共用DB锁，普通注册不能设置admin角色。没有共用默认管理员密码、邮件找回、邮箱验证、OAuth或通用提权接口。
 
 初始化 JSON 示例使用占位符，须由调用者在自己的私有环境填写：
 
@@ -153,6 +156,42 @@ commandId 8–120 字符，对同一用户全局去重。同内容重试不重�
 | `DELETE /admin/announcements/:id` | JSON `{}`                                                                     |
 | `GET /admin/audit`                | 最近最多 100 条管理审计                                                       |
 
-这些接口必须 `role=admin`；没有跨站平台管理员或配置Host/DB/secret的Web API。词书只能引用本站已发布词；Web创建/替换编排一次最多500个wordIds且禁止重复，这个管理输入上限不限制源内容工具安装的完整词书或分页读取。编辑词义增加内容版本，既有session保留创建时快照；所有管理变更记录本站审计。公告与释义是文本，不是执行任意HTML/JS的扩展入口。
+这些接口必须role=admin，只管理本站；群站跨站能力必须另经目标管理员批准grant。没有配置全局Host/DB/secret的Web API。词书Web编排一次最多500个wordIds，不限制源完整书/分页；旧session保留快照，管理变更记录审计。公告与释义是文本。
 
 词书/字典/admin词列表已分页，生词本、用户/公告/审计等接口仍有上述读取上限。operator可通过固定摘要的工具批量安装源内容；当前没有Web通用内容上传、媒体上传或OpenAPI导出。生产客户端应固定版本并在升级时核对 [CHANGELOG](../CHANGELOG.md) 与 [部署文档](DEPLOYMENT.md)。
+
+## 版本检测
+
+| 方法与相对路径                    | 访问      | 契约                                                                        |
+| --------------------------------- | --------- | --------------------------------------------------------------------------- |
+| `GET /admin/system`               | 本站admin | version/siteId/instanceId/initialized/registrationOpen/update；读取保存状态 |
+| `POST /admin/system/check-update` | 本站admin | JSON `{}`；从固定NightStudy GitHub Releases检测，返回update                 |
+
+update包含status/checkedAt/latestVersion/releaseUrl/message/channel，另有cached/stale/lastSuccessfulAt。status为unchecked、up-to-date、available、ahead、no-release或failed。严格SemVer处理预发布数字、稳定版和build metadata；当前带预发布后缀时channel=prerelease，否则stable排除预发布。无该渠道Release时latestVersion=null/no-release，不用main提交冒充发布。失败保存错误与上次结果，lastSuccessfulAt不被失败续期。
+
+各Realm PG记录以60秒冷却与条件锁避免同站副本重复检查；同一进程合并固定上游请求并短时缓存，不能称跨全部实例统一请求预算。接口只给发布说明链接，不提供shell执行、镜像下载安装或数据库降级。
+
+## 群站配对与限权管理
+
+以下入口均要求控制站admin。默认列出最近最多100条，创建票据须包含status:read；可选scope为users:read、users:write、settings:write、announcements:write。默认创建给出全部scope，管理员应按实际用途缩小授权。每站最多20张活跃票据，每张10分钟有效；最多100条活跃grant，连接记录总量最多100条（含revoked/forgotten）。远端用户摘要的name最多80字，历史长名称仅在返回时截断。
+
+| 方法与相对路径                                                | 契约                                                                                                                               |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /admin/fleet`                                            | pairingTokens/controllers/sites概要；不返回长期凭据                                                                                |
+| `GET/POST /admin/fleet/pairing-tokens`                        | 读取票据元数据；POST label/scopes，返回仅本次可见token、10分钟有效期                                                               |
+| `DELETE /admin/fleet/pairing-tokens/:id`                      | 撤销未消费票据；已换出的grant需独立撤销                                                                                            |
+| `DELETE /admin/fleet/controllers/:id`                         | 在受控站撤销对应长期grant                                                                                                          |
+| `GET/POST /admin/fleet/sites`                                 | 读取连接；POST url/token/label，将单次票据换成长授权并加密保存                                                                     |
+| `POST /admin/fleet/sites/:id/refresh`                         | 刷新目标状态、版本、counts与更新状态；失败保留上次快照                                                                             |
+| `DELETE /admin/fleet/sites/:id`                               | 请求目标撤销；确认后remoteRevoked=true，否则disconnect_pending，不能假报成功                                                       |
+| `POST /admin/fleet/sites/:id/forget`                          | JSON `{ "acknowledgeRemoteGrantMayRemain": true }`；仅本地清密文/记forgotten，remoteRevocationConfirmed=false，允许同URL用新票重配 |
+| `GET/PATCH /admin/fleet/sites/:id/settings`                   | 查看/设置registrationOpen；写须settings:write                                                                                      |
+| `GET /admin/fleet/sites/:id/users`                            | users:read；limit1–100/cursor的用户摘要                                                                                            |
+| `PATCH /admin/fleet/sites/:id/users/:userId`                  | users:write；disabled/commandId，保护最后有效管理员，停用撤销session                                                               |
+| `GET/POST /admin/fleet/sites/:id/announcements`               | announcements:write；查看/创建title/body/status公告                                                                                |
+| `DELETE /admin/fleet/sites/:id/announcements/:announcementId` | announcements:write；删除公告，可带commandId                                                                                       |
+| `POST /admin/fleet/sites/:id/check-update`                    | status:read；检测该受控站Release，不安装更新                                                                                       |
+
+跨站机器入口为POST /fleet/pair及/fleet/remote下的status/users/announcements/actions/unpair。兑换票据原子消耗，独立长期credential保存hash；控制端AES-GCM密文绑定本地/远端instanceId+siteId、连接、地址及grant。机器请求携Bearer及X-Nightstudy-Fleet-Instance/Site目标身份，不建立/转发浏览器Cookie。公共HTTPS443、规范basePath、验证DNS与固定实际拨号地址；拒绝私网/redirect/任意上游路径。
+
+写动作registration.set、user.set-disabled、announcement.create/delete使用commandId与持久回执：同grant同编号同内容安全重试，内容变化409；客户端应在首次请求前生成并保留编号。updates.check为固定检测动作，由检查冷却约束。离线断开保留pending和凭据以便后续确认；网络失败不等于撤销。若管理员明确确认远端grant可能仍存在，可本地forget：清除密文、记forgotten并停止全部远程操作，返回remoteRevocationConfirmed=false；同URL可凭新票重配。远端仍可能需要管理员独立撤销旧grant。目标管理员撤销grant或发行管理员失去admin权限后，授权失效。域名/实例改变、密钥更换等恢复情况应按 [部署边界](DEPLOYMENT.md#群站与版本检测) 处理。

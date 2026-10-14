@@ -1,28 +1,26 @@
-# 多站兼容的通用工程参考
+# 多站、配对与更新检测的工程参考
 
-只读核验日期：2026-10-14。参考用户指定的 [guangyue-panel](https://github.com/wudi000888-svg/guangyue-panel)，固定快照为 `7002036692caa6b9d54d3fa19983a076c737445f`。读取了 README、五份指定部署文档和 deploy 源码/测试；没有运行仓库脚本、安装程序、测试或改动任何服务器配置。临时读取内容只保存在 `/tmp`。
+只读核验日期：2026-10-14。用户指定参考 [guangyue-panel](https://github.com/wudi000888-svg/guangyue-panel) 的工程思路；它与英语学习产品不同。NightStudy独立设计与实现，没有复制其产品代码或移植代理协议、资源/支付模型。没有读取私有.env/masterkey、运行其安装/更新脚本或变更服务器。
 
-这不是同类学习产品；本文不规划 NightStudy 主站控制远程子站，也不移植代理协议、配对、网络调优或支付。参考范围为共存、显式边界、预检查、版本与回滚。
+早期入口共存核验固定commit `7002036692caa6b9d54d3fa19983a076c737445f`；本轮通过Agent-Reach的GitHub/gh只读路径补充公开main快照 `80f32ad3fdb025c35765079e61273986ad7f1075` 的更新/群站实现。授权本地checkout `a0605ed3` 只作差异辅助，不当作最新公开版本。
 
-## 证据与采用范围
+## 来源与采用原则
 
-| 已读证据                                                                                                                                                                                                                                                                                                                                                                                               | NightStudy 采用的通用原则                                                                    |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| README 明确排除同站多主 HA、组织租户隔离与服务等级承诺。[README:25](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/README.md#L25)                                                                                                                                                                                                                      | 不把“多站”或使用 PG/Redis 写成 SaaS 隔离与高并发容量已被证明；独立实现并验收。               |
-| NGINX 文档区分公网 TCP 443 的 SNI 分流和回环 HTTPS 监听，要求 PROXY 链一致；已有 stream 需要显式合并。[NGINX:5](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/docs/NGINX.md#L5)、[NGINX:55](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/docs/NGINX.md#L55)                                         | 复用已有入口；不创建第二个抢占 443 的代理，不自动覆盖共享配置。                              |
-| CONFIGURATION 列出内部回环端口与公开 URL 边界。[CONFIGURATION:37](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/docs/CONFIGURATION.md#L37)                                                                                                                                                                                                            | 每份 installation 显式记录 host/base path、内部端口、可信代理、DB 与密钥引用。               |
-| INSTALL 使用固定包及 SHA256 检查，再进行 preflight；源码拒绝已存在受管路径、服务、stream 和域名冲突，在临时配置上检查 Nginx。[INSTALL:108](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/docs/INSTALL.md#L108)、[install.py:88](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/deploy/install.py#L88) | 先只读清点与生成审阅片段；发现冲突停在检查阶段。采用固定镜像/dataset digest 与独立回滚计划。 |
-| render 源码显式生成已有站点域名映射、PROXY 发送/接收配置；测试声明覆盖已有站点及配置注入。[render.py:69](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/deploy/render.py#L69)、[test_deploy.py:93](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/deploy/tests/test_deploy.py#L93)                     | 为 host/path 注入、端口冲突、入口共存建立自己的回归；静态测试存在不等于本次已执行通过。      |
-| EDITIONS 描述安装升级失败的恢复边界；BUSINESS-SITES 描述独立站点保留本地数据库，并明确没有自动跨站负载均衡。[EDITIONS:75](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/docs/EDITIONS.md#L75)、[BUSINESS-SITES:29](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/docs/BUSINESS-SITES.md#L29)         | 采用“本站数据有明确归属、失败不清空别站”的原则；不移植其主控/子站产品结构。                  |
+| 公开源码证据                                                                                                                                                                                   | NightStudy采用的原则                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [NGINX入口共存](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/docs/NGINX.md) 区分SNI/TLS/内部监听及PROXY链                                    | 精确域名映射，保留旧路由；basePath在解密后的HTTP层处理。                                         |
+| [固定包/preflight](https://github.com/wudi000888-svg/guangyue-panel/blob/7002036692caa6b9d54d3fa19983a076c737445f/deploy/install.py) 与失败恢复边界                                            | 固定版本/摘要、先验证配置与冲突；发布重建、独立DB恢复、完整灾备分别记录。                        |
+| [版本目录缓存与失败](https://github.com/wudi000888-svg/guangyue-panel/blob/80f32ad3fdb025c35765079e61273986ad7f1075/deploy/update_agent.py#L67) 保留成功时间/目录，错误持久化并标过期          | 检测失败不能显示已最新；NightStudy仅检测固定GitHub Release，PG保存本Realm结果/检查冷却。         |
+| [现有长期配对凭据](https://github.com/wudi000888-svg/guangyue-panel/blob/80f32ad3fdb025c35765079e61273986ad7f1075/backend/internal/controlplane/fleet.go) 有scope/hash/撤销；并非单次票据      | NightStudy另建10分钟一次票据与独立长期grant，二者撤销分别处理。                                  |
+| [连接凭据包装](https://github.com/wudi000888-svg/guangyue-panel/blob/80f32ad3fdb025c35765079e61273986ad7f1075/backend/internal/controlplane/site_management.go#L24) 需要鉴权核验实例/站点      | 包装不是签名身份；绑定(instanceId,siteId)，保留NightStudy合法basePath，不能只靠同名default站点。 |
+| [固定网关白名单/外连验证](https://github.com/wudi000888-svg/guangyue-panel/blob/80f32ad3fdb025c35765079e61273986ad7f1075/backend/internal/httpapi/gateway.go) 拒递归、敏感凭据接口和私网重绑定 | 不转发Cookie，只允许明确管理动作；目标grant限权、可信HTTPS和逐请求tuple核验。                    |
 
-部分部署文档沿用较早版本号；本次证据以固定 commit 中的文字与代码为准，未据此确认其实际生产部署状态或性能。
+广月最新版非force目录TTL15分钟，手动force直接刷新；较早local版本的60秒复用不能当最新行为。它的版本比较限定稳定x.y.z，NightStudy需要独立支持alpha/beta与完整SemVer。参考 [node-semver官方规则](https://github.com/npm/node-semver)，不使用字符串排序或coerce丢掉预发布后缀。
 
-## 本项目的兼容方案
+## NightStudy的边界
 
-已有普通 Nginx/Caddy/ALB 时，只增加学习站点自己的 host/location/upstream 片段；应用绑定空闲回环端口或受控内部网络。预检查记录既有 listener、证书、站点路径、include 与健康基线，生成差异和备份/回滚步骤。修改后验收其他已有站点，不能只看新首页。
+本项目有两类部署：独立installation各有Compose/PG/密钥；共享backend按operator配置的可信Host+basePath选择各站独立DB/认证Realm。互不信任租户用独立origin；同源子路径不构成浏览器强隔离。0.3新增自愿授权的远程群站管理，不改变本站数据归属或operator域名/DB配置权。
 
-已有广月的 TCP 443 SNI → 回环 HTTPS 体系时，NightStudy 保持现入口和原路由，只把明确学习域名接到现有 `127.0.0.1:10443` 虚拟主机。PROXY protocol 在 stream → TLS listener 两端匹配；HTTPS Nginx → Node 使用普通 HTTP 与校验过的来源头。SNI 只用于域名分流；同域 base path 在解密后的 HTTP 层路由。现有共享入口需要 operator 审阅接入，不套用另一产品安装器。
+群站只提供状态、限权用户/注册/公告管理和更新检测。撤销失败保留pending，不假报远端已撤销；管理员明确确认后可仅本地忘记连接并用新票重配同URL，remoteRevocationConfirmed=false，旧远端grant仍需独立撤销。密码、私钥、数据库URL及长期明文credential不通过Web导出。不存在可传任意URL或shell的自动升级接口。GitHub无该渠道Release时明确no-release，当前源版本不冒充已发布版本。
 
-NightStudy 自己实现两种部署：独立 installations 各有 Compose project/PG/密钥；共享 backend 由 operator SiteRegistry 选择每站独立 PG DB 与固定 Realm。真租户默认不同 domain/subdomain；同 origin 的子路径只作同信任域共存，Cookie Path/prefix 不构成强隔离。高并发使用无状态 Web、副本入口、独立 worker、有界队列与数据库连接预算，吞吐只在压测后报告。
-
-完整施工选择见 [部署方案](deployment-design-notes.md)。本文只是参考证据附录，不是安装指令。
+已有共享TLS入口继续精确登记学习域名，不另抢443；当前部署的再生成参数保留要求见 [部署文档](../DEPLOYMENT.md#共享tls入口与已有站点共存)。参考代码、静态设计和历史0.2实测均不替代0.3本轮测试/CI/VPS验收。完整实现契约见 [API](../API.md#群站配对与限权管理)，高并发/HA仍按独立压测和恢复证据验收。

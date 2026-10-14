@@ -1,32 +1,40 @@
 # Alpha 运行与部署
 
-本文件对应 `0.2.0-alpha.1`、Node24、pnpm11.25、Prisma7与Postgres17，已验收代码基线为 `577f48b`。[对应CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 完成55项测试、格式/类型/构建、真实PG17/Compose全量安装，明确核对installedDictionary=true/declaredEntryCount=770611和网关健康/未鉴权401。VPS发布、容器重建与数据/内容缓存保留、22项HTTPS生产HTTP检查及首份数据库备份/独立库恢复已验证。Render、主机断电恢复、异机/密钥灾备、高并发容量和真人录音尚未验收。浏览器范围见 [验证记录](../README.md#本机验证与待验收项)。
+本文件描述 `0.3.0-alpha.1`、Node24、pnpm11.25、Prisma7与Postgres17。自动管理员、群站与更新检测已按源码接入，本轮完整测试、CI和VPS验收尚待记录。历史0.2代码577f48b的55项 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457)、完整安装、生产HTTP和限定恢复证据见本文后段，不能当作0.3通过。Render、主机断电恢复、异机/密钥灾备、高并发容量和真人录音也未验收。
 
 ## Docker Compose minimal
 
-需要 Docker Engine 与支持 `!reset` 合并标签的现代 Docker Compose。先准备本地私有配置：
+需要Docker Engine、现代Docker Compose及openssl。标准首次安装：
 
 ```sh
-cp .env.example .env
-mkdir -p .local/sites
+bash scripts/install.sh
 ```
 
-编辑 `.env`，为 `POSTGRES_PASSWORD`、`BETTER_AUTH_SECRET`、`BOOTSTRAP_TOKEN` 分别生成不同随机值。可在自己终端运行 `openssl rand -hex 32`，每次生成一个；不要把输出提交到仓库。PG 密码使用 URL 安全的 hex 值，避免未编码字符破坏连接串。
+脚本仅在不存在.env时生成配置，分别生成随机PG密码、认证密钥及初始化口令，并持久化所选Compose project、端口和PUBLIC_URL。已有.env保留，升级前按自己的配置审阅；脚本不改Nginx/TLS。自定义公开域名可在首次执行前设置 `PUBLIC_URL=https://english.example.com`，相应HTTPS入口由operator配置。
 
-默认 `PUBLIC_URL=http://127.0.0.1:5198`，内部 app 监听 3000；PG 不发布主机端口。配置完成后：
+默认PUBLIC_URL为 `http://127.0.0.1:5198`，app内部监听3000，PG不发布主机端口。已自行填写私有.env的部署也可手动执行准备与导出：
 
 ```sh
 docker compose config --quiet
 docker compose up --build --detach --wait --wait-timeout 600 app
+# 用install.sh完成私密凭据导出；直接compose启动不会在宿主机生成导出文件。
 ```
 
-`init` 是独立准备任务，运行 `pnpm db:prepare`：generate、全站迁移、原创版本seed，再按CONTENT_PACK安装内容。默认ecdict会下载并校验固定版完整ECDICT及独立英美IPA，在各站事务内安装；成功后app才启动。应用请求进程不重复迁移/安装。访问 `http://127.0.0.1:5198`，通过首次初始化流程，使用自己保管的BOOTSTRAP_TOKEN创建首位管理员。`CONTENT_PACK=demo` 可显式选择40词最小演示；CI单元/集成库使用该模式。没有使用原ZIP词库或旧服务器快照。
+`init` 运行 `pnpm db:prepare`：generate、全站迁移、seed、首次管理员准备，再按CONTENT_PACK安装内容。默认ecdict会校验完整ECDICT及独立英美IPA并逐站事务安装；成功后app启动，请求进程不重复迁移/创建管理员。默认ADMIN_BOOTSTRAP=auto，新站用户名admin、独立随机密码；已初始化站点不重置账号。manual模式跳过自动创建，保留BOOTSTRAP_TOKEN和/setup。CONTENT_PACK=demo显式跳过完整包，CI基础测试用manual/demo。
+
+## 初始管理员凭据
+
+自动模式先在私密目录持久化候选凭据，再提交账号；失败重试复用候选，既有管理员不改密。候选必须与已初始化本站、对应admin用户及自动初始化审计匹配，才可导出；未确认候选留私密记录，不作为有效登录凭据交付。
+
+Compose的admin-credentials卷仅init挂载到 `/app/.local/admin`，Web/app/worker不挂载。install.sh在成功准备后导出已确认的当前Realm记录到宿主机 `.local/admin/credentials.json`，目录0700、文件0600。只由operator读取并备份，不通过Web下载或提交Git。多站每站生成独立随机密码与 `<siteId>.credentials.json`；Native默认保存于本机.local/admin。单站可私有设置INITIAL_ADMIN_PASSWORD/INITIAL_ADMIN_EMAIL；多Realm拒绝共用这两个覆盖值。
+
+这些文件记录创建时的**初始密码**，用户之后改密不会同步更新明文记录；维护既有站点也不会强制重置。既有手工管理员没有自动生成的初始文件，继续用其原账号。恢复业务DB时同时保管对应认证密钥与初始交付资料，密码哈希不能反推出明文。
 
 PG业务数据与内容源缓存分别保存在postgres-data、content-cache named volume；源缓存挂载 `/app/.local/content`，不塞入Git或应用镜像。首次源下载约71MB，安装耗时取决于网络与机器。等待600秒是CI smoke等待上限，不是承诺安装时间；超时先检查init日志再决定增加等待。重复准备验证缓存与已安装pack，保留历史和管理编辑；摘要失败停止安装。离线内容导入、来源许可与目标书规则见 [CONTENT.md](CONTENT.md)，独立音标见 [PHONETICS.md](PHONETICS.md)。
 
 本机全量库实测Word770,611、追加源Sense1,113,723、5本新目标词书，原40词ID和历史保留。本机/VPS查询US IPA匹配83,424词、UK匹配64,321词及3个ready包；至少一种现代IPA匹配104,261词；含原始音标的任一种音标覆盖256,047词。该安装数据库约974,468,799字节（约975MB）；这是一次本机数据体量记录，不能推断最小磁盘、内存或并发容量。各站各存一份核心词义和进度，另需预算WAL、索引、备份及升级空间。
 
-检查 `/health/live` 与 `/health/ready`，再查询 `/api/v2/dictionary/stats` 核对installedDictionary、pack摘要与declaredEntryCount=770611；子路径安装给API添加basePath。ready检查配置站点的DB/SiteState身份，不能代替内容数量验收。查看 `docker compose logs init app`，日志分享前移除凭据与个人数据。`docker compose down` 停止服务但保留named volume；`down --volumes` 删除本站数据库和内容缓存，仅用于可丢弃测试安装。
+检查 `/health/live`、`/health/ready` 和 `/api/v2/dictionary/stats`；子路径API添加basePath。ready不代替内容数量验收。查看init/app日志，分享前移除凭据和个人数据。`docker compose down` 保留named volume；`down --volumes` 删除业务DB、内容缓存与初始凭据卷，仅用于可丢弃测试。
 
 默认 app 监听启动后及每 60 秒执行有界 PG lease 维护，清理过期限流/session/verification与旧任务；先核验本站 DB 绑定，同一任务由 lease 竞争执行。重试耗尽标记 failed，各表每次清理有批次上限。minimal 与 Render 无需额外维护 worker；scale/独立 worker 可复用同一维护入口，不重复消费同一个有效 lease。它仍只是维护任务入口，未实现大型内容异步导入。
 
@@ -72,6 +80,20 @@ PG业务数据与内容源缓存分别保存在postgres-data、content-cache nam
 
 `basePath` 使用空字符串或 `/school-a` 等规范路径，无尾斜杠；`publicUrl` 路径与其一致。配置站点数不得超过 MAX_ACTIVE_SITES，超出会启动失败；每站池也有硬上限。当前没有自动 LRU 淘汰。`/health/ready` 位于固定根路径并检查所有配置站点，因此也支持只有子路径的安装，但任一站 DB 异常会使整个副本 unready。总连接预算计算所有 Web/worker 副本的全部配置站点池，并预留迁移/运维连接。子路径认证、跨站点隔离及生产代理要按当前测试证据验收。
 
+## 群站与版本检测
+
+独立站点可在各自后台生成10分钟单次配对票据，再由控制站管理员输入受控站的规范HTTPS公开URL与票据。消费后换取独立长期grant；受控站存hash，控制站加密保存，绑定双方实例/Realm及连接/目标地址。账号、DB与学习数据保持独立，站点ID可能同名，因此身份由instanceId+siteId组成。受控站授予status:read及可选用户/注册/公告scope，控制站不能铸造更多目标凭据或改变Host/DB/secret。
+
+外连只支持公共HTTPS443及规范basePath，验证DNS并固定实际拨号地址，不跟随重定向；本进程有资源上限，不能写成整个fleet共享并发承诺。目标每次校验身份与凭据；本地状态刷新/断开用条件写保护新绑定。目标管理员可直接撤销长期授权；控制站断开只有在目标确认后才报remoteRevoked，离线时disconnect_pending并保留上次状态。密钥/域名/实例身份改变须经受控恢复流程，不将未知网络状态当作已经撤销。
+
+保存群站密文时使用本站认证secret派生密钥；备份需同时保管对应DB身份和密钥。secret变更会使已保存连接不可读，须处理撤销/重新配对，不通过Web返回长期凭据。仅允许固定管理动作，写操作应保留commandId重试；没有远端shell、自动部署或通用请求代理。
+
+受控站重装、身份变化或离线时，旧授权可能无法确认撤销。管理员明确确认远端grant可能仍存在后可本地forget：清密文、标forgotten、停止远程操作并审计，返回remoteRevocationConfirmed=false；同URL可用新票重配。它不等于远端撤销。每站最多20张活跃票据，每张10分钟有效；最多100条活跃grant，连接记录总量最多100条（含revoked/forgotten）。
+
+后台的检测更新只读取固定NightStudy GitHub Release。当前运行预发布版本选prerelease渠道，否则stable仅正式；严格SemVer排序，空发布返回no-release，不把main代码版本冒充最新Release。PG保存各Realm状态、60秒冷却和检查锁，跨进程竞争只覆盖该Realm；同进程固定上游请求合并/短时缓存。失败保留上次成功结果与错误，不刷新成功时间。功能只给发布链接，升级仍按备份/迁移/独立init程序由operator执行；目前没有公开GHCR发行镜像或自动安装入口。
+
+完整接口见 [API.md](API.md#群站配对与限权管理)。0.3配对、撤销、首装密码交付与更新缓存的真实测试/CI/VPS结果尚待本轮验收。
+
 ## Scale 扩展
 
 ```sh
@@ -89,7 +111,7 @@ PgBouncer、完整分布式队列、活动 Realm LRU、公平调度及高并发�
 
 根 `render.yaml` 描述一个 Docker Web 与一个 PG17 首站数据库，使用付费资源规格、内部 DB URL、随机认证/初始化密钥、`pnpm db:prepare` pre-deploy 和 ready 检查。默认 `autoDeployTrigger: off`，不因上游 push 自动升级所有使用者实例。
 
-该文件不会自行创建云资源。部署者在Render审阅费用、创建资源并检查首次构建/ready与catalog；PUBLIC_URL从RENDER_EXTERNAL_URL引用，自定义域名验证后更新配置。pre-deploy默认安装完整内容；没有runtime持久盘，临时源缓存可能在重新部署时重新下载，已提交的词典和业务数据保存在PG。当前不提供本地媒体上传。Render首次完整安装耗时、内存及恢复仍需平台实测。[Render Blueprint规范](https://render.com/docs/blueprint-spec)、[Docker部署](https://render.com/docs/docker)
+该文件不会自行创建云资源。部署者在Render审阅费用、创建资源并检查构建/ready/catalog；PUBLIC_URL从RENDER_EXTERNAL_URL引用。INITIAL_ADMIN_PASSWORD使用平台generateValue独立生成，部署者从Render私有环境保管，避免依赖临时pre-deploy文件；不是所有实例共用默认密码，既有管理员也不因重部署重置。pre-deploy默认完整内容，临时缓存可能重新下载，已提交词义/用户保存在PG。实际首装、耗时、负载与恢复仍待平台实测。[Render Blueprint规范](https://render.com/docs/blueprint-spec)、[Docker部署](https://render.com/docs/docker)
 
 新增站点由 operator 准备另一独立 DB/连接，再登记 Realm；不承诺免费数据库长期保存、无限租户或生产 SLA。Render 平台实际创建与恢复尚未验证，不展示已可一键使用的成功徽章。
 
@@ -101,7 +123,7 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 
 保留Google官方网页入口和私密VPS备用网关，暂不接收费Cloud API；网页不支持本站iframe。网关请求非官方网页兼容接口，本机及目标VPS真实请求均遇到429，不能宣称站内结果已可用或实现加速。生产配置、同机Compose override与独立网关入口见 [TRANSLATION.md](TRANSLATION.md)。应用不保存翻译历史，网关ready仅表示进程就绪，鉴权401只验证入口关闭；上游可用性仍取决于真实鉴权翻译请求。
 
-目标VPS运行0.2应用镜像、独立PG17、私密网关和内容缓存，外网 `https://english.minminlove.top/health/ready` 返回200。22项HTTPS生产HTTP检查已全部通过：主页CSP/JS/CSS、770,611词及3包、分页检索/rain全义/英美IPA、注册Secure/HttpOnly Cookie、客户端role无法提权、普通用户admin403、空曲线、目标词书与5词会话/reveal/rate、真实FSRS曲线记录、Google私密配置/官方deep link、网关真实429及退出/登录；临时学习账号已清理。这是HTTP契约验证，不是新版手机浏览器live验收，也不说明Google上游可用。
+以下为0.2历史验收：目标VPS的独立PG17/私密网关/内容缓存与22项HTTPS HTTP检查通过，含主页资产/CSP、770,611词/3包/完整检索、认证权限、5词学习与真实FSRS、官方翻译链接/网关429及退出/登录；临时账号已清理。本轮0.3自动管理员/群站/更新检测尚未生产验收，也未新版手机live，不说明Google上游可用。
 
 2026-10-14生产镜像 `nightstudy-english:0.2.0-alpha.1-577f48b` 发布成功，运行代码与 [成功CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 的基线相同，包含HEAD SPA修复。app/gateway容器重建后健康，init退出0，Word770611/3个ready包及内容缓存保留。外网HEAD `/` 返回200/HTML/CSP/no-store，HTTP→HTTPS301，site接口version=0.2.0-alpha.1/publicUrl正确。验收/交付时initialized=false，尚未初始化，管理员由部署者使用私有初始化口令自行创建；生产测试账号已删除。这次发布证明容器重建与已有卷保留，未执行主机断电恢复或跨机HA验证。
 
@@ -122,6 +144,9 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 | NIGHTSTUDY_IMAGE                                     | 可选已核验发行镜像；空值从当前 checkout 构建本地镜像                               |
 | CONTENT_PACK                                         | 默认ecdict完整内容；demo显式跳过完整词典/音标，仅保留40词演示                      |
 | CONTENT_FILE                                         | operator的本地ECDICT源文件；必须匹配固定大小/SHA256，缺失时不自动换源              |
+| ADMIN_BOOTSTRAP                                      | 默认auto，仅首次创建admin；manual保留/setup，既有管理员不重置                      |
+| ADMIN_CREDENTIALS_DIR                                | Native私密目录；Compose init固定/app/.local/admin，不挂给Web/worker                |
+| INITIAL_ADMIN_PASSWORD / INITIAL_ADMIN_EMAIL         | 单站私有初始覆盖；Render密码generateValue保管，多Realm不可共用                     |
 | TRANSLATION_MODE                                     | 默认website-official；gateway用于生产站内结果，direct仅本机开发                    |
 | TRANSLATION_GATEWAY_URL / TRANSLATION_GATEWAY_SECRET | 固定网关地址与独立私密token，不返回浏览器；详细约束见TRANSLATION.md                |
 
@@ -154,6 +179,6 @@ docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exi
 
 CI对PR/main运行锁文件安装、格式、双PG17 migration/seed、sites/typecheck/build与一次 `pnpm test`。测试库显式CONTENT_PACK=demo，CONTENT_TEST_DATABASE_URL启用源码内合成内容PG fixture；不重复执行独立CLI夹具。随后验证基础/scale/翻译Compose描述，构建镜像，并在隔离Compose默认ecdict安装完整字典及英美音标，等待最多600秒，核对ready和catalog声明770,611；另启动闭合网关容器，验证无鉴权请求返回401，不依赖真实Google可用性。清理只针对CI隔离project的卷。
 
-上述步骤已在 [源码577f48b的CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 实际通过，包括55项测试、PG17全量安装、770611声明数量核对和网关健康/401；本机同一代码基线也完成format/type/build和55项测试。VPS发布重建、生产HTTP与独立库恢复的限定证据见上文。容量、主机断电恢复与异机灾备仍分别验收；YAML静态解析不能代替实际启动。
+历史0.2代码577f48b的 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 通过55项、PG17全量安装、770611声明数量断言与网关健康/401。本轮0.3尚待新代码测试/CI/VPS记录；初始密码交付、配对撤销与副本更新缓存要按新功能另行验收，不能沿用旧结果。
 
 `release.yml` 仅在维护者发布GitHub Release时触发，版本tag须为 `v0.2.0-alpha.1` 等格式；先复用完整CI，通过后使用仓库GITHUB_TOKEN推送GHCR（当前目标linux/amd64），保留版本、commit、provenance与SBOM。初次发布后维护者须核对package visibility，公开仓库不意味着镜像自动公开。当前未创建Release或发布发行镜像。部署使用CI输出的 `ghcr.io/...@sha256:...` 固定摘要，不依赖浮动latest。[GitHub官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)

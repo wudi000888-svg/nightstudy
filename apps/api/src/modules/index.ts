@@ -7,10 +7,14 @@ import { registerAssessment } from './assessment.js';
 import { registerAnalytics } from './analytics.js';
 import { registerTranslation } from './translation.js';
 import { registerPronunciation } from './pronunciation.js';
+import { registerSystem } from './system.js';
+import { registerFleet } from './fleet.js';
+import type { FleetTransport } from './fleet-transport.js';
 
 export async function registerModules(
   app: FastifyInstance,
   getContext: ContextResolver,
+  options: { fleetTransport?: FleetTransport } = {},
 ): Promise<void> {
   await registerContent(app, getContext);
   await registerStudy(app, getContext);
@@ -19,4 +23,6 @@ export async function registerModules(
   await registerAnalytics(app, getContext);
   await registerTranslation(app, getContext);
   await registerPronunciation(app, getContext);
+  await registerSystem(app, getContext);
+  await registerFleet(app, getContext, { transport: options.fleetTransport });
 }

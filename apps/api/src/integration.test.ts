@@ -166,6 +166,47 @@ suite('PostgreSQL API and isolation', () => {
     ).toBe(403);
     expect((await request('GET', '/api/v2/study/plan', undefined, '')).statusCode).toBe(401);
   });
+  it('bounds registration and authentication profile names before writing users', async () => {
+    const oversizedName = '词'.repeat(81);
+    expect(
+      (
+        await request(
+          'POST',
+          '/api/auth/sign-up/email',
+          {
+            email: `long-${runId}@example.test`,
+            password,
+            name: oversizedName,
+          },
+          '',
+        )
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (await request('POST', '/api/auth/update-user', { name: oversizedName })).statusCode,
+    ).toBe(400);
+    expect((await request('GET', '/api/v2/me')).json().user.name).toBe('Test learner');
+    expect(await prisma.user.count({ where: { email: `long-${runId}@example.test` } })).toBe(0);
+  });
+  it('restricts system detection to admins and never accepts an arbitrary update source', async () => {
+    expect((await request('GET', '/api/v2/admin/system')).statusCode).toBe(403);
+    const response = await request('GET', '/api/v2/admin/system', undefined, adminCookie);
+    expect(response.statusCode).toBe(200);
+    expect(response.json().instanceId).toBe(
+      (await prisma.siteState.findUniqueOrThrow({ where: { id: 'singleton' } })).instanceId,
+    );
+    expect(response.body).not.toContain(config.sites[0]!.authSecret);
+    expect(
+      (
+        await request(
+          'POST',
+          '/api/v2/admin/system/check-update',
+          { sourceUrl: 'http://127.0.0.1/private' },
+          adminCookie,
+        )
+      ).statusCode,
+    ).toBe(400);
+  });
   it('serves GET and HEAD SPA pages without masking missing APIs, assets, or writes', async () => {
     const mounted = await buildApp(
       {

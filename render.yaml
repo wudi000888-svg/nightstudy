@@ -31,6 +31,10 @@ services:
         generateValue: true
       - key: BOOTSTRAP_TOKEN
         generateValue: true
+      - key: ADMIN_BOOTSTRAP
+        value: auto
+      - key: INITIAL_ADMIN_PASSWORD
+        generateValue: true
       - key: REGISTRATION_OPEN
         value: 'true'
       - key: CLIENT_IP_PROFILE

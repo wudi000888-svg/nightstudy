@@ -12,6 +12,10 @@ export interface RequestContext {
   siteId: string;
   basePath: string;
   publicUrl: string;
+  instanceId: string;
+  title: string;
+  fleetSecret: string;
+  registrationOpen: boolean;
   prisma: PrismaClient;
   user: UserView | null;
   translation?: TranslationConfig;

@@ -62,6 +62,9 @@ export class SiteRegistry {
 
   async context(request: FastifyRequest): Promise<RequestContext> {
     const runtime = this.runtime(this.resolve(request));
+    const state = await runtime.prisma.siteState.findUnique({ where: { id: 'singleton' } });
+    if (!state || state.siteId !== runtime.config.id)
+      throw new HttpError(503, 'database_not_prepared');
     const session = await runtime.auth.api.getSession({
       headers: authenticationHeaders(request, this.config),
     });
@@ -75,6 +78,10 @@ export class SiteRegistry {
       siteId: runtime.config.id,
       basePath: runtime.config.basePath,
       publicUrl: runtime.config.publicUrl,
+      instanceId: state.instanceId,
+      title: runtime.config.title,
+      fleetSecret: runtime.config.authSecret,
+      registrationOpen: state.registrationOpenOverride ?? runtime.config.registrationOpen,
       translation: runtime.config.translation,
       prisma: runtime.prisma,
       user:

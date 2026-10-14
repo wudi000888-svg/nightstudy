@@ -1,6 +1,20 @@
 import { useState } from 'react';
-import { BookOpen, ShieldCheck, Users, FileText, Search, Save, MessageSquare } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import {
+  BookOpen,
+  ShieldCheck,
+  Users,
+  FileText,
+  Search,
+  Save,
+  MessageSquare,
+  Settings2,
+  Network,
+} from 'lucide-react';
 import { AdminBooks } from '../components/AdminBooks';
+import { AdminConfirm, type AdminConfirmation } from '../components/AdminConfirm';
+import { AdminSystem } from '../components/AdminSystem';
+import { AdminFleet } from '../components/AdminFleet';
 import { useApp, useRemote } from '../AppContext';
 import { post } from '../lib/api';
 import type { PageInfo, Word, Sense } from '../lib/types';
@@ -31,7 +45,20 @@ interface Announcement {
 export function AdminPage() {
   const { user, site } = useApp();
   const isAdmin = user?.role === 'admin';
-  const [tab, setTab] = useState('overview');
+  const location = useLocation();
+  const section = location.pathname.split('/')[2] ?? 'overview';
+  const tab = [
+    'overview',
+    'users',
+    'books',
+    'content',
+    'announcements',
+    'system',
+    'fleet',
+  ].includes(section)
+    ? section
+    : 'overview';
+  const [confirmation, setConfirmation] = useState<AdminConfirmation | null>(null);
   const [search, setSearch] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [wordCursor, setWordCursor] = useState('');
@@ -164,15 +191,24 @@ export function AdminPage() {
           { id: 'books', label: '词书', icon: BookOpen },
           { id: 'content', label: '内容', icon: FileText },
           { id: 'announcements', label: '公告', icon: MessageSquare },
+          { id: 'system', label: '系统与更新', icon: Settings2 },
+          { id: 'fleet', label: '群站管理', icon: Network },
         ].map(({ id, label, icon: Icon }) => (
-          <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
+          <Link
+            key={id}
+            className={tab === id ? 'active' : ''}
+            aria-current={tab === id ? 'page' : undefined}
+            to={id === 'overview' ? '/admin' : `/admin/${id}`}
+          >
             <Icon size={16} />
             {label}
-          </button>
+          </Link>
         ))}
       </div>
       <ErrorNotice error={error} />
       {notice && <Notice>{notice}</Notice>}
+      {tab === 'system' && <AdminSystem />}
+      {tab === 'fleet' && <AdminFleet />}
       {tab === 'overview' && (
         <>
           {overview.isPending ? (
@@ -231,7 +267,16 @@ export function AdminPage() {
                       <button
                         className="button quiet"
                         disabled={busy}
-                        onClick={() => void toggleUser(value)}
+                        onClick={() =>
+                          setConfirmation({
+                            title: value.disabled ? '恢复本站用户？' : '停用本站用户？',
+                            message: value.disabled
+                              ? `将恢复 ${value.name}（${value.email}）在本站的登录权限。`
+                              : `将停用 ${value.name}（${value.email}）并撤销其本站会话，学习记录仍会保留。`,
+                            label: value.disabled ? '确认恢复' : '确认停用',
+                            run: () => toggleUser(value),
+                          })
+                        }
                       >
                         {value.disabled ? '恢复' : '停用'}
                       </button>
@@ -370,7 +415,14 @@ export function AdminPage() {
                 <button
                   className="button quiet"
                   disabled={busy}
-                  onClick={() => void removeAnnouncement(value.id)}
+                  onClick={() =>
+                    setConfirmation({
+                      title: '移除本站公告？',
+                      message: `将移除“${value.title}”，本站用户将无法继续查看这条公告。`,
+                      label: '确认移除',
+                      run: () => removeAnnouncement(value.id),
+                    })
+                  }
                 >
                   移除公告
                 </button>
@@ -445,6 +497,7 @@ export function AdminPage() {
           </form>
         )}
       </Dialog>
+      <AdminConfirm action={confirmation} onClose={() => setConfirmation(null)} />
     </div>
   );
 }

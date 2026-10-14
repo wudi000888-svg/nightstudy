@@ -11,7 +11,7 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前状态：`0.2.0-alpha.1` 已部署，验收代码基线为 `577f48b`。** 本机与 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 的55项测试、真实PG17/Compose完整内容安装、声明数量770,611核对和网关健康/401检查已通过。目标VPS完成22项HTTPS生产HTTP检查、首份备份/独立临时库恢复，并已发布该版本：容器重建健康，数据库与内容缓存保留。中文释义、多义项、独立英美音标、设备语音朗读与翻译面板已实现。异机/密钥灾备、主机断电恢复、Render、高并发容量、真人录音和0.2手机live尚未验收。具体变化见 [CHANGELOG](CHANGELOG.md)。
+**当前源码：`0.3.0-alpha.1` 施工中，新增自动管理员、群站配对管理和版本检测；本轮完整测试、CI与VPS验收待记录。** 默认首次安装创建用户名admin和独立随机密码，私密文件交付初始凭据；既有管理员不被重置。群站使用10分钟单次配对票据与独立长期授权，可读取状态、按批准的权限管理用户/注册/公告并检测更新。版本检测只访问固定GitHub Release，不执行shell安装。线上与历史验证目前仍是0.2代码基线 `577f48b`，不能用其55项测试替代0.3验收。具体变化见 [CHANGELOG](CHANGELOG.md)。
 
 ## 产品与边界
 
@@ -20,6 +20,7 @@
 - 固定会话先回忆、再评价、再拼写；动作去重与版本冲突保护避免重复评价。个人曲线使用真实 FSRS 状态，无数据时显示空态。
 - 每日新词目标约束新组预约；已签发的一组可继续完成，降低目标不会把学习中途锁住。同词预约去重，并发新组由服务端事务保护。
 - 管理员维护本站用户和学习内容；部署 operator 管理站点域名与数据库映射。
+- 独立部署的站点可由各自管理员生成单次票据，授权另一站点管理；各站账号、数据库与学习记录仍独立，远端操作受明确scope和白名单限制。
 - 同一份源码可独立部署多站，也可由共享后端按可信 host 选择每站独立 Postgres/认证 Realm。
 - 真租户默认使用独立域名或子域名。同域子路径只用于同一信任域内的共存，不能作为浏览器强隔离。
 
@@ -33,17 +34,13 @@
 
 ## 构建与部署
 
-Docker Compose 路径：复制配置，在私有 `.env` 填入不同的 PG 密码、认证密钥与初始化口令，再启动。每个随机值可单独运行 `openssl rand -hex 32` 生成。
+Docker Compose首次安装可使用脚本生成私有配置并启动。已有 `.env` 会保留；自定义域名须先配置自己的HTTPS入口，并在首次执行前设置PUBLIC_URL：
 
 ```sh
-cp .env.example .env
-mkdir -p .local/sites
-# 编辑 .env：POSTGRES_PASSWORD、BETTER_AUTH_SECRET、BOOTSTRAP_TOKEN
-docker compose config --quiet
-docker compose up --build --detach --wait --wait-timeout 600 app
+bash scripts/install.sh
 ```
 
-访问 `http://127.0.0.1:5198`，通过首次初始化页面，用本站初始化口令创建管理员，然后登录。`init` 独立任务负责迁移、种子和完整内容安装；PG 与内容源缓存各在 named volume。首次下载约 71 MB，数据库还需要词条、词义和索引的空间；安装耗时取决于 VPS。`CONTENT_PACK=demo` 可显式选择 40 词最小体验。完整变量、HTTPS、备份、多站与 scale 扩展见 [部署文档](docs/DEPLOYMENT.md)。不要对需要保留数据的安装使用 `down --volumes`。
+默认访问 `http://127.0.0.1:5198`。新站用户名为admin，密码为本站随机值；脚本将初始凭据从仅init挂载的私密卷导出到服务器 `.local/admin/credentials.json`（目录0700、文件0600），只由部署者读取和保管。文件不会通过Web下载，不放入Git。它记录创建时的初始密码，之后改密不会更新此明文记录。既有管理员继续使用原登录方式；`ADMIN_BOOTSTRAP=manual` 保留初始化口令/setup流程。`init` 负责迁移、种子、首次管理员与完整内容安装，PG/内容缓存/私密凭据分别持久化。首次源下载约71MB，`CONTENT_PACK=demo` 可显式选40词最小体验。完整变量、凭据备份、HTTPS与多站见 [部署文档](docs/DEPLOYMENT.md)。不要对需保留数据的安装使用 `down --volumes`。
 
 Native 开发使用 Node 24 与 pnpm 11.25.0，并自行准备可访问的 PG 数据库。在 `.env` 填入真实 DATABASE_URL 与两个随机密钥后：
 
@@ -54,15 +51,15 @@ pnpm build
 pnpm dev
 ```
 
-Web 开发地址 `http://127.0.0.1:5173`，API 开发地址 `http://127.0.0.1:5198`。生产同进程启动用 `pnpm start`；app 自带启动后/60秒有界 PG lease 维护，额外 worker 可用 `pnpm worker` 竞争同一 lease。检查命令为 `pnpm format:check`、`pnpm sites:check`、`pnpm typecheck`、`pnpm build`、`pnpm test`；真实 PG 集成测试需额外配置独立且名称以 `_test` 结尾的 TEST_DATABASE_URL，见 [贡献指南](CONTRIBUTING.md)。
+Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.local/admin/<siteId>.credentials.json`；已有账号不重置。Web开发地址 `http://127.0.0.1:5173`，API为 `http://127.0.0.1:5198`。生产同进程启动用 `pnpm start`；app自带PG lease维护，额外worker可用 `pnpm worker`。检查命令与隔离测试库要求见 [贡献指南](CONTRIBUTING.md)，测试准备显式manual/demo，不能指向生产库。
 
-[在 Render 审阅部署配置](https://render.com/deploy?repo=https://github.com/wudi000888-svg/nightstudy) 使用仓库 `render.yaml`，只创建首站 Web/PG 描述，采用付费资源规格；自行审阅费用与构建结果。默认无额外付费维护 worker；显式 render-public IP profile 仅适用于 Render 受控公网入口，私网/自托管使用 socket 模式。此入口尚未做平台实测，不自动创建无限租户。
+[在 Render 审阅部署配置](https://render.com/deploy?repo=https://github.com/wudi000888-svg/nightstudy) 使用 `render.yaml` 的首站Web/PG描述，采用付费规格。首次管理员密码由平台INITIAL_ADMIN_PASSWORD的generateValue独立生成，部署者从自己的Render私有环境保管；不是共用默认密码，也不依赖临时容器文件恢复。render-public仅适用于平台受控公网入口。Render实际创建、首装与恢复尚未实测，不自动创建无限租户。
 
 架构约定见 [架构](docs/architecture/ARCHITECTURE.md)、[多站与并发方案](docs/architecture/MULTISITE_AND_SCALING.md)。真人录音、PgBouncer、Redis provider、跨主机 HA 和实测高并发容量仍待实现/验收。当前 API 契约见 [API.md](docs/API.md)。词典/词书分页和学习选词不再被前 500/1,000 词截断；熟词导出以游标分批流式输出全部记录。
 
 ## 本机验证与待验收项
 
-以下记录区分首版基线、0.2本机/CI和当前VPS验收，使用合成账户。完整词库导入与测试fixture分开验收，不能据此推断生产容量，也不能把旧版浏览器结果当作新版生产验收。
+0.3的自动管理员、群站和检测更新目前按源码描述，完整测试/CI/VPS结果待本轮验收。以下表格为0.1/0.2历史基线；0.2的代码/生产版本为577f48b，使用合成账户，不能扩写为0.3或生产容量证据。
 
 | 验证项                | 结果与范围                                                                                                           |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------- |

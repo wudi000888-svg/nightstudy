@@ -28,6 +28,7 @@ export async function maintenanceTick(prisma: PrismaClient, siteId: string) {
       await tx.$executeRaw`DELETE FROM "RateBucket" WHERE "key" IN (SELECT "key" FROM "RateBucket" WHERE "expiresAt" < NOW() LIMIT 5000)`;
       await tx.$executeRaw`DELETE FROM "Session" WHERE "id" IN (SELECT "id" FROM "Session" WHERE "expiresAt" < NOW() LIMIT 1000)`;
       await tx.$executeRaw`DELETE FROM "Verification" WHERE "id" IN (SELECT "id" FROM "Verification" WHERE "expiresAt" < NOW() LIMIT 1000)`;
+      await tx.$executeRaw`DELETE FROM "FleetPairingToken" WHERE "id" IN (SELECT "id" FROM "FleetPairingToken" WHERE "expiresAt" < NOW() - INTERVAL '7 days' LIMIT 1000)`;
       await tx.job.update({
         where: { id: job.id },
         data: { status: 'completed', lockedUntil: null, result: { runId: randomUUID() } },

@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth';
+import { username } from 'better-auth/plugins';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import type { PrismaClient } from '@prisma/client';
 import type { SiteConfig, AppConfig } from './config.js';
@@ -6,6 +7,9 @@ import type { FastifyRequest } from 'fastify';
 import { fromNodeHeaders } from 'better-auth/node';
 import { isIP } from 'node:net';
 import { HttpError } from './context.js';
+import { z } from 'zod';
+
+const userName = z.string().trim().min(1).max(80);
 
 export function requestClientIp(request: FastifyRequest, config: AppConfig): string {
   if (config.clientIpProfile !== 'render-public') return request.ip;
@@ -45,7 +49,7 @@ export function createAuthentication(site: SiteConfig, prisma: PrismaClient, pro
       enabled: true,
       minPasswordLength: 8,
       maxPasswordLength: 128,
-      disableSignUp: !site.registrationOpen,
+      disableSignUp: false,
     },
     user: {
       additionalFields: {
@@ -65,6 +69,30 @@ export function createAuthentication(site: SiteConfig, prisma: PrismaClient, pro
       defaultCookieAttributes: { httpOnly: true, sameSite: 'lax', path: site.basePath || '/' },
     },
     databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            const name = userName.safeParse(user.name);
+            if (!name.success) return false;
+            const state = await prisma.siteState.findUnique({ where: { id: 'singleton' } });
+            if (
+              !state ||
+              state.siteId !== site.id ||
+              !(state.registrationOpenOverride ?? site.registrationOpen)
+            )
+              return false;
+            return { data: { ...user, name: name.data } };
+          },
+        },
+        update: {
+          before: async (user) => {
+            if (user.name === undefined) return { data: user };
+            const name = userName.safeParse(user.name);
+            if (!name.success) return false;
+            return { data: { ...user, name: name.data } };
+          },
+        },
+      },
       session: {
         create: {
           before: async (session) => {
@@ -78,5 +106,6 @@ export function createAuthentication(site: SiteConfig, prisma: PrismaClient, pro
         },
       },
     },
+    plugins: [username()],
   });
 }

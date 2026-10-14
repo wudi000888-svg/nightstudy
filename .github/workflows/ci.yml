@@ -42,6 +42,7 @@ jobs:
       REGISTRATION_OPEN: 'true'
       NODE_ENV: test
       CONTENT_PACK: demo
+      ADMIN_BOOTSTRAP: manual
       TRANSLATION_GATEWAY_SECRET: ci-only-gateway-token-not-a-production-secret-2026
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -81,11 +82,16 @@ jobs:
           PUBLIC_URL: http://127.0.0.1:5198
           NODE_ENV: production
           CONTENT_PACK: ecdict
+          ADMIN_BOOTSTRAP: auto
         run: |
           docker compose up --detach --no-build --wait --wait-timeout 600 app
           curl --fail --silent http://127.0.0.1:5198/health/ready
           curl --fail --silent http://127.0.0.1:5198/api/v2/dictionary/stats > /tmp/nightstudy-catalog.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-catalog.json','utf8'));if(!j.installedDictionary||j.declaredEntryCount!==770611)process.exit(1)"
+          umask 077
+          docker compose run --rm --no-deps --entrypoint node init scripts/export-admin-credentials.mjs > /tmp/nightstudy-ci-admin.json
+          node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-ci-admin.json','utf8'));const c=j.credentials[0];if(j.credentials.length!==1||c.username!=='admin'||c.password.length<32)process.exit(1);const r=await fetch('http://127.0.0.1:5198/api/auth/sign-in/username',{method:'POST',headers:{'Content-Type':'application/json',Origin:'http://127.0.0.1:5198'},body:JSON.stringify({username:c.username,password:c.password})});if(r.status!==200)process.exit(1)"
+          rm -f /tmp/nightstudy-ci-admin.json
       - name: Smoke-test closed translation gateway container
         env:
           COMPOSE_PROJECT_NAME: nightstudy-ci-${{ github.run_id }}

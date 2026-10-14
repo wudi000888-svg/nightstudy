@@ -17,16 +17,18 @@ NightStudy 当前处于 alpha 施工阶段。请围绕一个明确的问题提�
 真实PG测试只用于可丢弃数据库，名称必须以 `_test` 结尾；TEST_DATABASE_URL、TEST_DATABASE_URL_B分别指向两个独立已迁移/seed库。使用独立测试配置，不能让生产SITES_FILE或连接进入测试环境。准备测试库时显式 `CONTENT_PACK=demo`，避免默认db:prepare在测试前下载/安装完整内容：
 
 ```sh
-SITES_FILE= CONTENT_PACK=demo DATABASE_URL="$TEST_DATABASE_URL" pnpm db:prepare
-SITES_FILE= CONTENT_PACK=demo DATABASE_URL="$TEST_DATABASE_URL_B" pnpm db:prepare
-SITES_FILE= CONTENT_PACK=demo DATABASE_URL="$TEST_DATABASE_URL" CONTENT_TEST_DATABASE_URL="$TEST_DATABASE_URL" pnpm test
+SITES_FILE= ADMIN_BOOTSTRAP=manual CONTENT_PACK=demo DATABASE_URL="$TEST_DATABASE_URL" pnpm db:prepare
+SITES_FILE= ADMIN_BOOTSTRAP=manual CONTENT_PACK=demo DATABASE_URL="$TEST_DATABASE_URL_B" pnpm db:prepare
+SITES_FILE= ADMIN_BOOTSTRAP=manual CONTENT_PACK=demo DATABASE_URL="$TEST_DATABASE_URL" CONTENT_TEST_DATABASE_URL="$TEST_DATABASE_URL" pnpm test
 ```
 
 测试环境仍需README要求的独立认证/初始化配置。TEST_DATABASE_URL激活API PG集成，TEST_DATABASE_URL_B激活第二站隔离，CONTENT_TEST_DATABASE_URL激活 `scripts/content-lib.test.ts` 的受限PG夹具；缺变量时对应case跳过，不能将纯单元通过写成PG通过。完整suite已经包括内容parser与PG fixture，不需再重复执行 `pnpm test:content`；该CLI只用于独立排障。
 
 集成suite会创建/删除合成用户、修改SiteState与限流记录，不能指向生产或日常开发库。内容夹具先拒绝非空fixture命名空间，仅安装3行原创合成CSV，验证摘要失败不写库、原ID/旧Sense保留、admin编辑保护、幂等、错误站点与事务回滚；结束精确清理自建词/词义/词书/pack，并恢复SiteState的contentVersion/initialized/initializedAt。它不全量再次导入770k，也不把合成文本或假音标作为学习数据。
 
-CI使用双PG17演示测试库、激活上述源码fixture并只运行一次pnpm test；另在隔离Compose安装完整ECDICT/英美音标、明确核对installedDictionary=true/declaredEntryCount=770611，并做网关健康与401鉴权smoke。代码基线 `577f48b` 的本机55项测试及 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 均已通过，包括真实PG17/完整Compose安装。VPS也已发布同一版本，完成22项生产HTTP检查、容器重建后的数据保留及独立临时库恢复。记录证据时固定实际验收的代码版本，不把文档后续提交、容器重建或本机结果扩写为未执行的主机断电恢复、手机live、跨机HA或生产容量；详细范围见 [部署文档](docs/DEPLOYMENT.md)。
+CI使用双PG17测试库与manual/demo基线，完整suite仅执行一次；独立bootstrap与群站回归另使用合成命名空间。自动管理员需验证首次凭据可恢复、失败重试/并发、既有管理员不重置；群站需验证单次票据、scope、tuple/密文绑定、撤销/并发与SSRF，更新需区分无发布和源故障。不要在测试输出暴露真实密码、配对票据或长期凭据。
+
+0.3本轮完整测试/CI/VPS尚待验收。历史0.2代码577f48b的55项测试及 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38486206457) 通过PG17/完整Compose安装，明确断言installedDictionary/declaredEntryCount=770611及网关健康/401；其VPS22项HTTP检查、容器数据保留和独立库恢复有记录。这些结果不能扩写为0.3或未执行的主机断电、手机live、跨机HA及容量。提交文档时固定实际验收的代码基线，详见 [部署文档](docs/DEPLOYMENT.md)。
 
 内容/音标工具贡献遵循 [CONTENT.md](docs/CONTENT.md)、[PHONETICS.md](docs/PHONETICS.md) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。缺例句、IPA或录音时保持缺失；不得猜测数据覆盖、将旧式音标标为验证过的现代IPA，或把上游考试标签写成官方完整大纲。在线翻译的provider、网关与失败契约见 [TRANSLATION.md](docs/TRANSLATION.md)，不能把受控mock通过当作真实Google/VPS链路通过。
 

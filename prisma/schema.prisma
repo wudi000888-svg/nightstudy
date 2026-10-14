@@ -8,28 +8,30 @@ datasource db {
 }
 
 model User {
-  id            String             @id
-  name          String
-  email         String             @unique
-  emailVerified Boolean            @default(false)
-  image         String?
-  role          String             @default("user")
-  disabled      Boolean            @default(false)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  settings      UserSettings?
-  words         UserWord[]
-  progress      StudyProgress[]
-  studySessions StudySession[]
-  receipts      CommandReceipt[]
-  reviews       ReviewLog[]
-  imports       KnownImport[]
-  claims        KnownClaim[]
-  assessments   Assessment[]
-  mastery       MasteryProfile[]
-  activity      ActivityInterval[]
+  id              String             @id
+  name            String
+  email           String             @unique
+  username        String?            @unique
+  displayUsername String?
+  emailVerified   Boolean            @default(false)
+  image           String?
+  role            String             @default("user")
+  disabled        Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  sessions        Session[]
+  accounts        Account[]
+  settings        UserSettings?
+  words           UserWord[]
+  progress        StudyProgress[]
+  studySessions   StudySession[]
+  receipts        CommandReceipt[]
+  reviews         ReviewLog[]
+  imports         KnownImport[]
+  claims          KnownClaim[]
+  assessments     Assessment[]
+  mastery         MasteryProfile[]
+  activity        ActivityInterval[]
 }
 
 model Session {
@@ -80,11 +82,75 @@ model Verification {
 }
 
 model SiteState {
-  id             String    @id @default("singleton")
-  siteId         String
-  initialized    Boolean   @default(false)
-  initializedAt  DateTime?
-  contentVersion String    @default("demo-2026-10-14")
+  id                       String    @id @default("singleton")
+  siteId                   String
+  instanceId               String    @default(dbgenerated("gen_random_uuid()::text"))
+  registrationOpenOverride Boolean?
+  initialized              Boolean   @default(false)
+  initializedAt            DateTime?
+  contentVersion           String    @default("demo-2026-10-14")
+}
+
+model FleetPairingToken {
+  id          String    @id @default(cuid())
+  label       String
+  tokenHash   String    @unique
+  scopes      String[]
+  expiresAt   DateTime
+  usedAt      DateTime?
+  revokedAt   DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  @@index([expiresAt])
+}
+
+model FleetGrant {
+  id                   String    @id @default(cuid())
+  label                String
+  credentialHash       String    @unique
+  controllerInstanceId String
+  controllerSiteId     String
+  controllerUrl        String
+  scopes               String[]
+  createdById          String
+  revokedAt            DateTime?
+  lastUsedAt           DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@index([revokedAt])
+}
+
+model FleetConnection {
+  id                   String    @id @default(cuid())
+  label                String
+  remoteUrl            String    @unique
+  remoteInstanceId     String
+  remoteSiteId         String
+  grantId              String
+  credentialCiphertext String
+  scopes               String[]
+  status               String    @default("active")
+  lastSnapshot         Json?
+  lastCheckedAt        DateTime?
+  lastErrorCode        String?
+  createdById          String
+  revokedAt            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([status])
+}
+
+model SystemUpdateCheck {
+  id              String    @id @default("singleton")
+  status          String    @default("unchecked")
+  payloadJson     Json?
+  checkedAt       DateTime?
+  lastAttemptedAt DateTime?
+  lockedUntil     DateTime?
+  lockId          String?
+  updatedAt       DateTime  @updatedAt
 }
 
 model ContentPack {

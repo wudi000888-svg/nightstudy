@@ -28,6 +28,94 @@ export interface Me {
   user: User | null;
   siteId: string;
 }
+export interface SystemUpdate {
+  status: 'unchecked' | 'up-to-date' | 'available' | 'ahead' | 'no-release' | 'failed';
+  checkedAt: string | null;
+  latestVersion: string | null;
+  releaseUrl: string | null;
+  message: string;
+  channel: 'prerelease' | 'stable';
+  cached?: boolean;
+  stale?: boolean;
+  lastSuccessfulAt?: string | null;
+}
+export interface AdminSystemInfo {
+  version: string;
+  siteId: string;
+  instanceId: string;
+  initialized: boolean;
+  registrationOpen: boolean;
+  update: SystemUpdate;
+}
+export type FleetScope =
+  'status:read' | 'users:read' | 'users:write' | 'settings:write' | 'announcements:write';
+export interface FleetPairingToken {
+  id: string;
+  label: string;
+  scopes: FleetScope[];
+  expiresAt: string;
+  createdAt: string;
+  status: 'active' | 'used' | 'revoked' | 'expired';
+}
+export interface FleetController {
+  id: string;
+  label: string;
+  controllerInstanceId: string;
+  controllerSiteId: string;
+  controllerUrl: string;
+  scopes: FleetScope[];
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+export interface FleetSnapshot {
+  site: {
+    instanceId: string;
+    siteId: string;
+    title: string;
+    publicUrl: string;
+    basePath: string;
+    version: string;
+    contentVersion: string;
+  };
+  registrationOpen: boolean;
+  counts: { users: number; disabledUsers: number; books: number; words: number };
+  wordCountBasis: 'installed-pack-metadata';
+  checkedAt: string;
+  update?: SystemUpdate;
+}
+export interface FleetSite {
+  id: string;
+  label: string;
+  remoteUrl: string;
+  remoteInstanceId: string;
+  remoteSiteId: string;
+  scopes: FleetScope[];
+  status: 'active' | 'unreachable' | 'revoked' | 'disconnect_pending' | 'forgotten';
+  lastSnapshot: FleetSnapshot | null;
+  lastCheckedAt: string | null;
+  lastErrorCode: string | null;
+  createdAt: string;
+}
+export interface FleetSummary {
+  pairingTokens: FleetPairingToken[];
+  controllers: FleetController[];
+  sites: FleetSite[];
+}
+export interface FleetUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  disabled: boolean;
+  createdAt: string;
+}
+export interface AdminAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  status: string;
+}
 export interface ContentAttribution {
   kind: 'dictionary' | 'original-demo' | 'site-authored' | 'unknown';
   reference: string;

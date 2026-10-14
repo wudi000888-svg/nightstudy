@@ -95,6 +95,15 @@ export function progressDto(progress: StudyProgress | null) {
 export async function settings(db: Db, userId: string) {
   return db.userSettings.upsert({ where: { userId }, create: { userId }, update: {} });
 }
+export function retryableTransactionError(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (['P2034', 'P2002'].includes(error.code)) return true;
+  if (error.code !== 'P2010') return false;
+  const meta = obj(error.meta),
+    adapter = obj(meta.driverAdapterError),
+    cause = obj(adapter.cause);
+  return [meta.code, cause.originalCode].some((code) => code === '40001' || code === '40P01');
+}
 export async function transact<T>(
   prisma: PrismaClient,
   action: (tx: Prisma.TransactionClient) => Promise<T>,
@@ -107,11 +116,7 @@ export async function transact<T>(
         timeout: 15000,
       });
     } catch (error) {
-      if (
-        attempt < 3 &&
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        ['P2034', 'P2002'].includes(error.code)
-      ) {
+      if (attempt < 3 && retryableTransactionError(error)) {
         await new Promise((resolve) => setTimeout(resolve, 15 + attempt * 25));
         continue;
       }

@@ -12,6 +12,7 @@ import { SiteRegistry } from './sites.js';
 import { registerModules } from './modules/index.js';
 import { siteOrigins, requestClientIp, authenticationHeaders } from './auth.js';
 import { maintenanceTick } from './maintenance.js';
+import type { FleetTransport } from './modules/fleet-transport.js';
 
 const setupInput = z.object({
   token: z.string().min(32).max(256),
@@ -20,7 +21,11 @@ const setupInput = z.object({
   password: z.string().min(8).max(128),
 });
 
-export async function buildApp(config: AppConfig, logging = true) {
+export async function buildApp(
+  config: AppConfig,
+  logging = true,
+  options: { fleetTransport?: FleetTransport } = {},
+) {
   const app = Fastify({
     logger: logging
       ? {
@@ -29,6 +34,8 @@ export async function buildApp(config: AppConfig, logging = true) {
             'req.headers.authorization',
             'req.body.password',
             'req.body.token',
+            'req.body.pairingToken',
+            'req.body.credential',
           ],
         }
       : false,
@@ -63,7 +70,9 @@ export async function buildApp(config: AppConfig, logging = true) {
       reply.header('Cache-Control', 'no-store');
       const minute = Math.floor(Date.now() / 60000);
       const sensitive =
-        pathname.startsWith(`${site.basePath}/api/auth/`) || pathname.endsWith('/setup');
+        pathname.startsWith(`${site.basePath}/api/auth/`) ||
+        pathname.endsWith('/setup') ||
+        pathname === `${site.basePath}/api/v2/fleet/pair`;
       const clientIp = requestClientIp(request, config);
       const key = createHash('sha256')
         .update(`${site.id}:${clientIp}:${sensitive ? 'auth' : 'api'}:${minute}`)
@@ -110,14 +119,14 @@ export async function buildApp(config: AppConfig, logging = true) {
             version: appVersion,
             contentVersion: state.contentVersion,
             initialized: state.initialized,
-            registrationOpen: runtime.config.registrationOpen,
+            registrationOpen: state.registrationOpenOverride ?? runtime.config.registrationOpen,
           };
         });
         scope.get('/me', async (request) => {
           const ctx = await context(request);
           return { user: ctx.user, siteId: ctx.siteId };
         });
-        await registerModules(scope, context);
+        await registerModules(scope, context, options);
       },
       { prefix: `${basePath}/api/v2` },
     );
@@ -127,6 +136,14 @@ export async function buildApp(config: AppConfig, logging = true) {
       url: `${basePath}/api/auth/*`,
       handler: async (request, reply) => {
         const runtime = registry.runtime(registry.resolve(request));
+        if (request.url.split('?')[0]?.endsWith('/sign-up/email')) {
+          z.object({ name: z.string().trim().min(1).max(80) }).parse(request.body);
+          const state = await runtime.prisma.siteState.findUnique({ where: { id: 'singleton' } });
+          if (!(state?.registrationOpenOverride ?? runtime.config.registrationOpen))
+            throw new HttpError(403, 'registration_closed', '本站暂未开放注册');
+        }
+        if (request.url.split('?')[0]?.endsWith('/update-user'))
+          z.object({ name: z.string().trim().min(1).max(80).optional() }).parse(request.body);
         const url = new URL(request.url, new URL(runtime.config.publicUrl).origin);
         const response = await runtime.auth.handler(
           new Request(url, {

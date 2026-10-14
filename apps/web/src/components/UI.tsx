@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { AlertCircle, ArrowRight, LoaderCircle, X, MoonStar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { errorText } from '../lib/api';
@@ -245,6 +245,7 @@ export function Dialog({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
@@ -255,6 +256,7 @@ export function Dialog({
     <dialog
       ref={ref}
       className="night-dialog"
+      aria-labelledby={titleId}
       onCancel={onClose}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -263,7 +265,7 @@ export function Dialog({
       <button className="icon-button dialog-close" onClick={onClose} aria-label="关闭">
         <X size={19} />
       </button>
-      <h2>{title}</h2>
+      <h2 id={titleId}>{title}</h2>
       {children}
     </dialog>
   );

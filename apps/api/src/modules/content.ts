@@ -20,6 +20,7 @@ import {
 } from './shared.js';
 import { decodeCursor, pageInfo } from './pagination.js';
 import { visibleBookWhere } from './book-access.js';
+import { learningPreferencesInput, updateLearningPreferences } from './learning-preferences.js';
 
 const pageQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
@@ -369,45 +370,10 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
   app.patch('/me/settings', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx);
-    const input = parse(
-      z
-        .object({
-          goal: goal.optional(),
-          currentBookId: id.nullable().optional(),
-          dailyNewLimit: z.number().int().min(1).max(100).optional(),
-          groupSize: z.number().int().min(1).max(20).optional(),
-          timeZone: z.string().max(80).optional(),
-          expectedRevision: z.number().int().nonnegative().optional(),
-        })
-        .strict(),
-      req.body,
-    );
-    if (input.timeZone) {
-      try {
-        new Intl.DateTimeFormat('en', { timeZone: input.timeZone });
-      } catch {
-        throw new HttpError(400, 'invalid_timezone');
-      }
-    }
-    if (
-      input.currentBookId &&
-      !(await ctx.prisma.book.findFirst({
-        where: { id: input.currentBookId, ...visibleBookWhere(user.id) },
-      }))
-    )
-      throw new HttpError(404, 'book_not_found');
-    const { expectedRevision, ...data } = input;
-    return transact(ctx.prisma, async (tx) => {
-      const current = await settings(tx, user.id);
-      if (expectedRevision !== undefined && expectedRevision !== current.revision)
-        throw new HttpError(409, 'settings_conflict', '设置已被更新', { settings: current });
-      return {
-        settings: await tx.userSettings.update({
-          where: { userId: user.id },
-          data: { ...data, revision: { increment: 1 } },
-        }),
-      };
-    });
+    const input = parse(learningPreferencesInput, req.body);
+    return transact(ctx.prisma, async (tx) => ({
+      settings: await updateLearningPreferences(tx, user.id, input),
+    }));
   });
   app.get('/wordbook', async (req) => {
     const ctx = await getContext(req),

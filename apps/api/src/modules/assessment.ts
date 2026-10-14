@@ -75,9 +75,15 @@ function assessmentDto(value: AssessmentView) {
     }),
   };
 }
-export function suggestedPlan(recognition: number, spelling: number) {
+export function suggestedPlan(recognition: number, spelling: number, reviewPressure = 0) {
+  const newWordSuggestion = recognition >= 0.8 && spelling >= 0.7 ? 12 : recognition < 0.4 ? 8 : 16;
   return {
-    dailyNewLimit: recognition >= 0.8 && spelling >= 0.7 ? 12 : recognition < 0.4 ? 8 : 16,
+    dailyTotalGoal: Math.min(100, Math.max(20, reviewPressure + newWordSuggestion)),
+    newWordSuggestion,
+    reviewPressure,
+    countBasis: 'daily-unique-words',
+    // Older assessment reports and clients retain their original new-word suggestion.
+    dailyNewLimit: newWordSuggestion,
     groupSize: 5,
   };
 }
@@ -319,7 +325,15 @@ export async function registerAssessment(app: FastifyInstance, getContext: Conte
       const verifiedWordIds = testedWordIds.filter((wordId) =>
         assessment.items.filter((i) => i.wordId === wordId).every((i) => i.correct),
       );
-      const plan = suggestedPlan(accuracy.recognition, accuracy.spelling);
+      const reviewPressure = await tx.studyProgress.count({
+        where: {
+          userId: user.id,
+          lastReviewAt: { not: null },
+          dueAt: { lte: new Date() },
+          word: { status: 'published', userWords: { none: { userId: user.id, paused: true } } },
+        },
+      });
+      const plan = suggestedPlan(accuracy.recognition, accuracy.spelling, reviewPressure);
       const report = {
         goal: assessment.goal,
         version: assessment.blueprintVersion,

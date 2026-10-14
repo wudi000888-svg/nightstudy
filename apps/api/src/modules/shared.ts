@@ -109,7 +109,28 @@ export function progressDto(progress: StudyProgress | null) {
   };
 }
 export async function settings(db: Db, userId: string) {
-  return db.userSettings.upsert({ where: { userId }, create: { userId }, update: {} });
+  const current = await db.userSettings.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
+  if (
+    current.pendingTimeZone &&
+    current.timeZoneEffectiveAt &&
+    current.timeZoneEffectiveAt <= new Date()
+  ) {
+    await db.userSettings.updateMany({
+      where: { userId, revision: current.revision, pendingTimeZone: current.pendingTimeZone },
+      data: {
+        timeZone: current.pendingTimeZone,
+        pendingTimeZone: null,
+        timeZoneEffectiveAt: null,
+        revision: { increment: 1 },
+      },
+    });
+    return db.userSettings.findUniqueOrThrow({ where: { userId } });
+  }
+  return current;
 }
 export function retryableTransactionError(error: unknown): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
@@ -177,6 +198,86 @@ export function isoDay(date: Date, timeZone = 'Asia/Shanghai') {
       .map((p) => [p.type, p.value]),
   );
   return `${parts.year}-${parts.month}-${parts.day}`;
+}
+const learningFormatters = new Map<string, Intl.DateTimeFormat>();
+const learningBoundaries = new Map<string, number>();
+function localParts(date: Date, timeZone: string) {
+  let formatter = learningFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    if (learningFormatters.size >= 128)
+      learningFormatters.delete(learningFormatters.keys().next().value!);
+    learningFormatters.set(timeZone, formatter);
+  }
+  return Object.fromEntries(formatter.formatToParts(date).map((part) => [part.type, part.value]));
+}
+function shiftedDate(label: string, days: number) {
+  const value = new Date(`${label}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+/** Fast display label. UTC timestamps remain untouched; local learning days start at 04:00. */
+export function learningDay(date: Date, timeZone = 'Asia/Shanghai') {
+  const parts = localParts(date, timeZone);
+  const label = `${parts.year}-${parts.month}-${parts.day}`;
+  return Number(parts.hour) < 4 ? shiftedDate(label, -1) : label;
+}
+function fourOClock(label: string, timeZone: string) {
+  const key = `${timeZone}:${label}`;
+  const cached = learningBoundaries.get(key);
+  if (cached !== undefined) return cached;
+  const target = new Date(`${label}T04:00:00Z`).getTime();
+  const localClock = (at: number) => {
+    const p = localParts(new Date(at), timeZone);
+    return Date.UTC(
+      Number(p.year),
+      Number(p.month) - 1,
+      Number(p.day),
+      Number(p.hour),
+      Number(p.minute),
+    );
+  };
+  let candidate = target;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const delta = target - localClock(candidate);
+    if (!delta) break;
+    candidate += delta;
+  }
+  if (localClock(candidate) === target) {
+    // Prefer the first occurrence if a historical offset change repeated the 04:00 hour.
+    for (const offset of [120, 90, 60, 30])
+      if (localClock(candidate - offset * 60000) === target) candidate -= offset * 60000;
+  } else {
+    // A skipped local boundary starts at the first real minute after 04:00, never UTC-4h.
+    let found: number | undefined;
+    for (let at = candidate - 4 * 3600000; at <= candidate + 4 * 3600000; at += 60000)
+      if (localClock(at) >= target && localClock(at) < target + 20 * 3600000) {
+        found = at;
+        break;
+      }
+    if (found === undefined) throw new HttpError(400, 'invalid_timezone_day');
+    candidate = found;
+  }
+  if (learningBoundaries.size >= 512)
+    learningBoundaries.delete(learningBoundaries.keys().next().value!);
+  learningBoundaries.set(key, candidate);
+  return candidate;
+}
+export function learningDayWindow(now: Date, timeZone = 'Asia/Shanghai') {
+  const localDate = learningDay(now, timeZone);
+  return {
+    localDate,
+    startsAt: new Date(fourOClock(localDate, timeZone)),
+    endsAt: new Date(fourOClock(shiftedDate(localDate, 1), timeZone)),
+  };
 }
 export function mergedSeconds(intervals: { startAt: Date; endAt: Date }[]): number {
   const sorted = intervals

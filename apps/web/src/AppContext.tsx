@@ -1,8 +1,14 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, errorText } from './lib/api';
 import type { Me, Site, User } from './lib/types';
-import { flushCommands, pendingCommands } from './lib/outbox';
+import {
+  flushCommands,
+  pendingCommands,
+  conflictingCommands,
+  discardConflictedCommand,
+  type CommandConflict,
+} from './lib/outbox';
 
 interface AppState {
   site: Site;
@@ -12,6 +18,8 @@ interface AppState {
   pending: number;
   sync: () => Promise<void>;
   syncNote: string;
+  conflicts: CommandConflict[];
+  discardConflict: (id: string) => Promise<void>;
 }
 const Context = createContext<AppState | null>(null);
 export function useApp() {
@@ -43,7 +51,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
   const [pending, setPending] = useState(0);
   const [syncNote, setSyncNote] = useState('');
+  const [conflicts, setConflicts] = useState<CommandConflict[]>([]);
   const scope = `${siteQuery.data?.siteId ?? ''}:${meQuery.data?.user?.id ?? 'guest'}`;
+  const [syncScope, setSyncScope] = useState(scope);
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
   async function refresh() {
     queryClient.removeQueries({
       predicate: (query) => !String(query.queryKey[0]).startsWith('bootstrap'),
@@ -53,12 +65,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   async function sync(silent = false) {
     if (!meQuery.data?.user) return;
     try {
-      const result = await flushCommands(scope);
+      const result = await flushCommands(scope, () => currentScope.current === scope);
+      const blocked = await conflictingCommands(scope);
+      if (currentScope.current !== scope) return;
       setPending(result.pending);
+      setConflicts(blocked);
       if (!silent || result.applied || result.pending || result.conflicts)
         setSyncNote(
           result.conflicts
-            ? '有更新冲突，请重新打开学习组以恢复最新进度。'
+            ? '有同步冲突，请在今日任务中读取服务器进度并逐条处理。'
             : result.pending
               ? '仍有暂存操作，稍后可再次重试。'
               : result.applied
@@ -67,22 +82,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
         );
       if (result.applied) {
         await queryClient.invalidateQueries({ queryKey: [scope] });
+        if (currentScope.current !== scope) return;
         window.dispatchEvent(new Event('nightstudy-synced'));
       }
     } catch (error) {
-      setSyncNote(errorText(error));
+      if (currentScope.current === scope) setSyncNote(errorText(error));
     }
+  }
+  async function discardConflict(id: string) {
+    const owner = scope;
+    if (!meQuery.data?.user || currentScope.current !== owner) return;
+    await discardConflictedCommand(owner, id);
+    const [rows, blocked] = await Promise.all([pendingCommands(owner), conflictingCommands(owner)]);
+    if (currentScope.current !== owner) return;
+    setPending(rows.length);
+    setConflicts(blocked);
+    setSyncNote(
+      rows.length
+        ? '已放弃这一条冲突操作，其余暂存记录仍保留，可重试同步。'
+        : '已放弃这一条冲突操作，服务器已接受的记录保留。',
+    );
+    await queryClient.invalidateQueries({ queryKey: [owner] });
   }
   useEffect(() => {
     let active = true;
+    setSyncScope(scope);
+    setPending(0);
+    setConflicts([]);
+    setSyncNote('');
     const update = () => {
       if (!meQuery.data?.user) {
         setPending(0);
         return;
       }
-      pendingCommands(scope)
-        .then((rows) => {
-          if (active) setPending(rows.length);
+      Promise.all([pendingCommands(scope), conflictingCommands(scope)])
+        .then(([rows, blocked]) => {
+          if (active && currentScope.current === scope) {
+            setPending(rows.length);
+            setConflicts(blocked);
+          }
         })
         .catch(() => {});
     };
@@ -135,9 +173,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user: meQuery.data.user,
         scope,
         refresh,
-        pending,
+        pending: syncScope === scope ? pending : 0,
         sync,
-        syncNote,
+        syncNote: syncScope === scope ? syncNote : '',
+        conflicts: syncScope === scope ? conflicts : [],
+        discardConflict,
       }}
     >
       {children}

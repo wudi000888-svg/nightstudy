@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { BookOpen, Download, FileUp, Pencil, Plus, Archive, ArrowRight } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
@@ -25,6 +25,7 @@ import {
 } from '../components/UI';
 import { AdminConfirm, type AdminConfirmation } from '../components/AdminConfirm';
 import { adminTime } from '../components/AdminTools';
+import { useBookPlan } from '../components/tasks/useBookPlan';
 
 function fileBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -481,7 +482,7 @@ export function CustomBookImportPage() {
 export function MyBooksPage() {
   const { user, scope } = useApp();
   const client = useQueryClient();
-  const navigate = useNavigate();
+  const planning = useBookPlan();
   const books = useRemote<{ items: Book[] }>('custom-books', 'custom-books?status=all', !!user);
   const [filter, setFilter] = useState<'all' | 'published' | 'archived'>('published');
   const [editing, setEditing] = useState<Book | null>(null);
@@ -498,22 +499,6 @@ export function MyBooksPage() {
     setNotice('');
     setBusy('');
   }, [scope]);
-  async function select(book: Book) {
-    const requestId = generation.current;
-    setBusy(book.id);
-    setError(null);
-    try {
-      await post(`books/${encodeURIComponent(book.id)}/select`, {});
-      if (generation.current !== requestId) return;
-      await client.invalidateQueries({ queryKey: [scope] });
-      if (generation.current !== requestId) return;
-      navigate('/learn');
-    } catch (value) {
-      if (generation.current === requestId) setError(value);
-    } finally {
-      if (generation.current === requestId) setBusy('');
-    }
-  }
   async function save() {
     if (!editing) return;
     const requestId = generation.current;
@@ -631,9 +616,9 @@ export function MyBooksPage() {
                 <button
                   className="button primary"
                   disabled={!!busy}
-                  onClick={() => void select(book)}
+                  onClick={() => planning.choose(book)}
                 >
-                  选择并学习 <ArrowRight size={16} />
+                  选择并制定计划 <ArrowRight size={16} />
                 </button>
               )}
               <button className="button ghost" disabled={!!busy} onClick={() => setEditing(book)}>
@@ -708,6 +693,7 @@ export function MyBooksPage() {
         )}
       </Dialog>
       <AdminConfirm action={confirmation} onClose={() => setConfirmation(null)} />
+      {planning.dialog}
     </div>
   );
 }

@@ -26,7 +26,17 @@ export function InteractiveEnglish({ text }: { text: string }) {
             className="word-token"
             aria-label={`查词 ${part.text}`}
             aria-haspopup="dialog"
-            onClick={(event) => cards.openWord(part.text, event.currentTarget)}
+            onPointerEnter={(event) => {
+              if (
+                event.pointerType === 'mouse' &&
+                window.matchMedia('(hover: hover) and (pointer: fine)').matches
+              )
+                cards.openWord(part.text, event.currentTarget, 'hover');
+            }}
+            onPointerLeave={(event) => {
+              if (event.pointerType === 'mouse') cards.leaveWord(event.currentTarget);
+            }}
+            onClick={(event) => cards.openWord(part.text, event.currentTarget, 'pinned')}
           >
             {part.text}
           </button>

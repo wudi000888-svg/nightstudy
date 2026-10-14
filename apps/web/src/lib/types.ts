@@ -266,21 +266,43 @@ export interface CustomBookTemplate {
 export interface Settings {
   goal: Goal;
   currentBookId: string | null;
-  dailyNewLimit: number;
+  dailyTotalGoal: number;
+  dailyNewLimit?: number;
   groupSize: number;
   timeZone: string;
+  pendingTimeZone?: string | null;
+  timeZoneEffectiveAt?: string | null;
   revision: number;
 }
 export interface Plan {
+  id: string;
+  revision: number;
+  localDate: string;
+  timeZone: string;
+  startsAt: string;
+  endsAt: string;
   goal: Goal;
   bookId: string | null;
-  dailyNewLimit: number;
+  bookTitle: string | null;
+  dailyTotalGoal: number;
   groupSize: number;
-  dueCount: number;
+  completedUnique: number;
+  completedNew: number;
+  completedReview: number;
+  assignedUnique: number;
+  plannedReview: number;
+  plannedNew: number;
+  dueNowCount: number;
+  dueTodayCount: number;
+  overdueCount: number;
+  unplannedOverdueCount: number;
+  pendingConsolidationCount: number;
+  pendingSpellingCount: number;
   newRemaining: number;
-  reservedNewCount: number;
-  knownCount: number;
-  recommendedNew: number;
+  reviewRemaining: number;
+  nextDueAt: string | null;
+  activeTaskId: string | null;
+  recommendedTotal: number;
 }
 export interface Progress {
   wordId: string;
@@ -309,18 +331,29 @@ export interface SessionItem {
   rated: boolean;
   exerciseDone: boolean;
   status: string;
+  bucket: 'new' | 'review' | null;
   question?: Question;
 }
 export interface StudySession {
   id: string;
   bookId: string | null;
-  mode: 'learn' | 'review';
+  mode: 'learn' | 'review' | 'daily' | 'extra-review';
   phase: 'recall' | 'practice' | 'completed';
   status: string;
   revision: number;
   cursor: number;
   step: string;
   currentItemId: string | null;
+  planId: string | null;
+  taskKind: 'daily' | 'extra-review' | 'legacy';
+  pausedAt: string | null;
+  deferredUntil: string | null;
+  learningDate: string | null;
+  timeZone?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  completedAt?: string | null;
+  bookTitle?: string | null;
   items: SessionItem[];
 }
 export interface CommandResult {

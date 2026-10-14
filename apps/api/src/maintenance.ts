@@ -7,10 +7,10 @@ export async function maintenanceTick(prisma: PrismaClient, siteId: string) {
   const now = new Date();
   await prisma.$executeRaw`UPDATE "Job" SET "status" = 'failed', "lockedUntil" = NULL, "result" = '{"code":"retry_exhausted"}'::jsonb, "updatedAt" = NOW() WHERE "id" IN (SELECT "id" FROM "Job" WHERE "attempts" >= 5 AND (("status" = 'running' AND "lockedUntil" < NOW()) OR ("status" = 'pending' AND "runAfter" <= NOW())) FOR UPDATE SKIP LOCKED LIMIT 1000)`;
   const minute = Math.floor(now.getTime() / 60000);
-  await prisma.job.upsert({
-    where: { id: `maintenance-${minute}` },
-    create: { id: `maintenance-${minute}`, type: 'maintenance', payload: { siteId } },
-    update: {},
+  // PostgreSQL handles simultaneous replica inserts atomically with ON CONFLICT.
+  await prisma.job.createMany({
+    data: [{ id: `maintenance-${minute}`, type: 'maintenance', payload: { siteId } }],
+    skipDuplicates: true,
   });
   const jobs = await prisma.$queryRaw<
     Array<{ id: string; type: string }>

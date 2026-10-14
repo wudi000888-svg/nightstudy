@@ -1,7 +1,12 @@
 import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
-    include: ['packages/**/*.test.ts', 'apps/api/src/**/*.test.ts', 'scripts/**/*.test.ts'],
+    include: [
+      'packages/**/*.test.ts',
+      'apps/api/src/**/*.test.ts',
+      'apps/web/src/lib/**/*.test.ts',
+      'scripts/**/*.test.ts',
+    ],
     fileParallelism: false,
     testTimeout: 30000,
   },

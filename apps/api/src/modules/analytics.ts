@@ -12,6 +12,8 @@ import {
   isoDay,
   mergedSeconds,
   transact,
+  settings,
+  learningDay,
 } from './shared.js';
 import { visibleBookWhere } from './book-access.js';
 
@@ -19,13 +21,16 @@ export function splitInterval(
   startAt: Date,
   endAt: Date,
   timeZone: string,
+  dayStartHour = 0,
 ): { date: string; startAt: Date; endAt: Date }[] {
   const result: { date: string; startAt: Date; endAt: Date }[] = [];
   let start = startAt.getTime(),
     end = endAt.getTime();
   while (start < end) {
-    const date = isoDay(new Date(start), timeZone);
-    if (isoDay(new Date(end - 1), timeZone) === date) {
+    const label = (at: Date) =>
+      dayStartHour === 4 ? learningDay(at, timeZone) : isoDay(at, timeZone);
+    const date = label(new Date(start));
+    if (label(new Date(end - 1)) === date) {
       result.push({ date, startAt: new Date(start), endAt: new Date(end) });
       break;
     }
@@ -33,11 +38,62 @@ export function splitInterval(
       high = Math.min(end, start + 26 * 3600000);
     while (high - low > 1) {
       const middle = Math.floor((low + high) / 2);
-      if (isoDay(new Date(middle), timeZone) === date) low = middle;
+      if (label(new Date(middle)) === date) low = middle;
       else high = middle;
     }
     result.push({ date, startAt: new Date(start), endAt: new Date(high) });
     start = high;
+  }
+  return result;
+}
+
+type SavedLearningWindow = { startsAt: Date; endsAt: Date; localDate: string; timeZone: string };
+// Preserve a saved learning day's timezone even after the user changes preferences.
+export function splitPlannedInterval(
+  startAt: Date,
+  endAt: Date,
+  plans: SavedLearningWindow[],
+  timeZone: string,
+  legacyBefore?: Date,
+) {
+  const result: { date: string; startAt: Date; endAt: Date }[] = [];
+  let cursor = startAt.getTime();
+  const end = endAt.getTime();
+  while (cursor < end) {
+    if (legacyBefore && cursor < legacyBefore.getTime()) {
+      const until = Math.min(end, legacyBefore.getTime());
+      result.push(...splitInterval(new Date(cursor), new Date(until), timeZone));
+      cursor = until;
+      continue;
+    }
+    let low = 0,
+      high = plans.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (plans[middle]!.startsAt.getTime() <= cursor) low = middle + 1;
+      else high = middle;
+    }
+    const plan = plans[low - 1];
+    if (plan && cursor < plan.endsAt.getTime()) {
+      const until = Math.min(end, plan.endsAt.getTime());
+      result.push({ date: plan.localDate, startAt: new Date(cursor), endAt: new Date(until) });
+      cursor = until;
+    } else {
+      const until = Math.min(
+        end,
+        plans[low]?.startsAt.getTime() ?? end,
+        legacyBefore && cursor < legacyBefore.getTime() ? legacyBefore.getTime() : end,
+      );
+      result.push(
+        ...splitInterval(
+          new Date(cursor),
+          new Date(until),
+          timeZone,
+          legacyBefore && cursor < legacyBefore.getTime() ? 0 : 4,
+        ),
+      );
+      cursor = until;
+    }
   }
   return result;
 }
@@ -119,13 +175,14 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
   app.get('/stats', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx);
-    const prefs = await ctx.prisma.userSettings.findUnique({ where: { userId: user.id } }),
-      timeZone = prefs?.timeZone ?? 'Asia/Shanghai';
+    const prefs = await settings(ctx.prisma, user.id),
+      timeZone = prefs.timeZone;
     const [logs, intervals, totalLearned, totalReviews, totalRatings, claims] = await Promise.all([
       ctx.prisma.reviewLog.findMany({
         where: { userId: user.id },
         orderBy: { reviewedAt: 'desc' },
         take: 20000,
+        include: { plan: { select: { localDate: true } } },
       }),
       ctx.prisma.activityInterval.findMany({
         where: { userId: user.id },
@@ -140,6 +197,25 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
         select: { wordId: true },
       }),
     ]);
+    const [plans, firstPlan] = await Promise.all([
+      ctx.prisma.dailyPlan.findMany({
+        where: { userId: user.id, endsAt: { gte: intervals.at(-1)?.startAt ?? new Date() } },
+        orderBy: { startsAt: 'desc' },
+        take: 2000,
+        select: { startsAt: true, endsAt: true, localDate: true, timeZone: true },
+      }),
+      ctx.prisma.dailyPlan.findFirst({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      }),
+    ]);
+    plans.reverse();
+    const now = new Date();
+    const activePlan = plans
+      .slice()
+      .reverse()
+      .find((p) => p.startsAt <= now && p.endsAt > now);
     const buckets = new Map<
       string,
       {
@@ -149,9 +225,13 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
         seconds: number;
         minutes: number;
         checkedIn: boolean;
+        uniqueWords: number;
+        reviewWords: number;
       }
     >();
     const newSets = new Map<string, Set<string>>(),
+      wordSets = new Map<string, Set<string>>(),
+      reviewSets = new Map<string, Set<string>>(),
       segments = new Map<string, { startAt: Date; endAt: Date }[]>();
     const getDay = (date: string) => {
       if (!buckets.has(date))
@@ -162,11 +242,19 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
           seconds: 0,
           minutes: 0,
           checkedIn: false,
+          uniqueWords: 0,
+          reviewWords: 0,
         });
       return buckets.get(date)!;
     };
     for (const log of logs) {
-      const day = isoDay(log.reviewedAt, timeZone);
+      const day = log.plan?.localDate ?? isoDay(log.reviewedAt, timeZone);
+      if (!wordSets.has(day)) wordSets.set(day, new Set());
+      wordSets.get(day)!.add(log.wordId);
+      if (!log.wasNew) {
+        if (!reviewSets.has(day)) reviewSets.set(day, new Set());
+        reviewSets.get(day)!.add(log.wordId);
+      }
       if (!log.wasNew) getDay(day).reviews++;
       if (log.wasNew) {
         if (!newSets.has(day)) newSets.set(day, new Set());
@@ -174,7 +262,13 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
       }
     }
     for (const interval of intervals)
-      for (const segment of splitInterval(interval.startAt, interval.endAt, timeZone)) {
+      for (const segment of splitPlannedInterval(
+        interval.startAt,
+        interval.endAt,
+        plans,
+        timeZone,
+        firstPlan?.createdAt ?? new Date(8640000000000000),
+      )) {
         if (!segments.has(segment.date)) segments.set(segment.date, []);
         segments.get(segment.date)!.push(segment);
       }
@@ -185,7 +279,12 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
       row.checkedIn = row.seconds >= 300;
     }
     for (const [day, words] of newSets) getDay(day).newWords = words.size;
-    const today = isoDay(new Date(), timeZone),
+    for (const [day, words] of wordSets) getDay(day).uniqueWords = words.size;
+    for (const [day, words] of reviewSets)
+      getDay(day).reviewWords = [...words].filter(
+        (wordId) => !newSets.get(day)?.has(wordId),
+      ).length;
+    const today = activePlan?.localDate ?? learningDay(now, timeZone),
       trends = [];
     for (let n = 29; n >= 0; n--) {
       const anchor = new Date(`${today}T12:00:00Z`);
@@ -201,6 +300,8 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
     }
     return {
       today: getDay(today),
+      timeZone: activePlan?.timeZone ?? timeZone,
+      dayStartHour: 4,
       totalLearned,
       totalReviews,
       totalRatings,
@@ -208,7 +309,7 @@ export async function registerAnalytics(app: FastifyInstance, getContext: Contex
       activeDays: [...buckets.values()].filter((x) => x.checkedIn).length,
       streak,
       trends,
-      dataLimited: logs.length === 20000 || intervals.length === 20000,
+      dataLimited: logs.length === 20000 || intervals.length === 20000 || plans.length === 2000,
     };
   });
   app.get('/memory/curve', async (req) => {

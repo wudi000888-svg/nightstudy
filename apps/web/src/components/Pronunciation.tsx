@@ -47,7 +47,10 @@ function sourceLink(value: string | null | undefined) {
 
 export function AudioButton({ word }: { word: Word }) {
   const { user } = useApp();
-  const supported = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  const supported =
+    typeof window !== 'undefined' &&
+    'speechSynthesis' in window &&
+    'SpeechSynthesisUtterance' in window;
   const pronunciation = useRemote<{ pronunciation: PronunciationInfo }>(
     'pronunciation',
     `pronunciation/${encodeURIComponent(word.id)}`,
@@ -66,9 +69,8 @@ export function AudioButton({ word }: { word: Word }) {
   const audioUk = entries
     .filter((entry) => entry.accent === 'UK')
     .sort((a, b) => Number(b.kind === 'recorded') - Number(a.kind === 'recorded'))[0];
-  const [selection, setSelection] = useState<Selection>(
-    audioUs ? 'US' : audioUk ? 'UK' : 'device-US',
-  );
+  const [selection, setSelection] = useState<Selection>('US');
+  const [deviceRegion, setDeviceRegion] = useState<'US' | 'UK'>('US');
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voicesReady, setVoicesReady] = useState(false);
   const [playback, setPlayback] = useState<Playback>({ phase: 'idle', text: '' });
@@ -77,24 +79,15 @@ export function AudioButton({ word }: { word: Word }) {
   const timeout = useRef<number | undefined>(undefined);
   const mounted = useRef(true);
   const wordIdentity = useRef(word.id);
-  const selectedByUser = useRef(false);
-  const region = selection.endsWith('UK') ? 'UK' : 'US';
-  const language = region === 'UK' ? 'en-GB' : 'en-US';
+  const activeSelection = useRef<Selection | null>(null);
   const device = selection.startsWith('device-');
-  const selectedAudio = region === 'UK' ? audioUk : audioUs;
-  const voice = voices
-    .filter((value) => value.lang.replace('_', '-').toLowerCase() === language.toLowerCase())
+  const deviceVoice = voices
+    .filter(
+      (value) =>
+        value.lang.replace('_', '-').toLowerCase() === (deviceRegion === 'UK' ? 'en-gb' : 'en-us'),
+    )
     .sort((a, b) => voiceScore(b) - voiceScore(a))[0];
   const playing = playback.phase === 'preparing' || playback.phase === 'playing';
-  const available = device ? supported && !!voice : !!selectedAudio;
-  const accentName = region === 'UK' ? '英式' : '美式';
-  const soundName = device
-    ? '设备合成发音'
-    : selectedAudio?.kind === 'recorded'
-      ? '真人录音'
-      : '服务器合成发音';
-  const ipaEntry = info?.phonetics?.find((value) => value.region === region);
-  const ipa = ipaEntry?.ipa;
   const hasUsIpa =
     !!info?.phonetics?.some((value) => value.region === 'US' && value.ipa.trim()) ||
     !!word.phoneticUs?.trim();
@@ -114,23 +107,18 @@ export function AudioButton({ word }: { word: Word }) {
     }
     if (supported && stopActivePlayback === stop) window.speechSynthesis.cancel();
     if (stopActivePlayback === stop) stopActivePlayback = null;
+    activeSelection.current = null;
     if (mounted.current) setPlayback({ phase: 'idle', text: '播放已停止。' });
   }, [supported]);
   useEffect(() => {
     mounted.current = true;
     wordIdentity.current = word.id;
-    selectedByUser.current = false;
     setPrepared(null);
     setPreparingServer(false);
     setPrepareError(null);
     setPrepareNote('');
-    setSelection(
-      word.audio?.some((entry) => entry.accent === 'US' && safeAudio(entry, word.id))
-        ? 'US'
-        : word.audio?.some((entry) => entry.accent === 'UK' && safeAudio(entry, word.id))
-          ? 'UK'
-          : 'device-US',
-    );
+    setSelection('US');
+    setDeviceRegion('US');
     setPlayback({ phase: 'idle', text: '' });
     return () => {
       mounted.current = false;
@@ -149,12 +137,6 @@ export function AudioButton({ word }: { word: Word }) {
     );
     return () => window.clearInterval(timer);
   }, [preparingServer]);
-  useEffect(() => {
-    if (!selectedByUser.current && !playing) {
-      if (audioUs) setSelection('US');
-      else if (audioUk) setSelection('UK');
-    }
-  }, [audioUs?.url, audioUk?.url, playing]);
   useEffect(() => {
     if (!supported) {
       setVoicesReady(true);
@@ -202,9 +184,8 @@ export function AudioButton({ word }: { word: Word }) {
         {},
       );
       if (!mounted.current || wordIdentity.current !== targetId) return;
-      selectedByUser.current = false;
       setPrepared(result.pronunciation);
-      setPrepareNote('补齐完成。请选择英美口音，再点击播放。');
+      setPrepareNote('补齐完成，点击美式或英式喇叭播放。');
       await refreshSources(false);
     } catch (error) {
       if (!mounted.current || wordIdentity.current !== targetId) return;
@@ -245,14 +226,26 @@ export function AudioButton({ word }: { word: Word }) {
     }
     update(requestId, { phase: 'error', text: message });
   }
-  function play() {
-    if (playing) {
+  function play(next: Selection) {
+    if (preparingServer) return;
+    if (playing && activeSelection.current === next) {
       stop();
       return;
     }
-    selectedByUser.current = true;
-    stopActivePlayback?.();
+    if (stopActivePlayback && stopActivePlayback !== stop) stopActivePlayback();
+    stop();
     stopActivePlayback = stop;
+    activeSelection.current = next;
+    setSelection(next);
+    const region = next.endsWith('UK') ? 'UK' : 'US';
+    const device = next.startsWith('device-');
+    const selectedAudio = region === 'UK' ? audioUk : audioUs;
+    const accentName = region === 'UK' ? '英式' : '美式';
+    const soundName = selectedAudio?.kind === 'recorded' ? '真人录音' : '服务器合成发音';
+    const language = region === 'UK' ? 'en-GB' : 'en-US';
+    const voice = voices
+      .filter((value) => value.lang.replace('_', '-').toLowerCase() === language.toLowerCase())
+      .sort((a, b) => voiceScore(b) - voiceScore(a))[0];
     const requestId = ++generation.current;
     if (!device && selectedAudio) {
       const audio = new Audio(mountUrl(selectedAudio.url));
@@ -287,6 +280,13 @@ export function AudioButton({ word }: { word: Word }) {
           phase: 'error',
           text: '浏览器未能播放本站音频，请检查声音权限或选择设备合成发音。',
         });
+      });
+      return;
+    }
+    if (!device) {
+      setPlayback({
+        phase: 'error',
+        text: `本站尚未提供${accentName}音源，可补齐或明确选择设备合成备用。`,
       });
       return;
     }
@@ -330,49 +330,48 @@ export function AudioButton({ word }: { word: Word }) {
   }
   return (
     <div className="audio-control pronunciation-control">
-      <div className="pronunciation-actions">
-        <select
-          aria-label={`${word.lemma} 发音音源与口音`}
-          value={selection}
-          disabled={preparingServer}
-          onChange={(event) => {
-            stop();
-            selectedByUser.current = true;
-            setSelection(event.target.value as Selection);
-            setPlayback({ phase: 'idle', text: '' });
-          }}
-        >
-          {audioUs && (
-            <option value="US">
-              美式 · {audioUs.kind === 'recorded' ? '真人录音' : '服务器合成'}
-            </option>
-          )}
-          {audioUk && (
-            <option value="UK">
-              英式 · {audioUk.kind === 'recorded' ? '真人录音' : '服务器合成'}
-            </option>
-          )}
-          <option value="device-US">美式 · 设备合成（备用）</option>
-          <option value="device-UK">英式 · 设备合成（备用）</option>
-        </select>
-        <button
-          className="audio-button"
-          disabled={preparingServer || (!available && !playing)}
-          aria-label={
-            playing ? `停止 ${word.lemma} 发音` : `播放 ${word.lemma} ${accentName}${soundName}`
-          }
-          aria-pressed={playing}
-          onClick={play}
-        >
-          {playback.phase === 'preparing' ? (
-            <LoaderCircle size={18} className="spin" />
-          ) : playing ? (
-            <Square size={16} />
-          ) : (
-            <Volume2 size={18} />
-          )}
-          <span>{playing ? '停止' : '播放'}</span>
-        </button>
+      <div className="pronunciation-lines">
+        {(['US', 'UK'] as const).map((accent) => {
+          const audio = accent === 'US' ? audioUs : audioUk;
+          const active = playing && selection === accent;
+          const ipa =
+            info?.phonetics?.find((entry) => entry.region === accent)?.ipa ||
+            (accent === 'US' ? word.phoneticUs : word.phoneticUk);
+          const name = accent === 'US' ? '美式' : '英式';
+          const kind = audio?.kind === 'recorded' ? '真人录音' : '服务器合成';
+          return (
+            <div className="pronunciation-row" key={accent}>
+              <button
+                type="button"
+                className="audio-button pronunciation-speaker"
+                disabled={preparingServer || !audio}
+                aria-label={
+                  active
+                    ? `停止 ${word.lemma} ${name}发音`
+                    : `播放 ${word.lemma} ${name}${audio ? kind : '音源未就绪'}`
+                }
+                aria-pressed={active}
+                onClick={() => play(accent)}
+              >
+                {active && playback.phase === 'preparing' ? (
+                  <LoaderCircle size={18} className="spin" />
+                ) : active ? (
+                  <Square size={16} />
+                ) : (
+                  <Volume2 size={18} />
+                )}
+              </button>
+              <div className="pronunciation-ipa">
+                <span>
+                  <small>{name}</small> {ipa || '暂无此口音音标'}
+                </span>
+                <small className="pronunciation-kind">
+                  {audio ? kind : pronunciation.isPending ? '正在检查音源…' : '暂无本站音源'}
+                </small>
+              </div>
+            </div>
+          );
+        })}
       </div>
       {playback.text && (
         <small role="status" className={playback.phase === 'error' ? 'rose-text' : ''}>
@@ -383,63 +382,87 @@ export function AudioButton({ word }: { word: Word }) {
       {pronunciation.error && (
         <small className="rose-text">本站音源资料暂未更新成功，可重试或选择设备合成。</small>
       )}
-      {!available && !playing && (
-        <small role="status">
-          {device
-            ? !supported
-              ? '此浏览器未提供语音合成。'
-              : !voicesReady
-                ? '正在读取设备英语语音…'
-                : `设备未提供${accentName}语音，请更换口音或安装系统英语语音。`
-            : '此口音暂无可用的本站音源，请选择设备合成备用。'}
-        </small>
-      )}
-      {ipa && (
-        <small>
-          {accentName}音标 · {ipa}
-        </small>
-      )}
-      {!ipa && !pronunciation.isPending && (
-        <small>本站尚未提供此口音的完整IPA，音标以词库来源为准。</small>
-      )}
-      {available &&
-        (device ? (
-          <small className="pronunciation-source">设备合成 · {voice?.name}</small>
-        ) : (
-          <div className="pronunciation-attribution">
-            <small>
-              {soundName} · {selectedAudio?.sourceName}
-              {selectedAudio?.license ? ` · ${selectedAudio.license}` : ''}
-            </small>
-            <details className="pronunciation-license">
-              <summary>作者、许可与音源出处</summary>
-              {ipaEntry?.sourceRef && <small>音标来源 · {ipaEntry.sourceRef}</small>}
-              {selectedAudio?.attribution && <small>{selectedAudio.attribution}</small>}
-              {sourceLink(selectedAudio?.sourceUrl) && (
+      <details className="pronunciation-license">
+        <summary>音标与音源出处</summary>
+        {(['US', 'UK'] as const).map((accent) => {
+          const audio = accent === 'US' ? audioUs : audioUk;
+          const ipaSource =
+            info?.phonetics?.find((entry) => entry.region === accent)?.sourceRef ||
+            word.phoneticSource;
+          return (
+            <div className="pronunciation-attribution" key={accent}>
+              <small>
+                {accent === 'US' ? '美式' : '英式'} ·{' '}
+                {audio
+                  ? `${audio.kind === 'recorded' ? '真人录音' : '服务器合成'} · ${audio.sourceName} · ${audio.license}`
+                  : '本站音源尚未就绪'}
+              </small>
+              {ipaSource && <small>音标来源 · {ipaSource}</small>}
+              {audio?.attribution && <small>{audio.attribution}</small>}
+              {sourceLink(audio?.sourceUrl) && (
                 <a
                   className="text-link"
-                  href={sourceLink(selectedAudio?.sourceUrl)}
+                  href={sourceLink(audio?.sourceUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  音源许可与来源 ↗
+                  查看音源许可与来源 ↗
                 </a>
               )}
-            </details>
-          </div>
-        ))}
-      {playback.phase === 'error' && !device && (
-        <button
-          className="button quiet"
-          onClick={() => {
-            stop();
-            selectedByUser.current = true;
-            setSelection(region === 'UK' ? 'device-UK' : 'device-US');
-          }}
-        >
-          改用{accentName}设备合成（备用）
-        </button>
-      )}
+            </div>
+          );
+        })}
+      </details>
+      <details
+        className="pronunciation-device"
+        open={device || playback.phase === 'error' || undefined}
+      >
+        <summary>设备合成（备用）</summary>
+        <div className="pronunciation-actions">
+          <select
+            aria-label={`${word.lemma} 设备合成口音`}
+            value={deviceRegion}
+            disabled={preparingServer}
+            onChange={(event) => {
+              if (device && playing) stop();
+              setDeviceRegion(event.target.value as 'US' | 'UK');
+            }}
+          >
+            <option value="US">美式设备语音</option>
+            <option value="UK">英式设备语音</option>
+          </select>
+          <button
+            type="button"
+            className="audio-button"
+            disabled={preparingServer || !supported || !deviceVoice}
+            aria-label={
+              device && playing
+                ? `停止 ${word.lemma} 设备合成发音`
+                : `播放 ${word.lemma} ${deviceRegion === 'US' ? '美式' : '英式'}设备合成发音`
+            }
+            aria-pressed={device && playing}
+            onClick={() => play(`device-${deviceRegion}`)}
+          >
+            {device && playback.phase === 'preparing' ? (
+              <LoaderCircle size={16} className="spin" />
+            ) : device && playing ? (
+              <Square size={16} />
+            ) : (
+              <Volume2 size={17} />
+            )}
+            <span>{device && playing ? '停止' : '播放'}</span>
+          </button>
+        </div>
+        <small>
+          {!supported
+            ? '此浏览器未提供语音合成。'
+            : !voicesReady
+              ? '正在读取设备英语语音…'
+              : deviceVoice
+                ? `设备合成 · ${deviceVoice.name}`
+                : '设备未安装此口音英语语音，请选择另一口音。'}
+        </small>
+      </details>
       {user && info?.generationAvailable && (!audioUs || !audioUk) && (
         <div className="pronunciation-prepare">
           <button

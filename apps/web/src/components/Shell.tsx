@@ -4,7 +4,6 @@ import {
   House,
   MoonStar,
   Search,
-  RotateCcw,
   UserRound,
   ShieldCheck,
   CloudUpload,
@@ -22,8 +21,7 @@ import { useApp } from '../AppContext';
 const links = [
   { path: '/', label: '自习室', icon: House },
   { path: '/books', label: '词书', icon: BookOpen },
-  { path: '/learn', label: '今晚学习', icon: GraduationCap },
-  { path: '/review', label: '到期复习', icon: RotateCcw },
+  { path: '/learn', label: '今日任务', icon: GraduationCap },
   { path: '/lookup', label: '查词与生词本', icon: Search },
   { path: '/translate', label: '网页翻译', icon: Languages },
   { path: '/known', label: '熟词管理', icon: CheckCheck },
@@ -136,7 +134,7 @@ export function Shell() {
       <nav className="mobile-tabs" aria-label="移动导航">
         {[
           { path: '/', label: '自习室', icon: House },
-          { path: '/learn', label: '学习', icon: GraduationCap },
+          { path: '/learn', label: '任务', icon: GraduationCap },
           { path: '/books', label: '词书', icon: BookOpen },
           { path: '/lookup', label: '查词', icon: Search },
           { path: user ? '/me' : '/auth', label: '我的', icon: UserRound },

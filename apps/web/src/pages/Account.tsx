@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -13,6 +14,7 @@ import { useApp, useRemote } from '../AppContext';
 import { auth, post, setup } from '../lib/api';
 import { goalLabels, goalNames, type Settings } from '../lib/types';
 import { Empty, ErrorNotice, Heading, Loading, LoginPrompt, Notice, Panel } from '../components/UI';
+import type { TaskPlanResponse } from '../components/tasks/types';
 
 export function AuthPage() {
   const { site, user, refresh } = useApp();
@@ -125,7 +127,7 @@ export function AuthPage() {
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                       autoComplete="name"
-                      maxLength={100}
+                      maxLength={80}
                     />
                   </label>
                 )}
@@ -182,7 +184,9 @@ export function AuthPage() {
   );
 }
 export function ProfilePage() {
-  const { user, refresh, site, pending, sync, syncNote } = useApp();
+  const { user, refresh, site, pending, sync, syncNote, scope } = useApp();
+  const client = useQueryClient();
+  const plan = useRemote<TaskPlanResponse>('plan', 'study/plan', !!user);
   const navigate = useNavigate();
   const settings = useRemote<{ settings: Settings }>('settings', 'me/settings', !!user);
   const [draft, setDraft] = useState<Settings | null>(null);
@@ -192,6 +196,14 @@ export function ProfilePage() {
   const [name, setName] = useState(user?.name ?? '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  useEffect(() => {
+    setDraft(null);
+    setName(user?.name ?? '');
+    setCurrentPassword('');
+    setNewPassword('');
+    setError(null);
+    setNotice('');
+  }, [scope]);
   useEffect(() => {
     if (settings.data) setDraft(settings.data.settings);
   }, [settings.data]);
@@ -204,15 +216,15 @@ export function ProfilePage() {
         'me/settings',
         {
           goal: draft.goal,
-          dailyNewLimit: draft.dailyNewLimit,
+          dailyTotalGoal: draft.dailyTotalGoal,
           groupSize: draft.groupSize,
-          timeZone: draft.timeZone,
+          timeZone: draft.pendingTimeZone ?? draft.timeZone,
           expectedRevision: draft.revision,
         },
         'PATCH',
       );
-      await settings.refetch();
-      setNotice('学习设置已保存，从下一组开始使用。');
+      await client.invalidateQueries({ queryKey: [scope] });
+      setNotice('每日总词数计划已保存。已签发任务与真实评价保留，剩余未安排词按新计划调整。');
     } catch (value) {
       setError(value);
     } finally {
@@ -305,7 +317,7 @@ export function ProfilePage() {
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 required
-                maxLength={100}
+                maxLength={80}
               />
             </label>
             <button className="button ghost" disabled={busy}>
@@ -331,7 +343,7 @@ export function ProfilePage() {
                 }}
               >
                 <label className="field">
-                  学习目标
+                  词汇基线方向
                   <select
                     value={draft.goal}
                     onChange={(event) =>
@@ -347,14 +359,14 @@ export function ProfilePage() {
                 </label>
                 <div className="form-columns">
                   <label className="field">
-                    每天新词
+                    每天总词数（复习 + 新学）
                     <input
                       type="number"
                       min={1}
                       max={100}
-                      value={draft.dailyNewLimit}
+                      value={draft.dailyTotalGoal}
                       onChange={(event) =>
-                        setDraft({ ...draft, dailyNewLimit: Number(event.target.value) })
+                        setDraft({ ...draft, dailyTotalGoal: Number(event.target.value) })
                       }
                       required
                     />
@@ -373,11 +385,34 @@ export function ProfilePage() {
                     />
                   </label>
                 </div>
+                <div className="task-plan-explanation">
+                  <div>
+                    <strong>新学来源：{plan.data?.plan.bookTitle ?? '尚未选择词书'}</strong>
+                    <p>
+                      先复习本站全部已学词，到期词不足每日总数时再补本书新词。同词当天只计一次；巩固和拼写不重复占总数。
+                    </p>
+                    <p>
+                      当前未安排逾期 {plan.data?.plan.unplannedOverdueCount ?? '—'}{' '}
+                      词；切书或降低目标保留已签发任务。
+                      <Link className="text-link" to="/books">
+                        选书并预览计划
+                      </Link>
+                    </p>
+                  </div>
+                </div>
+                {draft.pendingTimeZone && (
+                  <Notice>
+                    时区 {draft.pendingTimeZone} 已预约下个学习日生效；今日按 {draft.timeZone}{' '}
+                    统计。
+                  </Notice>
+                )}
                 <label className="field">
-                  统计时区
+                  统计时区（下个学习日生效）
                   <input
-                    value={draft.timeZone}
-                    onChange={(event) => setDraft({ ...draft, timeZone: event.target.value })}
+                    value={draft.pendingTimeZone ?? draft.timeZone}
+                    onChange={(event) =>
+                      setDraft({ ...draft, pendingTimeZone: null, timeZone: event.target.value })
+                    }
                     required
                     placeholder="Asia/Shanghai"
                   />

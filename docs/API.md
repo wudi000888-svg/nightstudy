@@ -1,6 +1,6 @@
 # Alpha API 契约
 
-对应 `0.4.0-alpha.1` 开发接口；本轮完整音频生成、最终验收和发布仍在进行。已验收的0.3代码 `86afefa` 及其86项测试/生产HTTPS证据保持为历史范围，见 [README](../README.md)。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。root的basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
+对应 `0.5.0-alpha.1` 开发接口。此文说明当前实现契约，本轮统一验收、发行和部署结果另行记录；0.4及更早的验证仍是各自版本的历史证据，见 [README](../README.md)。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
 
 请求由可信 Host 与规范 basePath 选择 operator 配置的 Realm，随后只访问该站独立认证/业务 PG DB。客户端不能通过 `siteId`、`userId`、数据库 URL 参数切换身份。真正互不信任的站点使用不同 origin；同 origin 子路径属于同一信任域。
 
@@ -61,7 +61,7 @@
 | `GET /words/:id`                    | 访客      | 已发布word的全部senses、音标与来源；每个Sense包含source/exampleSource                                                   |
 | `GET /me/settings`                  | 用户      | settings                                                                                                                |
 | `PATCH /me/profile`                 | 用户      | name；不允许修改 role/email/其他用户                                                                                    |
-| `PATCH /me/settings`                | 用户      | 可选 goal/currentBookId/dailyNewLimit/groupSize/timeZone/expectedRevision                                               |
+| `PATCH /me/settings`                | 用户      | 可选 goal/currentBookId/dailyTotalGoal/groupSize/timeZone/expectedRevision；旧dailyNewLimit仅作兼容                     |
 | `GET /wordbook?limit=50&cursor=...` | 用户      | 本人生词本游标分页，默认50条、每页最多100条，items/page含note/favorite/paused/progress                                  |
 | `GET /wordbook/:wordId`             | 用户      | 读取本人精确收藏项或null，不用列表首批推断收藏状态                                                                      |
 | `POST /wordbook`                    | 用户      | wordId 与可选 note；加入/收藏已发布词                                                                                   |
@@ -69,7 +69,7 @@
 | `DELETE /wordbook/:wordId`          | 用户      | JSON `{}`；移除生词本项，保留学习进度                                                                                   |
 | `GET /announcements`                | 访客      | 最近 20 条已发布公告                                                                                                    |
 
-goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固定版ECDICT的770,611词及5本源目标词书；0.4生产内容准备归档旧演示书，40词身份、原创内容、历史学习和会话快照仍保留。目标书按上游标签/词频规则建立，不是官方完整考试大纲。`CONTENT_PACK=demo` 用于显式最小开发/测试数据。内容版本、许可和覆盖见 [CONTENT.md](CONTENT.md)。dailyNewLimit 1–100，groupSize 1–20，timeZone 必须是有效 IANA 时区。settings 有 revision；建议 PATCH 携带 expectedRevision，过期返回409 `settings_conflict` 和最新settings。
+goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固定版ECDICT的770,611词及5本源目标词书；0.4生产内容准备归档旧演示书，40词身份、原创内容、历史学习和会话快照仍保留。目标书按上游标签/词频规则建立，不是官方完整考试大纲。`CONTENT_PACK=demo` 用于显式最小开发/测试数据。内容版本、许可和覆盖见 [CONTENT.md](CONTENT.md)。dailyTotalGoal 1–100，是每天复习与新学的不同词总目标；groupSize 1–20。timeZone 必须是有效 IANA 时区，学习日按当地04:00交接；时区改变返回pendingTimeZone/timeZoneEffectiveAt，下个学习日生效，不重切今日窗口。settings有revision；建议PATCH携带expectedRevision，过期返回409 `settings_conflict` 和最新settings。Settings中的旧dailyNewLimit兼容字段现在镜像总目标，不能继续理解为独立新词配额；与dailyTotalGoal同时提交但不相等时返回400 `conflicting_daily_goal`。网页选书使用下述原子计划确认入口，旧book select保留兼容。
 
 `/dictionary/resolve` 接受text长度1–80，当前执行规范化精确匹配，返回 `matchType=exact` 或 `not-found`；没有前缀近似替代、后缀猜测或未经证实的原形推断。客户端可兼容未来有词典关系证据的 `inflection` 类型，但本轮不能把它描述为已实现的词形分析。未命中示例：`{ "word": null, "queried": "…", "matchedLemma": null, "matchType": "not-found" }`。
 
@@ -118,17 +118,62 @@ prepare只补缺失音源，不覆盖优先的已就绪真人录音；返回后�
 
 翻译文本最多1,000个Unicode字符，sourceLanguage为auto/en/zh-CN（默认en），targetLanguage为en/zh-CN（默认zh-CN）。默认website-official仅提供官方网页入口，站内text返回503 `translation_not_configured`；生产站内结果使用带私密token的固定VPS网关，direct仅供本机开发。网页兼容provider返回 `google-web-compat` / `unofficial=true` / `bestEffort=true`，不是受支持的Google Cloud API。本机真实调用已遇到上游429；失败显示明确错误，不把离线词义冒充翻译。Google网页不能直接iframe，本站返回链接。原文会传送至配置网关/Google，不写翻译历史。配置、鉴权、超时的验证范围与尚待项见 [TRANSLATION.md](TRANSLATION.md)。
 
-## 固定学习会话与 FSRS
+## 每日总量计划、固定任务与 FSRS
 
-| 方法与相对路径                      | 主要参数与响应                                                         |
-| ----------------------------------- | ---------------------------------------------------------------------- |
-| `GET /study/plan`                   | plan：目标、词书、到期数、今日新词剩余及本地日期                       |
-| `GET /study/sessions`               | 最近最多 10 个进行中的本人会话                                         |
-| `POST /study/sessions`              | mode=learn/review，可选 bookId、size 1–20；返回 session 或 null/reason |
-| `GET /study/sessions/:id`           | 本人固定会话、revision、cursor/currentItemId、内容快照                 |
-| `POST /study/sessions/:id/commands` | commandId/itemId/action/expectedSessionRevision，以及动作参数          |
+以上业务入口均要求本站登录用户，不接受userId/siteId来替换任务所有者。每天总目标N包含复习与新学，按canonical wordId去重，先给今日到期复习预留预算，剩余才从选定词书补新词。复习覆盖本站全部已学词，不局限于当前书；未安排的逾期词独立显示。今日稍后到期的预留复习不会提前产生评分。
 
-以上均要求登录。先对当前 item 发 `reveal`，再发 `rate`（again/hard/good/easy，必须含 expectedProgressRevision）；整组评价后进入 practice，对当前题发 `answer`。拼写答题只记练习结果，FSRS 调度由此前评价决定，不能跳过 reveal 或操作别人的 item。命令示例：
+| 方法与相对路径                      | 参数与响应                                                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `GET /study/plan`                   | 返回`{plan,settings}`；读取或维护本站当前用户的当日计划                                                                     |
+| `GET /study/plan/preview`           | 可选bookId/dailyTotalGoal/groupSize/timeZone；只读返回`{preview,settingsRevision}`，不签发任务、不改设置                    |
+| `POST /study/plan/confirm`          | bookId/dailyTotalGoal/groupSize/expectedRevision/commandId，timeZone可选；原子确认书与计划，返回`{plan,settings,duplicate}` |
+| `POST /study/sessions`              | 正式mode=daily或extra-review，commandId、expectedPlanRevision可选，size 1–20可选；返回`{session,plan,reason?,duplicate}`    |
+| `GET /study/tasks`                  | status=active/completed/all，limit默认20、最大50，cursor可选；返回`{items,page:{total,hasMore,nextCursor}}`                 |
+| `GET /study/sessions/:id`           | 本人固定任务，返回`{session}`                                                                                               |
+| `POST /study/tasks/:id/state`       | action=pause/resume/defer、commandId、expectedSessionRevision；defer须含deferUntil                                          |
+| `GET /study/forecast`               | 七个学习日的到期负担；返回days/asOf/assumption                                                                              |
+| `GET /study/sessions`               | 兼容列表：最近最多10个in_progress或paused本人组；正式分页用/study/tasks                                                     |
+| `POST /study/sessions/:id/commands` | commandId/itemId/action/expectedSessionRevision及动作参数；返回更新后的session                                              |
+
+计划确认示例（expectedRevision来自预览的settingsRevision，字段示例是说明而非实际账户数据）：
+
+```json
+{
+  "bookId": "<选中的本站词书ID>",
+  "dailyTotalGoal": 30,
+  "groupSize": 5,
+  "timeZone": "Asia/Shanghai",
+  "expectedRevision": 0,
+  "commandId": "<本次确认独立UUID>"
+}
+```
+
+preview包含bookId/bookTitle、dailyTotalGoal/groupSize、timeZone/pendingTimeZone、startsAt/endsAt、completedUnique/retainedAssignedCount、reviewPlanned/newPlanned及dueNowCount/dueTodayCount/overdueCount/unplannedOverdueCount。它是当前状态的只读预计，确认时重新核对revision并计算，不能当成已经签发的词组。
+
+plan包含id/revision/localDate/timeZone/startsAt/endsAt、goal/bookId/bookTitle、dailyTotalGoal/groupSize，以及下列计数：
+
+| 字段                                             | 含义                                                                                    |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| completedUnique / completedNew / completedReview | 当日已接受真实评分的不同词及其新学/复习分组；不是全部步骤完成、客观掌握或评分动作总次数 |
+| assignedUnique                                   | 已分配到固定任务、尚未当日首次评分的不同词                                              |
+| plannedReview / plannedNew                       | 当日复习与新学安排；保留的已签发承诺可能使它们超过降低后的目标                          |
+| dueNowCount / dueTodayCount / overdueCount       | 当前已到期、学习日结束前到期（含逾期）、学习日开始前已逾期的词；范围互有包含，不相加    |
+| unplannedOverdueCount                            | 仍未被当前计划安排的逾期词                                                              |
+| pendingConsolidationCount                        | 今日已评分但FSRS处于学习/重学状态，且本学习日还会到期的不同词；未到期时继续等待         |
+| pendingSpellingCount                             | 本人未完成固定组中已评分、尚未完成拼写的不同词；跨书重复项不重复计数                    |
+| newRemaining / reviewRemaining                   | 可新增安排的新学量、未评分复习与巩固待办量；不能直接相加视为今日剩余unique预算          |
+| nextDueAt / activeTaskId                         | 本学习日下一次未来到期时间、当前进行中的主任务ID，均可为null                            |
+| recommendedTotal                                 | 当前总目标建议值；诊断推荐另见assessment.suggestedPlan                                  |
+
+学习日保存为用户时区04:00到下一次04:00的实际startsAt/endsAt，使用左闭右开窗口，不假定始终24小时。变更时区从当前窗口结束后生效，新的窗口不与旧窗口重叠。session返回planId/taskKind、签发计划的learningDate/timeZone、createdAt/updatedAt/completedAt、pausedAt/deferredUntil及原revision/phase/cursor/step/currentItemId/items。无计划的legacy任务timeZone可为null，客户端应明确其显示时区。SessionItem新增bucket=new/review，legacy可为null。
+
+mode=daily为可混合复习与新学的主任务；mode=extra-review为主动额外复习，不增加新学额度。额外复习的真实评分仍计入当日不同词数，允许超过主目标；同词再次评分不重复计unique。旧mode=learn/review和taskKind参数保留兼容，新客户端使用正式mode。服务端同类已有进行中组时返回该固定组，不创建副本；恢复暂停组须显式state/resume。任务列表游标绑定站点、用户与status，不能跨账户或查询复用。
+
+pause保留固定内容、历史与未评分预约；deferUntil须为未来且不超过七天，任务变为paused，词条延后选择，真实FSRS dueAt和已有ReviewLog不修改。resume恢复同一任务并清除延期；同类另一组正在进行时返回409 `another_task_active`。降低目标、换书和跨日都不取消已签发组；昨日已经评分只剩拼写的项不会占新学习日词数，尚未评分的保留组仍按当前计划显示预约。
+
+没有可立即签发项时session=null，reason可能为planned_reviews_pending（预留的复习稍后到期）、daily_goal_complete、no_new_words或nothing_due。这不代表所有已签发任务或未安排逾期词已经完成，客户端继续展示真实待办。
+
+评分流程仍是当前item先reveal，再rate（again/hard/good/easy，必须含expectedProgressRevision）；整组评分后进入practice，当前题用answer。phase保持recall/practice/completed，step为prompt/revealed/exercise/completed。拼写只记录练习，不能写FSRS或伪造评分。巩固是到达真实FSRS dueAt后再回忆并评分，产生真实ReviewLog，不是重复增加当日词数，也不是将点击看答案当作复习成功。
 
 ```json
 {
@@ -141,13 +186,11 @@ prepare只补缺失音源，不覆盖优先的已就绪真人录音；返回后�
 }
 ```
 
-commandId 8–120 字符，对同一用户全局去重。同内容重试不重复记录 review；同编号不同内容返回 `idempotency_conflict`。session/progress 的 stale revision 返回 409 并给出最新状态。每次成功以后使用响应中的 revision；rating 同时更新 FSRS 状态、dueAt、ReviewLog。服务端不接受客户端自行修改 dueAt/记忆参数。
+commandId为8–120字符，推荐独立UUID，对同一用户全局去重；同内容重试不重复写评分，同编号不同内容返回idempotency_conflict。session/progress/plan的过期revision返回409；读取最新状态后核对再提交。接受评分更新FSRS/dueAt/ReviewLog；服务端不接受客户端自行改dueAt或记忆参数。Plan确认和任务状态也有幂等回执，状态响应含session/plan/duplicate。
 
-`GET /study/plan` 的 `reservedNewCount` 是今日已签发但尚未首次评价的新词预约数，按 wordId 去重，区别于 `learnedToday` 已实际学过的词。`newRemaining = max(0, dailyNewLimit - learnedToday - reservedNewCount)` 表示新增预约额度，日期按用户 timeZone 计算。客户端应同时展示待完成组，不能将 newRemaining=0 当作已签发组不可继续。
+forecast的days含localDate/startsAt/endsAt/dueUnique/overdueCarry。dueUnique是该窗口内当前持久dueAt的不同词，overdueCarry是该窗口开始前到期的不同词，两者不重叠，可相加显示单日负担。assumption固定current_due_dates_no_future_reviews：假设后续尚未复习，不计未来新学或预测复习成功。同词会出现在后续多个学习日，不能跨七天求和当作不同词总量。
 
-创建 learn 会话在事务内锁定本人设置行、读取预约，再分配固定组。同书并发创建会排除当日已预约词；不同词书共享 wordId 的当日预约不重复占配额，评价仍受 progress revision 保护。额度用尽且没有可复用预约时返回 session=null/reason=daily_goal_complete。预约不是 Review，也不增加 learnedToday；首次成功评价才记录学习。
-
-每日目标只在创建新组时限制新增预约，已签发组继续按既有固定项完成回忆、评价与拼写。中途降低 dailyNewLimit 或改变计划不回收旧组，不在 rate 阶段以新目标拒绝它；下一次创建按新设置与当前预约额度判断。到期 review 不使用新词配额。当前预约统计只覆盖用户时区当日，跨日保留的旧组仍可完成；没有自动取消/回收未完成组接口。
+离线队列只暂存待接受的动作。遇409持久标为冲突，可读取服务器最新任务，并逐条明确确认放弃该条未接受本地操作；不清其他队列、不删除服务器评分、不自动覆盖新revision。只有服务端接受的评分计入completedUnique。详情见 [每日任务](DAILY_TASKS.md) 和 [个性化规则](architecture/PERSONALIZATION.md)。
 
 ## 熟词声明、测试与个人统计
 
@@ -171,7 +214,7 @@ commandId 8–120 字符，对同一用户全局去重。同内容重试不重�
 
 导出没有10,000行总量截断。JSON含 `consistency=cursor_export`、exportedAt和最终rowCount；CSV是UTF-8 BOM的声明表。导出不是跨批次事务快照，并发确认/撤销可能影响后续批次；需要稳定结果时在导出期间停止修改声明。
 
-熟词声明降低新学优先级、保留抽查，不等于客观掌握。已有普通新词时，按累计预约/学习量约每5词安排1个熟词抽查，避免小组持续不抽查；只剩熟词候选时仍可抽查，均遵守新组配额。目标测试按已安装goal范围和difficulty分层抽样，report包含totalCandidates/coveredPopulation/byStratum/accuracy/estimateScope；完整内容标 `limited_sample`，演示模式标 `limited_demo`。仅已测且全部答对的词进入验证证据，建议计划不自动改用户设置；测试不产生ReviewLog或修改FSRS。报告不推断标准化考试能力。记忆曲线只使用真正评价后的状态，未产生复习数据时empty=true；阴影为词间分布，不是准确率保证或置信区间。stats超过20,000日志/区间、curve超过2,000 progress时会标dataLimited。
+熟词声明降低新学优先级、保留抽查，不等于客观掌握。已有普通新词时，按累计预约/学习量约每5词安排1个熟词抽查，避免小组持续不抽查；只剩熟词候选时仍可抽查，均受每天不同词总预算的安排约束。目标测试按已安装goal范围和difficulty分层抽样，report包含totalCandidates/coveredPopulation/byStratum/accuracy/estimateScope；完整内容标 `limited_sample`，演示模式标 `limited_demo`。仅已测且全部答对的词进入验证证据，新报告suggestedPlan包含dailyTotalGoal/newWordSuggestion/reviewPressure/groupSize/countBasis=daily-unique-words，总量建议与新学建议分开；不自动改设置。历史报告的dailyNewLimit仅是当时的新学建议，不能直接当作总量。测试不产生ReviewLog或修改FSRS。报告不推断标准化考试能力。记忆曲线只使用真正评价后的状态，未产生复习数据时empty=true；阴影为词间分布，不是准确率保证或置信区间。stats超过20,000日志/区间、curve超过2,000 progress时会标dataLimited。
 
 ## 本站管理员
 

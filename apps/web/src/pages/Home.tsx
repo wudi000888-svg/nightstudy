@@ -1,21 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  ArrowRight,
-  BookOpen,
-  Clock3,
-  GraduationCap,
-  RotateCcw,
-  Search,
-  Sparkles,
-  Check,
-} from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { ArrowRight, BookOpen, GraduationCap, Search, Sparkles, Check } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
-import { post } from '../lib/api';
-import { goalLabels, goalNames, type Book, type Goal, type Plan } from '../lib/types';
+import { goalLabels, goalNames, type Book, type Goal } from '../lib/types';
 import { Empty, ErrorNotice, Heading, Loading, Panel } from '../components/UI';
 import { NightScene } from '../components/NightScene';
+import { useBookPlan } from '../components/tasks/useBookPlan';
+import { TaskOverview } from '../components/tasks/TaskOverview';
 
 export function BookGrid({
   books,
@@ -58,7 +49,7 @@ export function BookGrid({
             </small>
           </span>
           <span className="book-action">
-            {busyId === book.id ? '正在选择…' : '选择词书'}
+            {busyId === book.id ? '正在确认…' : '选择并制定计划'}
             <ArrowRight size={15} />
           </span>
         </button>
@@ -67,32 +58,12 @@ export function BookGrid({
   );
 }
 export function HomePage() {
-  const { user, scope } = useApp();
-  const navigate = useNavigate();
-  const client = useQueryClient();
+  const { user, pending } = useApp();
+  const planning = useBookPlan();
   const books = useRemote<{ items: Book[] }>('books', 'books');
-  const plan = useRemote<{ plan: Plan }>('plan', 'study/plan', !!user);
-  const [busyId, setBusyId] = useState('');
-  const [error, setError] = useState<unknown>(null);
+  const plan = planning.query;
   const currentBook = books.data?.items.find((book) => book.id === plan.data?.plan.bookId);
   const availableBooks = books.data?.items.filter((book) => !book.isDemo) ?? [];
-  async function select(id: string) {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    setBusyId(id);
-    setError(null);
-    try {
-      await post(`books/${id}/select`, {});
-      await client.invalidateQueries({ queryKey: [scope] });
-      navigate('/learn');
-    } catch (value) {
-      setError(value);
-    } finally {
-      setBusyId('');
-    }
-  }
   const date = new Intl.DateTimeFormat('zh-CN', {
     weekday: 'long',
     month: 'long',
@@ -118,7 +89,7 @@ export function HomePage() {
           <div className="hero-actions">
             <Link className="button primary" to={user ? '/learn' : '/auth'}>
               <GraduationCap size={18} />
-              {user ? '继续今晚学习' : '连接我的自习室'}
+              {user ? '查看今日任务' : '连接我的自习室'}
               <ArrowRight size={16} />
             </Link>
             <Link className="button ghost" to="/lookup">
@@ -148,72 +119,24 @@ export function HomePage() {
           全部词书 <ArrowRight size={15} />
         </Link>
       </div>
-      <ErrorNotice error={error} />
       <ErrorNotice error={plan.error} onRetry={() => void plan.refetch()} />
       {user && plan.isPending && <Loading />}
-      <div className="tonight-grid">
-        <Panel className="today-plan">
-          <div className="section-heading">
-            <span className="tiny-label">今日计划</span>
-            <span className="soft-badge">
-              <Clock3 size={12} /> 轻量 · 专注
-            </span>
-          </div>
-          <h3>
-            {plan.data
-              ? `先复习 ${plan.data.plan.dueCount} 个到期词，`
-              : '从一点可持续的积累开始。'}
-            {plan.data && (
-              <>
-                <br />
-                {plan.data.plan.reservedNewCount > 0
-                  ? `再完成 ${plan.data.plan.reservedNewCount} 个已安排新词。`
-                  : `还可安排 ${plan.data.plan.newRemaining} 个新词。`}
-              </>
-            )}
-          </h3>
-          <p>
-            {user
-              ? `每组 ${plan.data?.plan.groupSize ?? '—'} 词，按你的本站进度继续。`
-              : '学习、拼写和复习都有记录。登录后保存在你的账户里。'}
-          </p>
-          {plan.data && plan.data.plan.reservedNewCount > 0 && (
-            <p>已有学习组待完成，另可安排 {plan.data.plan.newRemaining} 个新词。</p>
-          )}
-          <Link className="text-link" to={user ? '/learn' : '/auth'}>
-            {plan.data?.plan.reservedNewCount ? '继续已安排学习组' : '开始这一组'}{' '}
-            <ArrowRight size={15} />
-          </Link>
-        </Panel>
-        <Panel className="metric">
-          <span className="metric-icon sage">
-            <RotateCcw size={20} />
-          </span>
-          <span>到期复习</span>
-          <strong>
-            {plan.data?.plan.dueCount ?? '—'}
-            <small>词</small>
-          </strong>
-          <p>{user ? '按你的记忆安排' : '登录后读取真实记录'}</p>
-        </Panel>
-        <Panel className="metric">
-          <span className="metric-icon blue">
-            <GraduationCap size={20} />
-          </span>
-          <span>可再安排新词</span>
-          <strong>
-            {plan.data?.plan.newRemaining ?? '—'}
-            <small>词</small>
-          </strong>
-          <p>
-            {plan.data?.plan.reservedNewCount
-              ? `另有 ${plan.data.plan.reservedNewCount} 词已安排待完成`
-              : user
-                ? '同词重复不计新学'
-                : '从自己的计划开始'}
-          </p>
-        </Panel>
-      </div>
+      {plan.data ? (
+        <TaskOverview plan={plan.data.plan} pending={pending} compact />
+      ) : (
+        !user && (
+          <Panel className="today-plan">
+            <span className="tiny-label">给每一天一点可持续的积累</span>
+            <h3>每天总词数，包含复习与新学。</h3>
+            <p>
+              先给到期词一点时间，再从选好的词书学新词。同一个词当天只计一次，计划与任务保存在你的本站账户。
+            </p>
+            <Link className="text-link" to="/auth">
+              登录，制定自己的计划 <ArrowRight size={15} />
+            </Link>
+          </Panel>
+        )
+      )}
       <div className="section-heading compact">
         <div>
           <span className="eyebrow">从语境开始</span>
@@ -229,8 +152,10 @@ export function HomePage() {
       ) : availableBooks.length ? (
         <BookGrid
           books={availableBooks.slice(0, 4)}
-          onSelect={(id) => void select(id)}
-          busyId={busyId}
+          onSelect={(id) => {
+            const book = availableBooks.find((value) => value.id === id);
+            if (book) planning.choose(book);
+          }}
         />
       ) : (
         <Empty title="这一页还没有词书。" description="管理员发布学习内容后，词书会出现在这里。" />
@@ -253,34 +178,14 @@ export function HomePage() {
           <ArrowRight size={17} />
         </Link>
       </div>
+      {planning.dialog}
     </div>
   );
 }
 export function BooksPage() {
-  const { user, scope } = useApp();
-  const navigate = useNavigate();
-  const client = useQueryClient();
+  const planning = useBookPlan();
   const books = useRemote<{ items: Book[] }>('books', 'books');
   const [goal, setGoal] = useState<Goal | 'all'>('all');
-  const [busyId, setBusyId] = useState('');
-  const [error, setError] = useState<unknown>(null);
-  async function select(id: string) {
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    setBusyId(id);
-    setError(null);
-    try {
-      await post(`books/${id}/select`, {});
-      await client.invalidateQueries({ queryKey: [scope] });
-      navigate('/learn');
-    } catch (value) {
-      setError(value);
-    } finally {
-      setBusyId('');
-    }
-  }
   return (
     <div className="page">
       <Heading
@@ -290,7 +195,7 @@ export function BooksPage() {
             让遇见的词，<em>有一条路径。</em>
           </>
         }
-        description="词书决定新词来源。同一个词在本站不同词书间共享进度。"
+        description="选书后先确认每天总词数。新学从本书开始，复习覆盖本站全部已学词；切书保留已签发任务。"
         action={
           <div className="action-row">
             <Link className="button ghost" to="/books/mine">
@@ -319,7 +224,7 @@ export function BooksPage() {
       <p className="content-caption">
         公开词书词数和覆盖进度来自本站记录。同词跨书共享学习进度；自己的私有词书在“我的词书”管理。
       </p>
-      <ErrorNotice error={error || books.error} />
+      <ErrorNotice error={books.error} onRetry={() => void books.refetch()} />
       {books.isPending ? (
         <Loading />
       ) : (
@@ -332,8 +237,10 @@ export function BooksPage() {
                 (goal === 'all' || book.goal === goal),
             ) ?? []
           }
-          onSelect={(id) => void select(id)}
-          busyId={busyId}
+          onSelect={(id) => {
+            const book = books.data?.items.find((value) => value.id === id);
+            if (book) planning.choose(book);
+          }}
         />
       )}
       {books.data &&
@@ -351,6 +258,7 @@ export function BooksPage() {
             }
           />
         )}
+      {planning.dialog}
     </div>
   );
 }

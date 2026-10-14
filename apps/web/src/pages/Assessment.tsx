@@ -27,7 +27,14 @@ interface Report {
   accuracy: { recognition: number | null; spelling: number | null };
   confidence: string;
   verifiedWordIds: string[];
-  suggestedPlan: { dailyNewLimit: number; groupSize: number };
+  suggestedPlan: {
+    dailyTotalGoal?: number;
+    newWordSuggestion?: number;
+    reviewPressure?: number;
+    countBasis?: 'daily-unique-words';
+    dailyNewLimit?: number;
+    groupSize: number;
+  };
   byStratum: unknown;
 }
 export function AssessmentPage() {
@@ -91,7 +98,7 @@ export function AssessmentPage() {
     }
   }
   async function applyPlan() {
-    if (!report) return;
+    if (!report || typeof report.suggestedPlan.dailyTotalGoal !== 'number') return;
     setBusy(true);
     setError(null);
     try {
@@ -99,13 +106,16 @@ export function AssessmentPage() {
         'me/settings',
         {
           goal,
-          dailyNewLimit: report.suggestedPlan.dailyNewLimit,
+          dailyTotalGoal: report.suggestedPlan.dailyTotalGoal,
+          ...(savedSettings.data ? { expectedRevision: savedSettings.data.settings.revision } : {}),
           groupSize: report.suggestedPlan.groupSize,
         },
         'PATCH',
       );
       void client.invalidateQueries({ queryKey: [scope] });
-      setNotice('推荐计划已保存。结果只确认实测的词，不代表整个目标词表都已掌握。');
+      setNotice(
+        '推荐每日总词数已保存，已签发任务保留。结果只确认实测词，不代表整个目标词表都已掌握。',
+      );
     } catch (value) {
       setError(value);
     } finally {
@@ -169,15 +179,33 @@ export function AssessmentPage() {
           </div>
           <Notice>这是本次抽样的有限基线，不是完整考试水平或全词表掌握证明。</Notice>
           <p>
-            建议每天 {report.suggestedPlan.dailyNewLimit} 个新词、每组{' '}
-            {report.suggestedPlan.groupSize} 词。熟词降低额外曝光，仍保留抽查。
+            {typeof report.suggestedPlan.dailyTotalGoal === 'number' ? (
+              <>
+                建议每天总计 {report.suggestedPlan.dailyTotalGoal} 个不同词（复习 + 新学），每组{' '}
+                {report.suggestedPlan.groupSize} 词。当前复习压力{' '}
+                {report.suggestedPlan.reviewPressure ?? '—'} 词，新学建议{' '}
+                {report.suggestedPlan.newWordSuggestion ?? '—'}{' '}
+                词；最终按真实到期词与今日已签发任务分配。
+              </>
+            ) : (
+              <>
+                这份历史报告只记录新学建议 {report.suggestedPlan.dailyNewLimit ?? '—'}{' '}
+                词，不代表每天总词数。请到今日任务重新确认总量计划。
+              </>
+            )}
           </p>
           <div className="action-row">
-            <button className="button primary" disabled={busy} onClick={() => void applyPlan()}>
-              采用推荐计划 <ArrowRight size={16} />
-            </button>
+            {typeof report.suggestedPlan.dailyTotalGoal === 'number' && (
+              <button
+                className="button primary"
+                disabled={busy || savedSettings.isPending}
+                onClick={() => void applyPlan()}
+              >
+                采用每日总量建议 <ArrowRight size={16} />
+              </button>
+            )}
             <Link className="button ghost" to="/learn">
-              回到学习
+              查看今日任务与计划
             </Link>
             <button
               className="button quiet"

@@ -34,6 +34,7 @@ model User {
   activity        ActivityInterval[]
   customBooks     Book[]
   bookImports     CustomBookImport[]
+  dailyPlans      DailyPlan[]
 }
 
 model Session {
@@ -172,15 +173,18 @@ model ContentPack {
 }
 
 model UserSettings {
-  userId        String   @id
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  goal          String   @default("daily")
-  currentBookId String?
-  dailyNewLimit Int      @default(20)
-  groupSize     Int      @default(5)
-  timeZone      String   @default("Asia/Shanghai")
-  revision      Int      @default(0)
-  updatedAt     DateTime @updatedAt
+  userId              String    @id
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal                String    @default("daily")
+  currentBookId       String?
+  dailyNewLimit       Int       @default(20)
+  dailyTotalGoal      Int       @default(20)
+  groupSize           Int       @default(5)
+  timeZone            String    @default("Asia/Shanghai")
+  pendingTimeZone     String?
+  timeZoneEffectiveAt DateTime?
+  revision            Int       @default(0)
+  updatedAt           DateTime  @updatedAt
 }
 
 model Word {
@@ -207,6 +211,7 @@ model Word {
   claims          KnownClaim[]
   assessmentItems AssessmentItem[]
   audio           WordAudio[]
+  dailyPlanWords  DailyPlanWord[]
 
   @@index([status, difficulty])
 }
@@ -226,39 +231,39 @@ model Sense {
 }
 
 model Book {
-  id          String         @id
-  slug        String         @unique
+  id          String             @id
+  slug        String             @unique
   title       String
   description String
   goal        String
-  status      String         @default("published")
-  version     String         @default("demo-2026-10-14")
+  status      String             @default("published")
+  version     String             @default("demo-2026-10-14")
   ownerId     String?
-  owner       User?          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner       User?              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   imports     CustomBookImport[]
   items       BookItem[]
   sessions    StudySession[]
-  updatedAt   DateTime       @updatedAt
+  updatedAt   DateTime           @updatedAt
 
   @@index([ownerId, status])
 }
 
 model WordAudio {
-  id           String   @id @default(cuid())
-  wordId       String
-  word         Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
-  accent       String
-  kind         String
-  status       String   @default("ready")
-  sourceName   String
-  sourceUrl    String
-  license      String
-  attribution  String
-  fileKey      String
-  fileSha256   String
-  mimeType     String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  wordId      String
+  word        Word     @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  accent      String
+  kind        String
+  status      String   @default("ready")
+  sourceName  String
+  sourceUrl   String
+  license     String
+  attribution String
+  fileKey     String
+  fileSha256  String
+  mimeType    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([wordId, accent])
   @@index([status, accent])
@@ -336,20 +341,25 @@ model StudyProgress {
 }
 
 model StudySession {
-  id        String        @id @default(cuid())
-  userId    String
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookId    String?
-  book      Book?         @relation(fields: [bookId], references: [id], onDelete: Restrict)
-  mode      String
-  status    String        @default("in_progress")
-  phase     String        @default("recall")
-  cursor    Int           @default(0)
-  step      String        @default("prompt")
-  revision  Int           @default(0)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  items     SessionItem[]
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId        String?
+  book          Book?         @relation(fields: [bookId], references: [id], onDelete: Restrict)
+  mode          String
+  planId        String?
+  plan          DailyPlan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+  taskKind      String        @default("legacy")
+  pausedAt      DateTime?
+  deferredUntil DateTime?
+  status        String        @default("in_progress")
+  phase         String        @default("recall")
+  cursor        Int           @default(0)
+  step          String        @default("prompt")
+  revision      Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         SessionItem[]
 
   @@index([userId, status, mode])
 }
@@ -387,21 +397,68 @@ model CommandReceipt {
 }
 
 model ReviewLog {
-  id                   String   @id @default(cuid())
+  id                   String     @id @default(cuid())
   userId               String
-  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   wordId               String
-  word                 Word     @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  word                 Word       @relation(fields: [wordId], references: [id], onDelete: Restrict)
   commandId            String
   rating               String
-  reviewedAt           DateTime @default(now())
+  reviewedAt           DateTime   @default(now())
   beforeState          Json
   afterState           Json
   retrievabilityBefore Float?
-  wasNew               Boolean  @default(false)
+  wasNew               Boolean    @default(false)
+  planId               String?
+  plan                 DailyPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
 
   @@unique([userId, commandId])
   @@index([userId, reviewedAt])
+  @@index([planId, reviewedAt])
+}
+
+model DailyPlan {
+  id              String          @id @default(cuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  localDate       String
+  timeZone        String
+  startsAt        DateTime
+  endsAt          DateTime
+  targetTotal     Int
+  sourceBookId    String?
+  sourceBookTitle String?
+  goal            String
+  prefsRevision   Int
+  revision        Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  words           DailyPlanWord[]
+  sessions        StudySession[]
+  reviews         ReviewLog[]
+
+  @@unique([userId, startsAt])
+  @@index([userId, endsAt])
+}
+
+model DailyPlanWord {
+  id              String    @id @default(cuid())
+  planId          String
+  plan            DailyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  wordId          String
+  word            Word      @relation(fields: [wordId], references: [id], onDelete: Restrict)
+  bucket          String
+  status          String    @default("queued")
+  dueAtSnapshot   DateTime?
+  firstRatedAt    DateTime?
+  activeSessionId String?
+  deferredUntil   DateTime?
+  ordinal         Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([planId, wordId])
+  @@index([planId, status, ordinal])
 }
 
 model KnownImport {

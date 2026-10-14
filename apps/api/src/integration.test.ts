@@ -8,6 +8,7 @@ import { buildApp } from './app.js';
 import { createDatabase } from './db.js';
 import type { AppConfig } from './config.js';
 import { maintenanceTick } from './maintenance.js';
+import { json } from './modules/shared.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const suite = url ? describe : describe.skip;
@@ -271,7 +272,7 @@ suite('PostgreSQL API and isolation', () => {
     const data = response.json();
     expect(data.empty ?? data.curve?.empty).toBe(true);
   });
-  it('preserves fixed tasks, rates a word once, and detects a stale competing task', async () => {
+  it('deduplicates cross-book tasks, preserves fixed items, and rejects a stale legacy rating', async () => {
     const first = (
       await request('POST', '/api/v2/study/sessions', {
         mode: 'learn',
@@ -279,13 +280,36 @@ suite('PostgreSQL API and isolation', () => {
         size: 2,
       })
     ).json().session;
-    const competing = (
+    const recovered = (
       await request('POST', '/api/v2/study/sessions', {
         mode: 'learn',
         bookId: 'demo-book-cet4',
         size: 1,
       })
     ).json().session;
+    expect(recovered.id).toBe(first.id);
+    // A pre-upgrade fixed group may still share a word; its stale memory revision stays protected.
+    const snapshot = await prisma.sessionItem.findUniqueOrThrow({
+      where: { id: first.items[0].id },
+    });
+    const legacy = await prisma.studySession.create({
+      data: {
+        userId,
+        bookId: 'demo-book-cet4',
+        mode: 'learn',
+        taskKind: 'legacy',
+        items: {
+          create: {
+            wordId: snapshot.wordId,
+            ordinal: 0,
+            contentSnapshot: json(snapshot.contentSnapshot),
+            questionJson: json(snapshot.questionJson),
+            progressRevision: 0,
+          },
+        },
+      },
+    });
+    const competing = (await request('GET', `/api/v2/study/sessions/${legacy.id}`)).json().session;
     expect(first.items).toHaveLength(2);
     expect(first.items[0].word.senses).toBeUndefined();
     expect(
@@ -347,6 +371,7 @@ suite('PostgreSQL API and isolation', () => {
       expectedSessionRevision: competing.revision,
     });
     const current = r.json().session;
+    expect(r.statusCode, r.body).toBe(200);
     const stale = await request('POST', `/api/v2/study/sessions/${competing.id}/commands`, {
       commandId: randomUUID(),
       itemId: current.items[0].id,
@@ -356,6 +381,8 @@ suite('PostgreSQL API and isolation', () => {
       expectedProgressRevision: 0,
     });
     expect(stale.statusCode, stale.body).toBe(409);
+    expect(stale.json().code).toBe('progress_conflict');
+    await prisma.studySession.delete({ where: { id: legacy.id } });
   });
   it('imports and exports known claims without writing or erasing FSRS history', async () => {
     const before = await prisma.studyProgress.count({ where: { userId } });
@@ -403,8 +430,9 @@ suite('PostgreSQL API and isolation', () => {
     });
     expect(lowered.statusCode, lowered.body).toBe(200);
     expect(
-      (await request('POST', '/api/v2/study/sessions', { mode: 'learn', size: 5 })).json().session,
-    ).toBeNull();
+      (await request('POST', '/api/v2/study/sessions', { mode: 'learn', size: 5 })).json().session
+        .id,
+    ).toBe(session.id);
     while (session.phase === 'recall') {
       const item = session.items[session.cursor];
       const revealed = await request('POST', `/api/v2/study/sessions/${session.id}/commands`, {
@@ -453,13 +481,28 @@ suite('PostgreSQL API and isolation', () => {
       ).statusCode,
     ).toBe(200);
     const concurrent = await Promise.all([
-      request('POST', '/api/v2/study/sessions', { mode: 'learn', size: 2 }),
-      request('POST', '/api/v2/study/sessions', { mode: 'learn', size: 2 }),
+      request('POST', '/api/v2/study/sessions', {
+        mode: 'learn',
+        bookId: 'demo-book-daily',
+        size: 2,
+      }),
+      request('POST', '/api/v2/study/sessions', {
+        mode: 'learn',
+        bookId: 'demo-book-daily',
+        size: 2,
+      }),
     ]);
     concurrent.forEach((response) => expect(response.statusCode, response.body).toBe(200));
     const accepted = concurrent.map((response) => response.json().session).filter(Boolean);
-    expect(accepted).toHaveLength(1);
+    expect(accepted).toHaveLength(2);
+    expect(new Set(accepted.map((task) => task.id)).size).toBe(1);
     expect(accepted[0].items).toHaveLength(2);
+    const paused = await request('POST', `/api/v2/study/tasks/${accepted[0].id}/state`, {
+      action: 'pause',
+      commandId: randomUUID(),
+      expectedSessionRevision: accepted[0].revision,
+    });
+    expect(paused.statusCode, paused.body).toBe(200);
     prefs = (await request('GET', '/api/v2/me/settings')).json().settings;
     expect(
       (
@@ -646,7 +689,10 @@ suite('PostgreSQL API and isolation', () => {
             .map((word) => ({ userId, wordId: word.id, paused: true })),
         });
       }
-      await prisma.userSettings.update({ where: { userId }, data: { dailyNewLimit: 100 } });
+      await prisma.userSettings.update({
+        where: { userId },
+        data: { dailyNewLimit: 100, dailyTotalGoal: 100 },
+      });
       const learned = await request('POST', '/api/v2/study/sessions', {
         bookId: fixture,
         mode: 'learn',
@@ -671,10 +717,13 @@ suite('PostgreSQL API and isolation', () => {
       await prisma.book.deleteMany({ where: { id: fixture } });
       await prisma.knownImport.deleteMany({ where: { id: fixture } });
       await prisma.userWord.deleteMany({ where: { userId, wordId: { startsWith: fixture } } });
+      await prisma.dailyPlanWord.deleteMany({
+        where: { plan: { userId }, wordId: { startsWith: fixture } },
+      });
       await prisma.word.deleteMany({ where: { id: { startsWith: fixture } } });
       await prisma.userSettings.update({
         where: { userId },
-        data: { dailyNewLimit: prefs.dailyNewLimit },
+        data: { dailyNewLimit: prefs.dailyNewLimit, dailyTotalGoal: prefs.dailyTotalGoal },
       });
     }
   }, 60000);
@@ -714,7 +763,10 @@ suite('PostgreSQL API and isolation', () => {
           claims: { create: { userId, wordId: fixtureWords[5]! } },
         },
       });
-      await prisma.userSettings.update({ where: { userId }, data: { dailyNewLimit: 100 } });
+      await prisma.userSettings.update({
+        where: { userId },
+        data: { dailyNewLimit: 100, dailyTotalGoal: 100 },
+      });
       const group = await request('POST', '/api/v2/study/sessions', {
         mode: 'learn',
         bookId: fixture,
@@ -755,10 +807,13 @@ suite('PostgreSQL API and isolation', () => {
       await prisma.studySession.deleteMany({ where: { userId, bookId: fixture } });
       await prisma.book.deleteMany({ where: { id: fixture } });
       await prisma.knownImport.deleteMany({ where: { id: fixture } });
+      await prisma.dailyPlanWord.deleteMany({
+        where: { plan: { userId }, wordId: { startsWith: fixture } },
+      });
       await prisma.word.deleteMany({ where: { id: { startsWith: fixture } } });
       await prisma.userSettings.update({
         where: { userId },
-        data: { dailyNewLimit: prefs.dailyNewLimit },
+        data: { dailyNewLimit: prefs.dailyNewLimit, dailyTotalGoal: prefs.dailyTotalGoal },
       });
     }
   });

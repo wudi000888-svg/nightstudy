@@ -102,45 +102,21 @@ export function WordView({
   const senses = [...(hideMeanings ? [] : (word.senses ?? []))]
     .filter((sense) => (sense.definitionZh ?? '').trim() || sense.definitionEn?.trim())
     .sort((a, b) => Number(b.id === focusSenseId) - Number(a.id === focusSenseId));
+  const sourceTranscription =
+    word.phonetic || word.phonetics?.find((entry) => entry.region === 'unspecified')?.text;
   return (
     <div className="word-content">
       <div className="word-title-row">
         <div>
           <h2 className="word-title">{word.lemma}</h2>
-          <div className="phonetic">
-            {word.phoneticUs || word.phoneticUk ? (
-              <>
-                {word.phoneticUs && (
-                  <span>
-                    <small>美式</small> {word.phoneticUs}
-                  </span>
-                )}
-                {word.phoneticUk && (
-                  <span>
-                    <small>英式</small> {word.phoneticUk}
-                  </span>
-                )}
-              </>
-            ) : word.phonetics?.length ? (
-              word.phonetics.map((value) => (
-                <span key={value.text} title="词库读音标注，未区分英美">
-                  {value.text}
-                </span>
-              ))
-            ) : (
-              word.phonetic || '来源暂未提供音标'
-            )}
-          </div>
-          {word.phoneticUs || word.phoneticUk
-            ? word.phoneticSource && (
-                <details className="phonetic-caption">
-                  <summary>音标出处</summary>
-                  <span>{word.phoneticSource}</span>
-                </details>
-              )
-            : !!word.phonetics?.length && (
-                <span className="phonetic-caption">词库音标 · 来源未分型</span>
-              )}
+          {!word.phoneticUs && !word.phoneticUk && !!sourceTranscription && (
+            <>
+              <div className="phonetic">
+                <span title="词库读音标注，未区分英美">{sourceTranscription}</span>
+              </div>
+              <span className="phonetic-caption">词库音标 · 来源未分型</span>
+            </>
+          )}
         </div>
         <AudioButton word={word} />
       </div>

@@ -2758,13 +2758,53 @@ td strong {
 
 .audio-control.pronunciation-control {
   flex-shrink: 0;
-  max-width: 265px;
-  text-align: right;
+  width: min(100%, 320px);
+  max-width: 320px;
+  align-items: stretch;
+  text-align: left;
+}
+.pronunciation-lines {
+  display: grid;
+  gap: 6px;
+}
+.pronunciation-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pronunciation-row .pronunciation-speaker {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.pronunciation-ipa {
+  min-width: 0;
+  flex: 1;
+  color: var(--gold-light);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.pronunciation-ipa > span {
+  display: block;
+  line-height: 1.6;
+}
+.pronunciation-ipa > span > small {
+  margin-right: 5px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.pronunciation-kind {
+  display: block;
+  font-size: 10px;
+  color: var(--dim);
+  line-height: 1.5;
 }
 .pronunciation-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
 }
 .pronunciation-actions select {
@@ -2833,12 +2873,20 @@ td strong {
   background: #e9b36d14;
   text-decoration-color: var(--gold-light);
 }
-.word-card-modal {
-  inset: auto;
+.word-card-layer {
+  position: fixed;
+  z-index: 1100;
+  display: flex;
   margin: 0;
   padding: 0;
   max-width: calc(100vw - 32px);
   max-height: calc(100dvh - 32px);
+}
+.word-card-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: inherit;
   border: 1px solid #e9b36d3d;
   border-radius: 16px;
   background: linear-gradient(145deg, #1c282c, #11191f);
@@ -2846,40 +2894,44 @@ td strong {
   overflow: hidden;
   box-shadow: 0 22px 90px #000a;
 }
-.word-card-modal[open] {
-  display: flex;
-  flex-direction: column;
-}
-.word-card-modal::backdrop {
-  background: #03090e99;
-  backdrop-filter: blur(3px);
-}
 .word-card-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 18px 20px;
+  padding: 12px 18px;
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
+}
+.word-card-tools {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.word-card-tools .icon-button {
+  min-width: 36px;
+  min-height: 36px;
 }
 .word-card-heading {
   min-width: 0;
   outline: 0;
 }
 .word-card-heading h2 {
-  margin: 7px 0 0;
+  margin: 4px 0 0;
   font-family: Georgia, serif;
   font-size: 25px;
   overflow-wrap: anywhere;
 }
 .word-card-scroll {
-  padding: 22px;
+  padding: 18px;
   overflow-y: auto;
   min-height: 0;
   overscroll-behavior: contain;
 }
 .word-card-scroll .word-title {
+  display: none;
+}
+.word-card-scroll .word-title-row > div:first-child:not(:has(.phonetic)) {
   display: none;
 }
 .word-card-scroll .word-title-row {
@@ -2888,6 +2940,7 @@ td strong {
   gap: 18px;
 }
 .word-card-scroll .pronunciation-control {
+  width: 100%;
   max-width: 100%;
 }
 .word-card-scroll .word-source-detail {
@@ -2931,6 +2984,24 @@ td strong {
   font-size: 10px;
   line-height: 1.6;
   color: var(--muted);
+}
+.pronunciation-device {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.pronunciation-device > summary {
+  cursor: pointer;
+}
+.pronunciation-device > .pronunciation-actions {
+  margin-top: 9px;
+}
+.pronunciation-device > small {
+  display: block;
+  margin-top: 7px;
+  font-size: 10px;
+  overflow-wrap: anywhere;
 }
 .pronunciation-license summary,
 .phonetic-caption summary {
@@ -3055,13 +3126,15 @@ td strong {
   }
 }
 @media (max-width: 660px) {
-  .word-card-modal {
+  .word-card-layer {
     inset: auto 0 0;
     width: 100%;
     max-width: 100%;
     max-height: 82dvh;
-    border-radius: 22px 22px 0 0;
     padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .word-card-panel {
+    border-radius: 22px 22px 0 0;
   }
   .word-card-top {
     padding: 18px 19px 14px;

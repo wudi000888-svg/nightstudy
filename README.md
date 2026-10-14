@@ -11,9 +11,13 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**0.6 代码与内容更新：** 五书8,798词的独立中英文解释、8,786词的真实配对或原创用法，以及437词组的学习与英美合成音源；没有本地翻译模型。学习正文保留词性、解释和读音，来源许可单独查看。生词本可按真实复习证据软毕业，熟词本合并自己标记和自动熟词。后台可选DeepSeek只主动测试与预览，不自动改词库。详细范围见 [双语内容](docs/BILINGUAL_CONTENT.md)、[内容包](docs/CONTENT.md) 和 [AI配置](docs/AI_CONFIGURATION.md)；最终0.6构建、CI和生产安装结果待对应验收记录，以下历史结果不作为本版上线证明。
+**当前线上版本：[`0.6.0-alpha.3`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.3)。** 五书8,798词的独立中英文解释、8,786词的真实配对或原创用法，以及437词组的学习与英美音源已安装。学习正文保留词性、解释、例句和两个发音选项，来源许可单独查看。生词本按真实复习证据自动整理，熟词本合并自己标记和自动熟词。后台「AI 内容辅助」支持加密保存DeepSeek密钥、主动检测和缺项预览，候选需人工校对保存；日常学习不会触发付费请求。详细范围见 [双语内容](docs/BILINGUAL_CONTENT.md)、[内容包](docs/CONTENT.md) 和 [AI配置](docs/AI_CONFIGURATION.md)。
 
-**最近已记录的线上验收版本：[`0.5.0-alpha.2`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.5.0-alpha.2)。** 桌面悬停英文立即打开清晰背景词卡，英美喇叭各在对应IPA前。每日计划按“复习 + 新学”的不同词总数安排：先预留到期复习，再补本书新词。选书先确认计划，支持暂停、延期、跨端继续、完成历史与七天复习负担。具体规则见 [每日任务](docs/DAILY_TASKS.md)、[个性化计划](docs/architecture/PERSONALIZATION.md) 和 [CHANGELOG](CHANGELOG.md)。
+本版代码 `b2ace74` 已通过363项测试、类型/格式/构建和完整隔离Compose安装验证：[CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38604154087)、[镜像发行](https://github.com/wudi000888-svg/nightstudy/actions/runs/38604382836)。VPS保持770,611个词条，完成25组数据保留检查、45项HTTPS/只读数据库混合检查和旧任务7组快照回读；升级前备份在独立测试库实际恢复并核对原始元数据，临时库和测试账户已清理。管理员现用密码不重置，浏览器现有会话实际验证DeepSeek设置及最新版本检测。未提供真实API密钥，本次付费推理请求为0；未进行容量压测或专家语义认证。
+
+[线上双语词卡](docs/media/bilingual-card-preview.png) · [DeepSeek 配置页面](docs/media/deepseek-preview.jpg)。IPA包覆盖统计按实测词条刷新，原始账号、词书与学习数据保持；词库完整收录不代表每个冷门词已有双语例句，五书覆盖范围及12个待核对词见内容文档。
+
+**每日学习计划：** 桌面悬停英文立即打开清晰背景词卡，英美喇叭各在对应IPA前。每日计划按“复习 + 新学”的不同词总数安排：先预留到期复习，再补本书新词。选书先确认计划，支持暂停、延期、跨端继续、完成历史与七天复习负担。具体规则见 [每日任务](docs/DAILY_TASKS.md)、[个性化计划](docs/architecture/PERSONALIZATION.md) 和 [CHANGELOG](CHANGELOG.md)。0.5历史验收见 [0.5.0-alpha.2](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.5.0-alpha.2)。
 
 [线上悬停词卡](docs/media/hover-card-preview.png) · [手机任务实测（本机可丢弃账户）](docs/media/daily-tasks-mobile-preview.png)
 

@@ -67,7 +67,9 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - name: Verify bounded audio archive extraction
-        run: python3 scripts/audio-extract.test.py
+        run: |
+          python3 scripts/audio-extract.test.py
+          python3 scripts/audio-offline.test.py
       - name: Verify offline bilingual provenance and output boundaries
         run: |
           python3 scripts/bilingual-llm.test.py

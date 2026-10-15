@@ -4171,3 +4171,39 @@ td strong {
     margin-bottom: 15px;
   }
 }
+
+.sentence-audio-controls {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  vertical-align: middle;
+  margin-block: 4px;
+}
+.sentence-audio-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--line, #c9d9db);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ink, #29454a);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.sentence-audio-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sentence-audio-button[aria-pressed='true'] {
+  background: var(--accent-soft, #c8e5e2);
+}
+.sentence-audio-button:focus-visible {
+  outline: 2px solid var(--accent, #308379);
+  outline-offset: 3px;
+}

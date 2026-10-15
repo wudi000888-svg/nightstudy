@@ -1,9 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { audioEntry, synthesisAvailable, verifiedAudioBytes } from './audio.js';
+import {
+  audioEntry,
+  sentenceTextHash,
+  normalizeSentenceText,
+  verifiedAudioBytes,
+} from './audio.js';
 
 function pcmTone() {
   const bytes = Buffer.alloc(44 + 256);
@@ -27,6 +33,36 @@ function pcmTone() {
     );
   return bytes;
 }
+async function trackAssetReads(filenames: Set<string>) {
+  const first = filenames.values().next().value!;
+  const probe = await fsp.open(first, 'r');
+  const prototype = Object.getPrototypeOf(probe);
+  await probe.close();
+  const handles = new WeakSet<object>();
+  const originalOpen = fsp.open.bind(fsp),
+    originalReadFile = prototype.readFile;
+  let count = 0;
+  const opens = vi.spyOn(fsp, 'open').mockImplementation(async (filename, flags, mode) => {
+    const handle = await originalOpen(filename, flags, mode);
+    if (typeof filename === 'string' && filenames.has(filename)) handles.add(handle);
+    return handle;
+  });
+  const reads = vi.spyOn(prototype, 'readFile').mockImplementation(function (
+    this: object,
+    ...args: unknown[]
+  ) {
+    if (handles.has(this)) count++;
+    return Reflect.apply(originalReadFile, this, args);
+  });
+  return {
+    count: () => count,
+    restore: () => {
+      reads.mockRestore();
+      opens.mockRestore();
+    },
+  };
+}
+
 describe('audio asset metadata and filesystem boundaries', () => {
   let directory = '',
     originalCache: string | undefined,
@@ -99,6 +135,9 @@ describe('audio asset metadata and filesystem boundaries', () => {
     fs.writeFileSync(privateFilename, bytes);
     const entry = { fileKey: `files/${hash}.wav`, fileSha256: hash, mimeType: 'audio/wav' };
     const target = path.join(process.env.AUDIO_CACHE_DIR!, entry.fileKey);
+    fs.writeFileSync(target, bytes);
+    await verifiedAudioBytes(entry);
+    fs.unlinkSync(target);
     fs.symlinkSync(privateFilename, target);
     await expect(verifiedAudioBytes(entry)).rejects.toMatchObject({
       code: 'audio_asset_unavailable',
@@ -110,15 +149,55 @@ describe('audio asset metadata and filesystem boundaries', () => {
       code: 'audio_asset_unavailable',
     });
   });
-  it('does not advertise synthesis when Python or either required model is absent', () => {
-    expect(synthesisAvailable()).toBe(false);
-    process.env.AUDIO_PYTHON = process.execPath;
-    expect(synthesisAvailable()).toBe(false);
-    fs.mkdirSync(path.join(process.env.AUDIO_CACHE_DIR!, 'models'));
-    fs.writeFileSync(
-      path.join(process.env.AUDIO_CACHE_DIR!, 'models/en_US-ljspeech-high.onnx'),
-      'test marker; not a model',
+  it('reuses verified bytes only after a new descriptor stat, and rejects tampering even when mtime is restored', async () => {
+    const entry = fixture();
+    const target = path.join(process.env.AUDIO_CACHE_DIR!, entry.fileKey);
+    const reads = await trackAssetReads(new Set([target]));
+    try {
+      const first = await verifiedAudioBytes(entry);
+      first[0] = 0;
+      expect(await verifiedAudioBytes(entry)).toEqual(pcmTone());
+      expect(reads.count()).toBe(1);
+      const originalStat = fs.statSync(target);
+      const changed = pcmTone();
+      changed[50] = changed[50]! ^ 1;
+      fs.writeFileSync(target, changed);
+      fs.utimesSync(target, originalStat.atime, originalStat.mtime);
+      await expect(verifiedAudioBytes(entry)).rejects.toMatchObject({
+        code: 'audio_asset_invalid',
+      });
+      expect(reads.count()).toBe(2);
+      fs.writeFileSync(target, pcmTone());
+      expect(await verifiedAudioBytes(entry)).toEqual(pcmTone());
+      expect(reads.count()).toBe(3);
+    } finally {
+      reads.restore();
+    }
+  });
+  it('evicts the least recently used audio once the 32 MiB byte limit is reached', async () => {
+    const entries = Array.from({ length: 17 }, (_, index) => {
+      const bytes = Buffer.alloc(2 * 1024 * 1024);
+      pcmTone().copy(bytes);
+      bytes[bytes.length - 1] = index;
+      return fixture(bytes);
+    });
+    const reads = await trackAssetReads(
+      new Set(entries.map((entry) => path.join(process.env.AUDIO_CACHE_DIR!, entry.fileKey))),
     );
-    expect(synthesisAvailable()).toBe(false);
+    try {
+      for (const entry of entries) await verifiedAudioBytes(entry);
+      expect(reads.count()).toBe(17);
+      await verifiedAudioBytes(entries[16]!);
+      expect(reads.count()).toBe(17);
+      await verifiedAudioBytes(entries[0]!);
+      expect(reads.count()).toBe(18);
+    } finally {
+      reads.restore();
+    }
+  });
+  it('deduplicates sentence whitespace and quote forms while keeping lexical case', () => {
+    expect(normalizeSentenceText('  It’s  raining.  ')).toBe("It's raining.");
+    expect(sentenceTextHash('  It’s  raining.  ')).toBe(sentenceTextHash("It's raining."));
+    expect(sentenceTextHash('US')).not.toBe(sentenceTextHash('us'));
   });
 });

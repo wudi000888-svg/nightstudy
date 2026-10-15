@@ -12,7 +12,7 @@ export interface AcademyLesson {
   body: Array<{ id: string; en: string; zh: string }>;
   vocabulary: string[];
   listeningTargets: string[];
-  speech: { kind: 'device'; requiresAvailableVoice: true } | null;
+  speech: { kind: 'pack'; requiresAvailableAudio: true } | null;
   completionPolicy: 'objective-listening' | 'completion-only';
 }
 const lesson = (
@@ -36,7 +36,7 @@ const lesson = (
   body: lines.map(([en, zh], index) => ({ id: `${id}-${index + 1}`, en, zh })),
   vocabulary,
   listeningTargets,
-  speech: category === 'shadowing' ? { kind: 'device', requiresAvailableVoice: true } : null,
+  speech: category === 'shadowing' ? { kind: 'pack', requiresAvailableAudio: true } : null,
   completionPolicy: category === 'listening' ? 'objective-listening' : 'completion-only',
 });
 /** Original introductory lessons, not copied courseware or a complete examination curriculum. */
@@ -92,7 +92,7 @@ export const academyLessons: readonly AcademyLesson[] = [
     'clear-requests',
     '把请求说清楚',
     'shadowing',
-    '可选设备语音示范；自己朗读后标记完成，不进行口语评分。',
+    '先听英美朗读，再录下自己的声音，感受节奏与语调。',
     [
       ['Could you close the window, please?', '请你把窗户关上，好吗？'],
       ['May I have a glass of water?', '可以给我一杯水吗？'],

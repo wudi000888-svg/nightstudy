@@ -16,3 +16,9 @@ data/bilingual.review-queue.json
 data/phrase-books.source.manifest.json
 data/phrase-books.manifest.json
 data/phrase-books.review-queue.json
+data/exam-books.manifest.json
+data/exam-books.sources.json
+data/exam-books.review-queue.json
+data/recorded-audio.manifest.json
+data/word-audio-v2.manifest.json
+data/sentence-audio.manifest.json

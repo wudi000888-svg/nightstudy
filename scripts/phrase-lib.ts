@@ -63,6 +63,14 @@ const rowSchema = z
   })
   .strict();
 export type PhraseRow = z.infer<typeof rowSchema>;
+export const phraseBookLabels = {
+  'cet4-phrases': '四级 · 常用词组',
+  'cet6-phrases': '六级 · 进阶词组',
+} as const;
+export const phraseBookDescription = '在常见阅读与交流场景中，学习词组、搭配和例句。';
+export function legacyPhraseBookDescription(corpusCount: number) {
+  return `NightStudy独立编选的常用词组，供四级/六级方向练习参考；不是官方完整考试大纲。中文原释义来自固定版ECDICT，英文对照及多数例句为Codex辅助原创，待校对；本书${corpusCount}条真实Tatoeba双语例句保留双方来源归因。`;
+}
 export interface PhraseManifest {
   formatVersion: 1;
   id: string;
@@ -409,10 +417,8 @@ export async function importPhraseRows(
         result.newExamples += inserted.rowCount || 0;
       }
     }
-    for (const [goal, title] of [
-      ['cet4-phrases', '四级方向常用词组'],
-      ['cet6-phrases', '六级方向常用词组'],
-    ] as const) {
+    for (const goal of ['cet4-phrases', 'cet6-phrases'] as const) {
+      const title = phraseBookLabels[goal];
       const id = 'content-' + manifest.id + '-' + goal;
       const existing = await client.query(`SELECT "ownerId",kind FROM "Book" WHERE id=$1`, [id]);
       if (
@@ -430,7 +436,7 @@ export async function importPhraseRows(
           id,
           manifest.id === 'phrase-books-v1' ? goal : `${manifest.id}-${goal}`,
           title,
-          `NightStudy独立编选的常用词组，供四级/六级方向练习参考；不是官方完整考试大纲。中文原释义来自固定版ECDICT，英文对照及多数例句为Codex辅助原创，待校对；本书${resolved.filter((x) => x.row.book === goal && (x.row.examples[0]!.contentMetadata.exampleEn as Record<string, unknown>).kind === 'corpus').length}条真实Tatoeba双语例句保留双方来源归因。`,
+          phraseBookDescription,
           goal.startsWith('cet4') ? 'cet4' : 'cet6',
           manifest.version,
         ],

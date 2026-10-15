@@ -83,7 +83,7 @@ export interface AcademyLesson extends Omit<
   body: { id: string; en: string; zh: string }[];
   vocabulary: string[];
   listeningTargets: string[];
-  speech: { kind: 'device'; requiresAvailableVoice: true } | null;
+  speech: { kind: 'pack'; requiresAvailableAudio: true } | null;
   completionPolicy: 'objective-listening' | 'completion-only';
 }
 export interface AcademyAttempt {

@@ -77,11 +77,11 @@ class SafeAudioExtraction(unittest.TestCase):
         self.reject([("manifest.json", b"{}", tarfile.REGTYPE), ("licenses/run.py", b"not executed", tarfile.REGTYPE)], "archive_name_not_allowed")
         self.reject([("manifest.json", b"{}", tarfile.REGTYPE), ("manifest.json", b"duplicate", tarfile.REGTYPE)], "archive_duplicate_name")
 
-    def test_rejects_oversized_effective_names_and_the_actual_20050_member_boundary(self):
+    def test_rejects_oversized_effective_names_and_the_actual_60050_member_boundary(self):
         self.reject([("manifest.json", b"{}", tarfile.REGTYPE), ("licenses/" + "a" * 250 + ".txt", b"notice", tarfile.REGTYPE)])
         def entries():
             yield "manifest.json", b"{}", tarfile.REGTYPE
-            for index in range(20050):
+            for index in range(extractor.MAX_MEMBERS):
                 yield "files/" + format(index, "064x") + ".wav", b"", tarfile.REGTYPE
         self.pack(entries())
         with self.assertRaises(extractor.ArchiveError) as result:
@@ -116,8 +116,8 @@ class SafeAudioExtraction(unittest.TestCase):
         self.assertFalse(self.output.exists())
 
     def test_rejects_oversized_declared_file_and_pax_metadata_before_reading_payload(self):
-        for name, size in [("manifest.json", 32 * 1024 * 1024 + 1),
-                           ("sources.manifest.json", 1024 * 1024 + 1),
+        for name, size in [("manifest.json", 128 * 1024 * 1024 + 1),
+                           ("sources.manifest.json", 32 * 1024 * 1024 + 1),
                            ("licenses/notice.txt", 1024 * 1024 + 1),
                            ("files/" + "c" * 64 + ".mp3", 2 * 1024 * 1024 + 1)]:
             with self.subTest(name=name):

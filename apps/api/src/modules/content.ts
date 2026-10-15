@@ -357,9 +357,14 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
       declaredEntryCount: packs
         .filter(
           (pack) =>
-            !['phonetics', 'audio', 'bilingual', 'phrase-books'].includes(
-              String(obj(pack.tagCounts).kind),
-            ),
+            ![
+              'phonetics',
+              'audio',
+              'bilingual',
+              'phrase-books',
+              'exam-books',
+              'sentence-audio',
+            ].includes(String(obj(pack.tagCounts).kind)),
         )
         .reduce((sum, pack) => sum + pack.entryCount, 0),
       packs: packs.map(packDto),

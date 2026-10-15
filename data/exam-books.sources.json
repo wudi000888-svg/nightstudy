@@ -1,0 +1,140 @@
+{
+  "formatVersion": 1,
+  "sources": [
+    {
+      "id": "cet4",
+      "repository": "https://github.com/openetymology/OpenEtymology",
+      "commit": "7d89f3697abf26e305fe2627f181b692c2c10b28",
+      "path": "CET4/CET4.txt",
+      "sourceUrl": "https://raw.githubusercontent.com/openetymology/OpenEtymology/7d89f3697abf26e305fe2627f181b692c2c10b28/CET4/CET4.txt",
+      "sourcePage": "https://github.com/openetymology/OpenEtymology/blob/7d89f3697abf26e305fe2627f181b692c2c10b28/CET4/CET4.txt",
+      "gitBlobSha1": "eea828567145106ac5ba70d9f493846a21dc7b53",
+      "sha256": "55c074bcb06aaa2fe5aa99b550d255b55d373ef313bc051fa53f9d82231784e0",
+      "bytes": 33755,
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "cet6",
+      "repository": "https://github.com/openetymology/OpenEtymology",
+      "commit": "7d89f3697abf26e305fe2627f181b692c2c10b28",
+      "path": "CET6/CET6.txt",
+      "sourceUrl": "https://raw.githubusercontent.com/openetymology/OpenEtymology/7d89f3697abf26e305fe2627f181b692c2c10b28/CET6/CET6.txt",
+      "sourcePage": "https://github.com/openetymology/OpenEtymology/blob/7d89f3697abf26e305fe2627f181b692c2c10b28/CET6/CET6.txt",
+      "gitBlobSha1": "aa092bc7641e7f5fa32ca887f0fb3e3a65761e83",
+      "sha256": "9a8fa3f2464a39526472211228ef1f331ab1e3d67567b11eea49efc7444d5647",
+      "bytes": 18462,
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "tem8",
+      "repository": "https://github.com/openetymology/OpenEtymology",
+      "commit": "7d89f3697abf26e305fe2627f181b692c2c10b28",
+      "path": "TEM8/TEM8.txt",
+      "sourceUrl": "https://raw.githubusercontent.com/openetymology/OpenEtymology/7d89f3697abf26e305fe2627f181b692c2c10b28/TEM8/TEM8.txt",
+      "sourcePage": "https://github.com/openetymology/OpenEtymology/blob/7d89f3697abf26e305fe2627f181b692c2c10b28/TEM8/TEM8.txt",
+      "gitBlobSha1": "8071f1691b62d9ef95e835b581af1e8cb60d4892",
+      "sha256": "0d70fd4779399ec222308eaea7d81c0343e6a8416f887445c5687abb08561d6f",
+      "bytes": 33918,
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "toefl",
+      "repository": "https://github.com/openetymology/OpenEtymology",
+      "commit": "7d89f3697abf26e305fe2627f181b692c2c10b28",
+      "path": "TOEFL/TOEFL.txt",
+      "sourceUrl": "https://raw.githubusercontent.com/openetymology/OpenEtymology/7d89f3697abf26e305fe2627f181b692c2c10b28/TOEFL/TOEFL.txt",
+      "sourcePage": "https://github.com/openetymology/OpenEtymology/blob/7d89f3697abf26e305fe2627f181b692c2c10b28/TOEFL/TOEFL.txt",
+      "gitBlobSha1": "cb47cf7df5fe868d3c15dcb3e338e38bedf938ec",
+      "sha256": "5aafb5f70e5414e87264466ea1cf0d41528397fbcd1d3b0bea00bacf8985f587",
+      "bytes": 37348,
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "gre",
+      "repository": "https://github.com/openetymology/OpenEtymology",
+      "commit": "7d89f3697abf26e305fe2627f181b692c2c10b28",
+      "path": "GRE8000/GRE8000.txt",
+      "sourceUrl": "https://raw.githubusercontent.com/openetymology/OpenEtymology/7d89f3697abf26e305fe2627f181b692c2c10b28/GRE8000/GRE8000.txt",
+      "sourcePage": "https://github.com/openetymology/OpenEtymology/blob/7d89f3697abf26e305fe2627f181b692c2c10b28/GRE8000/GRE8000.txt",
+      "gitBlobSha1": "67dbf036f5e54bc3c66da5315f9cf1d107a4e6fd",
+      "sha256": "67086cdddfca2e7f5346f904302c3d57f4488d91d32835923d19b3e5256769e4",
+      "bytes": 66108,
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "tem4",
+      "repository": "https://github.com/RealKai42/qwerty-learner-vscode",
+      "commit": "e0dc7a09a5e0946d77b2c279f72a89daf3659b97",
+      "path": "assets/dicts/Level4luan_2_T.json",
+      "sourceUrl": "https://raw.githubusercontent.com/RealKai42/qwerty-learner-vscode/e0dc7a09a5e0946d77b2c279f72a89daf3659b97/assets/dicts/Level4luan_2_T.json",
+      "sourcePage": "https://github.com/RealKai42/qwerty-learner-vscode/blob/e0dc7a09a5e0946d77b2c279f72a89daf3659b97/assets/dicts/Level4luan_2_T.json",
+      "gitBlobSha1": "3ee34cc8cce4848b751bcb750b9b534459215818",
+      "sha256": "3c48b2ece3603b63daca4e887e615fb0a732266a568fe4be8ef2d1f497a4a722",
+      "bytes": 832667,
+      "license": "NOASSERTION",
+      "codeLicense": "MIT",
+      "use": "English headword facts only; no dictionary definitions, phonetics or audio are copied. Underlying kajweb/Youdao dictionary data has no separately established data licence. The repository MIT licence must not be read as a grant for that third-party dictionary content."
+    },
+    {
+      "id": "phrases-tem4",
+      "repository": "https://github.com/2ndLA/english-phrases",
+      "commit": "a03f97177ec0db8986085fb3edc1e64a4660e46c",
+      "path": "lists/tem4.txt",
+      "sourceUrl": "https://raw.githubusercontent.com/2ndLA/english-phrases/a03f97177ec0db8986085fb3edc1e64a4660e46c/lists/tem4.txt",
+      "sourcePage": "https://github.com/2ndLA/english-phrases/blob/a03f97177ec0db8986085fb3edc1e64a4660e46c/lists/tem4.txt",
+      "gitBlobSha1": "cc3eed4ff8e9c51dbb2112c1bd69bb852d77600b",
+      "sha256": "70f18d136630e820a0909ef66b9891eef58b98fc3d0e2cf1755e7644b5df6e47",
+      "bytes": 17118,
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "phrases-tem8",
+      "repository": "https://github.com/2ndLA/english-phrases",
+      "commit": "a03f97177ec0db8986085fb3edc1e64a4660e46c",
+      "path": "lists/tem8.txt",
+      "sourceUrl": "https://raw.githubusercontent.com/2ndLA/english-phrases/a03f97177ec0db8986085fb3edc1e64a4660e46c/lists/tem8.txt",
+      "sourcePage": "https://github.com/2ndLA/english-phrases/blob/a03f97177ec0db8986085fb3edc1e64a4660e46c/lists/tem8.txt",
+      "gitBlobSha1": "464f06e7cee23c429a55f06b790643e6690d0a4c",
+      "sha256": "469e9147d54b4c040aa2df49df294beea7f00680a1c36ebe7feb5db0553e2208",
+      "bytes": 40542,
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "openetymology-data-license",
+      "repository": "https://github.com/openetymology/OpenEtymology",
+      "commit": "7d89f3697abf26e305fe2627f181b692c2c10b28",
+      "path": "DATA_LICENSE.md",
+      "sourceUrl": "https://raw.githubusercontent.com/openetymology/OpenEtymology/7d89f3697abf26e305fe2627f181b692c2c10b28/DATA_LICENSE.md",
+      "sourcePage": "https://github.com/openetymology/OpenEtymology/blob/7d89f3697abf26e305fe2627f181b692c2c10b28/DATA_LICENSE.md",
+      "gitBlobSha1": "0f6b727a6654680384efbe2fa176de312d0b9373",
+      "sha256": "a92399cf4721a4a80b8c05f6028729bbe2c230e48cb3cdc0e28cef6084651069",
+      "bytes": 433,
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "id": "tem4-code-license",
+      "repository": "https://github.com/RealKai42/qwerty-learner-vscode",
+      "commit": "e0dc7a09a5e0946d77b2c279f72a89daf3659b97",
+      "path": "LICENSE",
+      "sourceUrl": "https://raw.githubusercontent.com/RealKai42/qwerty-learner-vscode/e0dc7a09a5e0946d77b2c279f72a89daf3659b97/LICENSE",
+      "sourcePage": "https://github.com/RealKai42/qwerty-learner-vscode/blob/e0dc7a09a5e0946d77b2c279f72a89daf3659b97/LICENSE",
+      "gitBlobSha1": "228c3871f70857ca23806e8a09dadd427f573545",
+      "sha256": "d3a47806c7c65f87e9d2b7721210a7ef5170a269f2e1a1ffa255590f5c636598",
+      "bytes": 1068,
+      "license": "MIT",
+      "use": "Code licence evidence only; does not license the third-party dictionary data."
+    },
+    {
+      "id": "phrases-license",
+      "repository": "https://github.com/2ndLA/english-phrases",
+      "commit": "a03f97177ec0db8986085fb3edc1e64a4660e46c",
+      "path": "LICENSE",
+      "sourceUrl": "https://raw.githubusercontent.com/2ndLA/english-phrases/a03f97177ec0db8986085fb3edc1e64a4660e46c/LICENSE",
+      "sourcePage": "https://github.com/2ndLA/english-phrases/blob/a03f97177ec0db8986085fb3edc1e64a4660e46c/LICENSE",
+      "gitBlobSha1": "795087c264ddd3059b2ab3945a74d11930e7c10e",
+      "sha256": "2003829cf643d61b00a76088dd31bb11b8029546f24c56b39fd492adb9281483",
+      "bytes": 20139,
+      "license": "CC-BY-SA-4.0"
+    }
+  ]
+}

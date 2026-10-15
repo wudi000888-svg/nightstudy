@@ -17,6 +17,7 @@ import { useAppNavigation } from '../components/AppNavigation';
 import type { H5HomeSummary, H5HomeEntry } from '../lib/h5-home-types';
 import { useScreenActive } from '../lib/screen-lifecycle';
 import { useBookPlan } from '../components/tasks/useBookPlan';
+import { SiteHomeAtmosphere } from '../components/HomeAtmosphere';
 import './h5-home.css';
 import './mobile-content.css';
 
@@ -154,14 +155,7 @@ export function HomePage() {
   };
   return (
     <section className="h5-home" aria-label="学习首页">
-      <div className="h5-home-wallpaper" aria-hidden="true">
-        <div className="h5-home-cloud" />
-        <div className="h5-home-architecture">
-          {Array.from({ length: 5 }, (_, index) => (
-            <span key={index} />
-          ))}
-        </div>
-      </div>
+      <SiteHomeAtmosphere />
       <button
         type="button"
         className="h5-home-avatar"

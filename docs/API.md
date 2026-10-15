@@ -1,6 +1,6 @@
 # Alpha API 契约
 
-对应当前0.7源码接口；最终版本的测试、发行与线上验收范围见 [README](../README.md) 和 [每日任务](DAILY_TASKS.md)，已记录的较早结果保留为历史证据。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
+对应当前0.9源码接口；最终版本的测试、发行与线上验收范围见 [README](../README.md) 和 [每日任务](DAILY_TASKS.md)，已记录的较早结果保留为历史证据。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
 
 请求由可信 Host 与规范 basePath 选择 operator 配置的 Realm，随后只访问该站独立认证/业务 PG DB。客户端不能通过 `siteId`、`userId`、数据库 URL 参数切换身份。真正互不信任的站点使用不同 origin；同 origin 子路径属于同一信任域。
 
@@ -118,16 +118,17 @@ goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固�
 
 | 方法与相对路径                             | 访问 | 主要参数与响应                                                                              |
 | ------------------------------------------ | ---- | ------------------------------------------------------------------------------------------- |
-| `GET /pronunciation/:wordId`               | 访客 | pronunciation：text/phonetics/audio/recordedAudioAvailable/speech                           |
+| `GET /pronunciation/:wordId`               | 访客 | pronunciation：text/phonetics/audio/recordedAudioAvailable                                  |
 | `GET /pronunciation/:wordId/audio/:accent` | 访客 | US或UK同源音频，验证文件/MIME头/SHA-256后返回媒体；ETag支持304                              |
-| `POST /pronunciation/:wordId/prepare`      | 用户 | JSON `{}`；服务可用且英美IPA齐备时补缺失合成音源，返回最新pronunciation                     |
 | `GET /translation/provider`                | 访客 | provider的mode/transport/configured/unofficial/bestEffort/maxTextLength等，无网关URL或token |
 | `POST /translation/website`                | 访客 | text/sourceLanguage/targetLanguage；返回Google官方网页链接及iframeSupported=false           |
 | `POST /translation/text`                   | 用户 | 同一文本契约；配置后返回translation与website；本站用户共享PG限流20次/分钟                   |
 
-发音接口提供已安装音标、ready音源、recordedAudioAvailable、generationAvailable和设备speech能力。`audio=[{id,accent,kind,url,status,sourceName,sourceUrl,license,attribution,mimeType}]`，accent为US/UK，kind为recorded/synthesized；URL是未添加挂载前缀的 `/api/v2/pronunciation/:wordId/audio/:accent`，客户端用本站mountUrl添加basePath，不接受任意外部字符串作为播放器源。WordDTO也有可选audio；旧会话快照没有该字段时读取fresh发音接口，不附带词义、不提前揭晓答案。
+发音接口只提供已安装音标、ready成品音源和recordedAudioAvailable，不返回generationAvailable或speech设备能力。`audio=[{id,accent,kind,url,status,sourceName,sourceUrl,license,attribution,mimeType}]`，accent为US/UK，kind为recorded/synthesized；URL是未添加挂载前缀的 `/api/v2/pronunciation/:wordId/audio/:accent`，客户端用本站mountUrl添加basePath，不接受任意外部字符串作为播放器源。WordDTO也有可选audio；旧会话快照没有该字段时读取fresh发音接口，不附带词义、不提前揭晓答案。
 
-prepare只补缺失音源，不覆盖优先的已就绪真人录音；返回后只更新选项，不自动播放。每用户每分钟最多20次补齐请求，合成运行并发有界。409 `audio_missing_phonetics`/`audio_preparing`、429 `audio_generation_busy`/`audio_generation_rate_limit`、503服务/文件失败与504超时显式报错；处理中可刷新元数据后重试。设备en-US/en-GB需要真实可用voice，是独立备用选项。音源来源许可、算法IPA与目标生成范围见 [PHONETICS.md](PHONETICS.md)。
+0.9删除实时prepare接口，缺音由维护者本机离线生成、验证并打包后安装；不提供浏览器语音备用入口。真人录音优先，合成不能覆盖现有recorded条目；没有可用文件时保持空列表与禁用播放状态。运行时逐项校验SHA/MIME及目录边界；32MiB字节缓存仍在每次打开描述符后核对inode、尺寸和纳秒时间戳，不能凭ETag绕过损坏或符号链接检查。音源范围见 [PHONETICS.md](PHONETICS.md)。
+
+词音与句音支持单段 `Range: bytes=start-end`、开放结尾和后缀范围，成功返回206与Content-Range；不可满足的范围返回416。过长、格式不符或多段范围按整文件200处理。If-Range仅在当前强ETag匹配时采用范围；If-None-Match匹配返回304。HEAD返回整文件头而不返回媒体体。以上所有路径均先完成文件验证，适配移动浏览器的分段媒体加载。
 
 翻译文本最多1,000个Unicode字符，sourceLanguage为auto/en/zh-CN（默认en），targetLanguage为en/zh-CN（默认zh-CN）。默认website-official仅提供官方网页入口，站内text返回503 `translation_not_configured`；生产站内结果使用带私密token的固定VPS网关，direct仅供本机开发。网页兼容provider返回 `google-web-compat` / `unofficial=true` / `bestEffort=true`，不是受支持的Google Cloud API。本机真实调用已遇到上游429；失败显示明确错误，不把离线词义冒充翻译。Google网页不能直接iframe，本站返回链接。原文会传送至配置网关/Google，不写翻译历史。配置、鉴权、超时的验证范围与尚待项见 [TRANSLATION.md](TRANSLATION.md)。
 
@@ -381,3 +382,22 @@ update包含status/checkedAt/latestVersion/releaseUrl/message/channel，另有ca
 其它状态为 `pending`、`disabled`、`unavailable`，此时 `payload: null`。`reason` 只使用稳定状态：`not_enabled`、`not_requested`、`busy`、`unavailable`、`invalid_response`、`configuration_changed`、`interrupted` 或 `null`。未知词条、重复词反馈、超限计划或不合格结构均不会成为可用建议。反馈的可选 `lemma` 由服务器对应拼写题快照补入，模型不能提交或替换词形。建议总目标最少 20、最大 100，并保留复习压力下限；组大小为 1–20，需用户自行采用。
 
 每份测试最多一次上游尝试；完成请求重发和 `GET /assessments/:id` 不重新调用。90 秒的旧 claim 只降级为中断，不启动第二次请求。模型失败时返回正常本地成绩；鉴权或所有权失效仍返回 401/404，不能用降级绕过私有报告权限。用户响应不含内部 claim、usage、模型或密钥，AI 不修改客观成绩、学习设置、熟词或真实复习历史。
+
+## 0.9 句子朗读与首页壁纸
+
+| 方法与相对路径                                | 访问   | 契约                                                                                                                             |
+| --------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /sentence-audio/:textHash`               | 访客   | `{sentence:{textHash,text,audio}}`；textHash为规范英文全文SHA-256，未安装时text=null、audio=[]。                                 |
+| `GET /sentence-audio/:textHash/audio/:accent` | 访客   | accent=US/UK，只播放当前站已安装成品，缺音404；字节校验和ETag规则与词音一致。                                                    |
+| `GET /appearance`                             | 访客   | `{appearance:{mode,imageUrl,positionX,positionY,overlay,animationEnabled,revision}}`。                                           |
+| `GET /admin/appearance`                       | 管理员 | 同上；有图片时即返回本站挂载路径内hash URL，mode只控制当前是否选用。                                                             |
+| `PUT /admin/appearance`                       | 管理员 | 严格JSON：expectedRevision以及mode/positionX/positionY/overlay/animationEnabled；不接收imageUrl。                                |
+| `POST /admin/appearance/wallpaper`            | 管理员 | expectedRevision/fileName/contentType/dataBase64；仅静态JPEG/PNG/WebP、输入≤4MiB、≤2000万像素；重编码≤1920×2560 WebP并去元数据。 |
+| `POST /admin/appearance/reset`                | 管理员 | `{expectedRevision}`；清除本站图片并恢复原创雨夜配置。                                                                           |
+| `GET /appearance/wallpaper/:sha256.webp`      | 访客   | 当前图片的内容寻址URL，image/webp、ETag与公开缓存；仅在本站独立数据库查找，支持HEAD。                                            |
+
+句子规范化为NFKC、弯引号转ASCII、折叠空白及去首尾空格，保留大小写；同样规则用于本机生成器、API和浏览器。没有接受任意文本并在线合成的接口。朗读元数据不混入FSRS、收藏、学习完成或口语评分。
+
+外观mode为rain-night/custom，位置0–100，overlay为0–0.85。首次revision=0，成功更新加1；旧版本返回409 appearance_conflict，必须读取新配置，不静默覆盖另一管理员的修改。JSON只影响站点公共外观，客户端不能指定站点、账户或数据库。上传失败不改当前壁纸，恢复默认也要求版本一致。
+
+目标枚举：daily/ielts/toefl/cet4/cet6/tem4/tem8/postgraduate/gre/high-school。社区考试词表是内容集合，不是官方大纲认证；词书安装和词义、句音覆盖分别统计。

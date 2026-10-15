@@ -16,6 +16,8 @@ const state = vi.hoisted(() => {
     refs: [] as { current: unknown }[],
     refCursor: 0,
     effects: [] as (() => unknown)[],
+    effectCursor: 0,
+    effectSlots: [] as { deps?: readonly unknown[]; cleanup?: () => void }[],
     rejectAudio: false,
   };
 });
@@ -36,8 +38,23 @@ vi.mock('react', async (original) => {
     },
     useRef: (initial: unknown) => (state.refs[state.refCursor++] ??= { current: initial }),
     useCallback: (callback: unknown) => callback,
-    useEffect: (callback: () => unknown) => {
-      state.effects.push(callback);
+    useEffect: (callback: () => unknown, deps: readonly unknown[] = []) => {
+      const index = state.effectCursor++,
+        previous = state.effectSlots[index];
+      if (
+        previous?.deps &&
+        deps.length === previous.deps.length &&
+        deps.every((value, i) => Object.is(value, previous.deps![i]))
+      )
+        return;
+      state.effects.push(() => {
+        previous?.cleanup?.();
+        const cleanup = callback();
+        state.effectSlots[index] = {
+          deps,
+          cleanup: typeof cleanup === 'function' ? (cleanup as () => void) : undefined,
+        };
+      });
     },
   };
 });
@@ -80,6 +97,7 @@ class FakeAudio {
   onended: (() => void) | null = null;
   onerror: (() => void) | null = null;
   pause = vi.fn();
+  removeAttribute = vi.fn();
   play = vi.fn(() =>
     state.rejectAudio ? Promise.reject(new Error('mock autoplay denied')) : Promise.resolve(),
   );
@@ -98,10 +116,12 @@ function render(autoPlay = true) {
   state.cursor = 0;
   state.refCursor = 0;
   state.effects = [];
+  state.effectCursor = 0;
   return AudioButton({ word, autoPlay });
 }
 function runAutomaticEffect() {
-  state.effects.at(-1)!();
+  for (const effect of state.effects) effect();
+  state.effects = [];
 }
 beforeAll(() =>
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('unexpected audio network'))),
@@ -115,6 +135,8 @@ beforeEach(() => {
   state.slots = [];
   state.refs = [];
   state.effects = [];
+  state.effectSlots = [];
+  state.effectCursor = 0;
   state.rejectAudio = false;
   instances.length = 0;
   vi.stubGlobal('React', React);
@@ -180,7 +202,8 @@ it('shows a failed autoplay attempt without retrying on render or silently switc
   expect(
     elements(tree).some(
       (element) =>
-        element.props.role === 'alert' && String(element.props.children).includes('再点一下喇叭'),
+        element.props.role === 'alert' &&
+        String(element.props.children).includes('请检查网络后重试'),
     ),
   ).toBe(true);
   runAutomaticEffect();

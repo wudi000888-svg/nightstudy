@@ -1,9 +1,24 @@
-export type Goal = 'daily' | 'ielts' | 'cet4' | 'cet6' | 'high-school';
+export type Goal =
+  | 'daily'
+  | 'ielts'
+  | 'toefl'
+  | 'cet4'
+  | 'cet6'
+  | 'tem4'
+  | 'tem8'
+  | 'postgraduate'
+  | 'gre'
+  | 'high-school';
 export const goalLabels: Record<Goal, string> = {
   daily: '日常英语',
   ielts: '雅思',
+  toefl: '托福',
   cet4: '四级',
   cet6: '六级',
+  tem4: '专四',
+  tem8: '专八',
+  postgraduate: '考研',
+  gre: 'GRE',
   'high-school': '高中',
 };
 export const goalNames = Object.keys(goalLabels) as Goal[];

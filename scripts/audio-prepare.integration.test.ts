@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { createDatabase } from '../apps/api/src/db.js';
 import type { SiteConfig } from '../apps/api/src/config.js';
-import { importAudioSite } from './audio-prepare.js';
+import { importAudioSite, importSentenceAudioSite } from './audio-prepare.js';
+import { sentenceTextHash } from '../apps/api/src/audio.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const suite = url ? describe : describe.skip;
@@ -111,6 +112,10 @@ suite('PostgreSQL audio installer SQL transaction helpers', () => {
     });
   }, 60000);
   afterAll(async () => {
+    await db.sentenceAudio.deleteMany({
+      where: { textHash: sentenceTextHash(`Original sentence ${prefix}.`) },
+    });
+    await db.contentPack.deleteMany({ where: { id: `${prefix}-sentences` } });
     await db.contentPack.deleteMany({ where: { id: prefix } });
     await db.word.deleteMany({ where: { id: { in: ids } } });
     await db.$disconnect();
@@ -198,5 +203,138 @@ suite('PostgreSQL audio installer SQL transaction helpers', () => {
     );
     expect(await db.contentPack.findUniqueOrThrow({ where: { id: prefix } })).toEqual(before);
     expect(await db.wordAudio.count({ where: { wordId: { in: ids } } })).toBe(2002);
+  });
+  it('does not replace an existing recorded word asset with a later synthetic refresh', async () => {
+    const where = { wordId_accent: { wordId: words[0]!.id, accent: 'US' } };
+    const before = await db.wordAudio.findUniqueOrThrow({ where });
+    await db.wordAudio.update({
+      where,
+      data: { kind: 'recorded', sourceName: 'Simulated recorded metadata; not certified speech' },
+    });
+    try {
+      await importAudioSite(site, manifest, source);
+      const after = await db.wordAudio.findUniqueOrThrow({ where });
+      expect(after.kind).toBe('recorded');
+      expect(after.sourceName).toBe('Simulated recorded metadata; not certified speech');
+      expect(after.id).toBe(before.id);
+    } finally {
+      await db.wordAudio.update({
+        where,
+        data: { kind: before.kind, sourceName: before.sourceName },
+      });
+    }
+  });
+  it('imports bound sentence hashes idempotently and rejects mismatched text before writes', async () => {
+    const text = `Original sentence ${prefix}.`,
+      textHash = sentenceTextHash(text);
+    const sentenceSource = {
+      ...source,
+      id: `${prefix}-sentences` as PackSource['id'],
+      lemmaCount: 1,
+      entryCount: 2,
+    };
+    const sentenceEntries = entries
+      .slice(0, 2)
+      .map((entry) => ({ ...entry, lemma: text, text, textHash }));
+    const sentenceManifest = {
+      ...manifest,
+      version: 'sentence-audio-v1' as const,
+      entries: sentenceEntries,
+      statistics: { ...manifest.statistics, lemmaCount: 1, entryCount: 2, synthesizedCount: 2 },
+    };
+    await importSentenceAudioSite(site, sentenceManifest, sentenceSource);
+    const first = await db.sentenceAudio.findMany({
+      where: { textHash },
+      orderBy: { accent: 'asc' },
+    });
+    expect(first).toHaveLength(2);
+    const firstPack = await db.contentPack.findUniqueOrThrow({
+      where: { id: sentenceSource.id },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await importSentenceAudioSite(site, sentenceManifest, sentenceSource);
+    expect(
+      await db.sentenceAudio.findMany({ where: { textHash }, orderBy: { accent: 'asc' } }),
+    ).toEqual(first);
+    expect(await db.contentPack.findUniqueOrThrow({ where: { id: sentenceSource.id } })).toEqual(
+      firstPack,
+    );
+    // This exercises SQL metadata replacement only; this namespace contains
+    // no speech files, and the production loader separately verifies MIME.
+    const corrected = {
+      ...sentenceManifest,
+      entries: sentenceEntries.map((entry) => ({
+        ...entry,
+        sourceName: 'Corrected fixture source',
+        sourceUrl: 'https://example.test/corrected',
+        license: 'Corrected test-only declaration',
+        attribution: 'Corrected metadata fixture only',
+        fileKey: `files/${'8'.repeat(64)}.ogg`,
+        mimeType: 'audio/ogg' as const,
+      })),
+    };
+    const correctedSource = {
+      ...sentenceSource,
+      source: {
+        ...sentenceSource.source,
+        url: 'https://example.test/corrected-sentence-pack.tar.gz',
+        sha256: '9'.repeat(64),
+      },
+    };
+    await importSentenceAudioSite(site, corrected, correctedSource);
+    const correctedPack = await db.contentPack.findUniqueOrThrow({
+      where: { id: sentenceSource.id },
+    });
+    expect(correctedPack.sourceUrl).toBe(correctedSource.source.url);
+    expect(correctedPack.sha256).toBe(correctedSource.source.sha256);
+    expect(correctedPack.installedAt).toEqual(firstPack.installedAt);
+    expect(correctedPack.updatedAt.getTime()).toBeGreaterThan(firstPack.updatedAt.getTime());
+    expect(correctedPack.id).toBe(firstPack.id);
+    const correctedRows = await db.sentenceAudio.findMany({
+      where: { textHash },
+      orderBy: { accent: 'asc' },
+    });
+    expect(
+      correctedRows.every(
+        (row) =>
+          row.sourceName === 'Corrected fixture source' &&
+          row.sourceUrl === 'https://example.test/corrected' &&
+          row.license === 'Corrected test-only declaration' &&
+          row.attribution === 'Corrected metadata fixture only' &&
+          row.mimeType === 'audio/ogg' &&
+          row.fileKey === `files/${'8'.repeat(64)}.ogg`,
+      ),
+    ).toBe(true);
+    expect(correctedRows.map((row) => row.fileSha256)).toEqual(first.map((row) => row.fileSha256));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await importSentenceAudioSite(site, corrected, correctedSource);
+    expect(
+      await db.sentenceAudio.findMany({ where: { textHash }, orderBy: { accent: 'asc' } }),
+    ).toEqual(correctedRows);
+    expect(await db.contentPack.findUniqueOrThrow({ where: { id: sentenceSource.id } })).toEqual(
+      correctedPack,
+    );
+    const recorded = {
+      ...corrected,
+      entries: corrected.entries.map((entry) => ({ ...entry, kind: 'recorded' as const })),
+    };
+    await importSentenceAudioSite(site, recorded, sentenceSource);
+    await importSentenceAudioSite(site, sentenceManifest, sentenceSource);
+    expect(
+      (await db.sentenceAudio.findMany({ where: { textHash } })).every(
+        (row) => row.kind === 'recorded' && row.sourceName === 'Corrected fixture source',
+      ),
+    ).toBe(true);
+    await expect(
+      importSentenceAudioSite(
+        site,
+        {
+          ...sentenceManifest,
+          entries: sentenceEntries.map((e) => ({ ...e, text: e.text + ' altered' })),
+        },
+        sentenceSource,
+      ),
+    ).rejects.toThrow('sentence_audio_text_binding_mismatch');
+    expect(await db.sentenceAudio.count({ where: { textHash } })).toBe(2);
   });
 });

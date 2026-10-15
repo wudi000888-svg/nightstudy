@@ -61,12 +61,19 @@ export interface SourceEntry {
 }
 
 const goals: ContentGoal[] = ['daily', 'high-school', 'cet4', 'cet6', 'ielts'];
-const goalLabels: Record<ContentGoal, string> = {
-  daily: '常用英语 · 词频前3000规则',
-  'high-school': '高考方向 · ECDICT gk标签',
-  cet4: '四级方向 · ECDICT cet4标签',
-  cet6: '六级方向 · ECDICT cet6标签',
-  ielts: '雅思方向 · ECDICT ielts标签',
+export const contentBookLabels: Record<ContentGoal, string> = {
+  daily: '常用英语 · 基础词汇',
+  'high-school': '高考 · 核心词汇',
+  cet4: '四级 · 基础词汇',
+  cet6: '六级 · 基础词汇',
+  ielts: '雅思 · 核心词汇',
+};
+export const contentBookDescriptions: Record<ContentGoal, string> = {
+  daily: '从日常高频词开始，积累阅读与交流的基础词汇。',
+  'high-school': '围绕高中英语学习，巩固常用词汇与基本表达。',
+  cet4: '循序积累四级基础词汇，在复习与拼写中巩固记忆。',
+  cet6: '拓展六级阅读与交流词汇，逐步提升表达的准确度。',
+  ielts: '积累雅思常见词汇，为听说读写建立词汇基础。',
 };
 const columns: (keyof EcdictRow)[] = [
   'word',
@@ -453,13 +460,7 @@ export async function importContentIntoSite(
       const bookId = `content-${manifest.id}-${goal}`;
       const created = await client.query(
         `INSERT INTO "Book" ("id", "slug", "title", "description", "goal", "status", "version", "updatedAt") VALUES ($1,$1,$2,$3,$4,'published',$5,NOW()) ON CONFLICT ("id") DO NOTHING RETURNING "id"`,
-        [
-          bookId,
-          goalLabels[goal],
-          `ECDICT固定基础CSV ${manifest.version}。完整导入上游对应标签/频率规则范围，不是官方考试大纲或CEFR等级；原始释义无例句。`,
-          goal,
-          manifest.id,
-        ],
+        [bookId, contentBookLabels[goal], contentBookDescriptions[goal], goal, manifest.id],
       );
       if (!created.rowCount) continue;
       result.newBooks++;

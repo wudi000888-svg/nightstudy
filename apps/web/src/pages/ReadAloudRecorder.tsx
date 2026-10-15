@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Mic, Square, Volume2 } from 'lucide-react';
+import { Mic, Square } from 'lucide-react';
 import { ErrorNotice } from '../components/UI';
+import { SentenceAudioButton } from '../components/SentenceAudio';
 import { usePageLifetime } from './usePageLifetime';
 import { claimAudio, releaseAudio } from '../lib/audio-manager';
 import { screenDeactivateEvent, useScreenActive } from '../lib/screen-lifecycle';
@@ -13,33 +14,18 @@ export function ReadAloudRecorder({ text, accent }: { text: string; accent: 'us'
   const visible = useRef(screenActive);
   visible.current = screenActive;
   const epoch = useRef(0);
-  const speechOwner = useRef({}),
-    recorderOwner = useRef({});
+  const recorderOwner = useRef({});
   const [recording, setRecording] = useState(false),
     [asking, setAsking] = useState(false),
     [seconds, setSeconds] = useState(0);
   const [url, setUrl] = useState(''),
-    [error, setError] = useState<unknown>(null),
-    [speaking, setSpeaking] = useState(false);
+    [error, setError] = useState<unknown>(null);
   const recorder = useRef<MediaRecorder | null>(null),
     stream = useRef<MediaStream | null>(null),
-    objectUrl = useRef(''),
-    speech = useRef<SpeechSynthesisUtterance | null>(null);
+    objectUrl = useRef('');
   const timer = useRef<number | undefined>(undefined),
     active = useRef(true),
     askingRef = useRef(false);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const matchingVoice = voices.find(
-    (voice) => voice.lang.replace('_', '-').toLowerCase() === (accent === 'uk' ? 'en-gb' : 'en-us'),
-  );
-  const stopSpeech = useCallback(() => {
-    if (speech.current && 'speechSynthesis' in window) {
-      speech.current = null;
-      window.speechSynthesis.cancel();
-    }
-    releaseAudio(speechOwner.current);
-    if (active.current) setSpeaking(false);
-  }, []);
   const clearMedia = useCallback(() => {
     epoch.current++;
     askingRef.current = false;
@@ -51,75 +37,29 @@ export function ReadAloudRecorder({ text, accent }: { text: string; accent: 'us'
     if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
     objectUrl.current = '';
     releaseAudio(recorderOwner.current);
-    stopSpeech();
     if (active.current) {
       setRecording(false);
       setAsking(false);
       setUrl('');
     }
-  }, [stopSpeech]);
+  }, []);
   useEffect(() => {
     if (!screenActive) clearMedia();
   }, [screenActive, clearMedia]);
   useEffect(() => {
     active.current = true;
-    const load = () => {
-      if ('speechSynthesis' in window) setVoices(window.speechSynthesis.getVoices());
-    };
-    load();
     const hidden = () => {
       if (document.visibilityState === 'hidden') clearMedia();
     };
     document.addEventListener('visibilitychange', hidden);
     window.addEventListener(screenDeactivateEvent, clearMedia);
-    if ('speechSynthesis' in window) window.speechSynthesis.addEventListener('voiceschanged', load);
     return () => {
       active.current = false;
       clearMedia();
       document.removeEventListener('visibilitychange', hidden);
       window.removeEventListener(screenDeactivateEvent, clearMedia);
-      if ('speechSynthesis' in window)
-        window.speechSynthesis.removeEventListener('voiceschanged', load);
     };
   }, [owner.scope]);
-  function play() {
-    if (
-      !matchingVoice ||
-      !('speechSynthesis' in window) ||
-      !visible.current ||
-      document.visibilityState === 'hidden'
-    )
-      return;
-    if (speech.current) {
-      stopSpeech();
-      return;
-    }
-    claimAudio(speechOwner.current, stopSpeech);
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = matchingVoice;
-    utterance.lang = accent === 'uk' ? 'en-GB' : 'en-US';
-    utterance.rate = 0.85;
-    speech.current = utterance;
-    setSpeaking(true);
-    setError(null);
-    utterance.onend = () => {
-      if (speech.current !== utterance) return;
-      speech.current = null;
-      releaseAudio(speechOwner.current);
-      if (active.current) setSpeaking(false);
-    };
-    utterance.onerror = () => {
-      if (speech.current !== utterance) return;
-      speech.current = null;
-      releaseAudio(speechOwner.current);
-      if (active.current) {
-        setSpeaking(false);
-        setError(new Error('设备语音未能播放，请手动朗读。'));
-      }
-    };
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  }
   async function record() {
     if (askingRef.current || recording || !visible.current || !foreground()) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
@@ -224,10 +164,11 @@ export function ReadAloudRecorder({ text, accent }: { text: string; accent: 'us'
     <section className="mobile-recorder">
       <h3>听一遍，再自己读一遍</h3>
       <div className="mobile-recorder-controls">
-        <button className="button ghost" disabled={!matchingVoice || recording} onClick={play}>
-          <Volume2 size={16} />
-          {speaking ? '停止朗读' : `${accent === 'uk' ? '英式' : '美式'}朗读`}
-        </button>
+        <SentenceAudioButton
+          text={text}
+          accent={accent === 'uk' ? 'UK' : 'US'}
+          disabled={recording || asking}
+        />
         <button
           className="button primary"
           disabled={asking}
@@ -237,11 +178,6 @@ export function ReadAloudRecorder({ text, accent }: { text: string; accent: 'us'
           {asking ? '等待麦克风权限…' : recording ? `停止录音 · ${seconds}s` : '录一段自己的朗读'}
         </button>
       </div>
-      {!matchingVoice && (
-        <p className="mobile-caption">
-          暂无{accent === 'uk' ? '英式' : '美式'}朗读示范，仍可自己朗读和录音。
-        </p>
-      )}
       {url && (
         <>
           <audio controls src={url} />

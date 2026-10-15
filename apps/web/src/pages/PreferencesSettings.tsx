@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLearningPreferences } from '../LearningPreferences';
 import { usePageLifetime } from './usePageLifetime';
 import { ErrorNotice, Loading, Notice } from '../components/UI';
+import { HomeMotionSettings } from '../components/HomeAtmosphere';
 
 export function PreferencesSettings() {
   const { preferences, loaded, saving, error, savePreferences, resetError, reloadPreferences } =
@@ -115,6 +116,7 @@ export function PreferencesSettings() {
           ))}
         </div>
       </fieldset>
+      <HomeMotionSettings />
       <label className="mobile-setting-toggle">
         <span>
           <strong>站内学习提醒</strong>

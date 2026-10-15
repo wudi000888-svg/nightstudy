@@ -58,6 +58,7 @@ vi.mock('../lib/screen-lifecycle', () => ({
   useScreenActive: () => state.screenActive,
 }));
 vi.mock('../components/UI', () => ({ ErrorNotice: () => null }));
+vi.mock('../components/SentenceAudio', () => ({ SentenceAudioButton: () => null }));
 
 class FakeTrack {
   stop = vi.fn();

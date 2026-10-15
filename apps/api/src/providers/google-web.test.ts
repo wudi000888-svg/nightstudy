@@ -170,7 +170,7 @@ describe('catalog pagination and pronunciation metadata', () => {
     expect(page.page).toMatchObject({ total: 1001, hasMore: true });
     expect(decodeCursor('book:A', page.page.nextCursor!, 'number')).toBe(500);
   });
-  it('reports source phonetic and real browser voice requirements without inventing audio', () => {
+  it('reports source phonetic without inventing audio or runtime synthesis', () => {
     const dto = pronunciationDto({
       id: 'word',
       lemma: 'rain',
@@ -187,6 +187,7 @@ describe('catalog pagination and pronunciation metadata', () => {
     ]);
     expect(dto.audio).toEqual([]);
     expect(dto.recordedAudioAvailable).toBe(false);
-    expect(dto.speech).toMatchObject({ provider: 'browser', requiresAvailableVoice: true });
+    expect(dto).not.toHaveProperty('speech');
+    expect(dto).not.toHaveProperty('generationAvailable');
   });
 });

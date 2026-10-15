@@ -8,6 +8,7 @@ import type { Word } from '../lib/types';
 import type { SavedSentence, SentencePage } from '../lib/mobile-content-types';
 import { Dialog, Empty, ErrorNotice, Loading, LoginPrompt, Notice } from '../components/UI';
 import { InteractiveEnglish } from '../components/InteractiveEnglish';
+import { SentenceAudioButton } from '../components/SentenceAudio';
 import { SentenceSaveButton } from '../components/SentenceSaveButton';
 import { usePageLifetime } from './usePageLifetime';
 import './mobile-content.css';
@@ -195,6 +196,7 @@ export function SentencesPage() {
                       <InteractiveEnglish text={item.exampleEn} />
                     </p>
                     <p lang="zh">{item.exampleZh}</p>
+                    <SentenceAudioButton text={item.exampleEn} />
                     <SentenceSaveButton
                       wordId={word.data.word.id}
                       sourceType={item.sourceType}
@@ -244,6 +246,7 @@ export function SentencesPage() {
                 <InteractiveEnglish text={item.exampleEn} />
               </p>
               <p lang="zh">{item.exampleZh}</p>
+              <SentenceAudioButton text={item.exampleEn} />
               <footer>
                 <span>再回来，读懂这一句</span>
                 <button

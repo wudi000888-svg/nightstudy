@@ -44,7 +44,18 @@ export const ratingValues = {
   good: Rating.Good,
   easy: Rating.Easy,
 } as const;
-export const goalValues = ['daily', 'ielts', 'cet4', 'cet6', 'high-school'] as const;
+export const goalValues = [
+  'daily',
+  'ielts',
+  'toefl',
+  'cet4',
+  'cet6',
+  'tem4',
+  'tem8',
+  'postgraduate',
+  'gre',
+  'high-school',
+] as const;
 export const goal = z.enum(goalValues);
 export const commandId = z.string().min(8).max(120);
 export const id = z.string().min(1).max(160);

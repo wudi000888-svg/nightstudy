@@ -4,6 +4,7 @@ import type { Sense, Word } from '../../lib/types';
 import { dictionaryText } from '../../lib/dictionary';
 import { InteractiveEnglish } from '../InteractiveEnglish';
 import { SentenceSaveButton } from '../SentenceSaveButton';
+import { SentenceAudioButton } from '../SentenceAudio';
 
 export interface StudyExample {
   id: string;
@@ -113,6 +114,7 @@ function ExampleContext({
               {example.chinese}
             </p>
           )}
+          {example.english && <SentenceAudioButton text={example.english} />}
           {interactive && example.english && example.chinese && (
             <SentenceSaveButton
               key={example.id}

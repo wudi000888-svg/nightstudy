@@ -49,7 +49,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const meQuery = useQuery({
     queryKey: ['bootstrap-me'],
     queryFn: () => api<Me>('me'),
-    enabled: !!siteQuery.data,
+    // Both endpoints resolve the trusted mount/realm themselves; fetch them together
+    // rather than adding an extra network round trip before the H5 home can open.
     retry: false,
   });
   const [pending, setPending] = useState(0);

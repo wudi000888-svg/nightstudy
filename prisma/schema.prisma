@@ -99,6 +99,42 @@ model SiteState {
   contentVersion           String    @default("demo-2026-10-14")
 }
 
+// One public, re-encoded wallpaper per isolated site database. No remote URLs.
+model SiteAppearance {
+  id               String   @id @default("singleton")
+  mode             String   @default("rain-night")
+  positionX        Float    @default(50)
+  positionY        Float    @default(50)
+  overlay          Float    @default(0.4)
+  animationEnabled Boolean  @default(true)
+  revision         Int      @default(0)
+  imageSha256      String?
+  imageBytes       Bytes?
+  updatedAt        DateTime @updatedAt
+}
+
+// Public, prebuilt sentence audio only. Runtime never synthesizes arbitrary input.
+model SentenceAudio {
+  id          String   @id
+  textHash    String
+  text        String
+  accent      String
+  kind        String
+  status      String   @default("ready")
+  sourceName  String
+  sourceUrl   String
+  license     String
+  attribution String
+  fileKey     String
+  fileSha256  String
+  mimeType    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([textHash, accent])
+  @@index([status, accent])
+}
+
 model FleetPairingToken {
   id          String    @id @default(cuid())
   label       String

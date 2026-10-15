@@ -196,7 +196,7 @@ describe('pinned audio archive installation and filesystem cache recovery', () =
     fs.writeFileSync(media, corrupt);
     await installAudioFiles(source);
     expect(sha256(fs.readFileSync(media))).toBe(toneHash);
-    expect(fs.readFileSync(path.join(cache, 'sources.manifest.json'))).toEqual(sources);
+    expect(fs.readFileSync(path.join(cache, 'audio-v1.sources.manifest.json'))).toEqual(sources);
     expect(fs.readdirSync(cache).some((item) => item.startsWith('.extract-'))).toBe(false);
   }, 120000);
 
@@ -216,7 +216,7 @@ describe('pinned audio archive installation and filesystem cache recovery', () =
     const privateDirectory = fs.mkdtempSync(path.join(directory, 'private-source-')),
       sentinel = path.join(privateDirectory, 'private.json'),
       secretBytes = Buffer.from('private source sentinel; never overwrite'),
-      destination = path.join(cache, 'sources.manifest.json');
+      destination = path.join(cache, 'audio-v1.sources.manifest.json');
     fs.writeFileSync(sentinel, secretBytes);
     fs.symlinkSync(sentinel, destination);
     await installAudioFiles(source);

@@ -1,5 +1,6 @@
 import Fastify, { type FastifyRequest } from 'fastify';
 import staticFiles from '@fastify/static';
+import compress from '@fastify/compress';
 import { randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -212,12 +213,16 @@ export async function buildApp(
     });
 
     if (fs.existsSync(path.join(config.webRoot, 'assets')))
-      app.register(staticFiles, {
-        root: path.join(config.webRoot, 'assets'),
-        prefix: `${basePath}/assets/`,
-        decorateReply: false,
-        maxAge: '1y',
-        immutable: true,
+      app.register(async (assets) => {
+        await assets.register(compress, { globalDecompression: false, threshold: 1024 });
+        await assets.register(staticFiles, {
+          root: path.join(config.webRoot, 'assets'),
+          prefix: `${basePath}/assets/`,
+          decorateReply: false,
+          maxAge: '1y',
+          immutable: true,
+          preCompressed: true,
+        });
       });
   }
 

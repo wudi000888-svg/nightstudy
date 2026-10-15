@@ -16,14 +16,14 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
-MAX_MEMBERS = 20050
+MAX_MEMBERS = 60050
 MAX_NAME_BYTES = 256
-MAX_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024
+MAX_EXPANDED_BYTES = 4 * 1024 * 1024 * 1024
 MAX_STREAM_BYTES = MAX_EXPANDED_BYTES
 MAX_PAX_BYTES = 64 * 1024
 MAX_TRAILING_BYTES = 10240
 CHUNK_BYTES = 65536
-AUDIO_NAME = re.compile(r"files/[a-f0-9]{64}\.(?:wav|ogg|mp3)\Z")
+AUDIO_NAME = re.compile(r"files/[a-f0-9]{64}\.(?:wav|ogg|mp3|flac)\Z")
 LICENSE_NAME = re.compile(r"licenses/[A-Za-z0-9_.-]+\.(?:txt|json|md)\Z")
 
 
@@ -118,8 +118,10 @@ def validate_entry(info, name, size):
     if info.type not in {tarfile.REGTYPE, tarfile.AREGTYPE}:
         raise ArchiveError("archive_type_rejected")
     if name == "manifest.json":
+        maximum = 128 * 1024 * 1024
+    elif name == "sources.manifest.json":
         maximum = 32 * 1024 * 1024
-    elif name == "sources.manifest.json" or LICENSE_NAME.fullmatch(name):
+    elif LICENSE_NAME.fullmatch(name):
         maximum = 1024 * 1024
     elif AUDIO_NAME.fullmatch(name):
         maximum = 2 * 1024 * 1024

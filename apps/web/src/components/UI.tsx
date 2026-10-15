@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { errorText } from '../lib/api';
 import type { Sense, Word } from '../lib/types';
 import { AudioButton } from './Pronunciation';
+import { SentenceAudioButton } from './SentenceAudio';
 import { dictionaryText } from '../lib/dictionary';
 import { InteractiveEnglish } from './InteractiveEnglish';
 import { StudyWordDetails } from './study/StudyWordDetails';
@@ -299,6 +300,7 @@ function BilingualExample({
           <p className="example-zh">{chinese}</p>
         </div>
       )}
+      {english && <SentenceAudioButton text={english} />}
       {interactive && english && chinese && <SentenceSaveButton {...source} compact />}
     </blockquote>
   );

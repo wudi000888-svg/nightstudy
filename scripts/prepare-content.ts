@@ -7,6 +7,7 @@ if (!['demo', 'ecdict'].includes(pack)) throw new Error('CONTENT_PACK must be de
 if (pack === 'ecdict') {
   const commands = [
     ['scripts/content-prepare.ts'],
+    ['scripts/exam-books-prepare.ts'],
     ...readConfig().sites.map((site) => ['scripts/phonetics-prepare.ts', '--site', site.id]),
     ['scripts/phrase-prepare.ts'],
     ['scripts/bilingual-prepare.ts'],

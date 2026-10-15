@@ -5,7 +5,7 @@ services:
     name: nightstudy
     runtime: docker
     region: singapore
-    # Reserve memory for bounded document workers and local speech inference.
+    # Reserve memory for bounded document/image workers and content installation.
     plan: 1c-2g
     dockerfilePath: ./Dockerfile
     dockerContext: .

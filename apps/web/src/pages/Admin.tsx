@@ -11,12 +11,14 @@ import {
   Settings2,
   Network,
   Sparkles,
+  Image,
 } from 'lucide-react';
 import { AdminBooks } from '../components/AdminBooks';
 import { AdminConfirm, type AdminConfirmation } from '../components/AdminConfirm';
 import { AdminSystem } from '../components/AdminSystem';
 import { AdminFleet } from '../components/AdminFleet';
 import { DeepSeekSettings } from '../components/DeepSeekSettings';
+import { AdminAppearance } from '../components/AdminAppearance';
 import { useApp, useRemote } from '../AppContext';
 import { ApiError, post } from '../lib/api';
 import {
@@ -70,6 +72,7 @@ function AdminPageContent() {
     'system',
     'fleet',
     'ai',
+    'appearance',
   ].includes(section)
     ? section
     : 'overview';
@@ -267,6 +270,7 @@ function AdminPageContent() {
           { id: 'system', label: '系统与更新', icon: Settings2 },
           { id: 'fleet', label: '群站管理', icon: Network },
           { id: 'ai', label: 'AI 设置', icon: Sparkles },
+          { id: 'appearance', label: '首页外观', icon: Image },
         ].map(({ id, label, icon: Icon }) => (
           <Link
             key={id}
@@ -284,6 +288,7 @@ function AdminPageContent() {
       {tab === 'system' && <AdminSystem />}
       {tab === 'fleet' && <AdminFleet />}
       {tab === 'ai' && <DeepSeekSettings />}
+      {tab === 'appearance' && <AdminAppearance />}
       {tab === 'overview' && (
         <>
           {overview.isPending ? (

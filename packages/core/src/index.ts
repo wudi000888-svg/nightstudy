@@ -1,13 +1,29 @@
 import { z } from 'zod';
 
-export const goals = ['daily', 'ielts', 'cet4', 'cet6', 'high-school'] as const;
+export const goals = [
+  'daily',
+  'ielts',
+  'toefl',
+  'cet4',
+  'cet6',
+  'tem4',
+  'tem8',
+  'postgraduate',
+  'gre',
+  'high-school',
+] as const;
 export const goalSchema = z.enum(goals);
 export type Goal = z.infer<typeof goalSchema>;
 export const goalLabels: Record<Goal, string> = {
   daily: '日常英语',
   ielts: '雅思',
+  toefl: '托福',
   cet4: '四级',
   cet6: '六级',
+  tem4: '专四',
+  tem8: '专八',
+  postgraduate: '考研',
+  gre: 'GRE',
   'high-school': '高中',
 };
 export const ratings = ['again', 'hard', 'good', 'easy'] as const;
@@ -32,4 +48,4 @@ export function localDate(value: Date, timeZone = 'Asia/Shanghai'): string {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-export const appVersion = '0.8.0-alpha.1';
+export const appVersion = '0.9.0-alpha.1';

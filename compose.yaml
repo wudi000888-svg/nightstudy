@@ -25,7 +25,7 @@ x-application: &application
     CONTENT_PACK: ${CONTENT_PACK:-ecdict}
     AUDIO_PACK: ${AUDIO_PACK:-}
     AUDIO_CACHE_DIR: /app/.local/audio
-    AUDIO_PYTHON: /opt/nightstudy-audio/bin/python
+    AUDIO_PYTHON: python3
     ADMIN_BOOTSTRAP: ${ADMIN_BOOTSTRAP:-auto}
     ADMIN_CREDENTIALS_DIR: /app/.local/admin
   volumes:

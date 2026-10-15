@@ -468,13 +468,13 @@ async function readSite(db, siteId) {
   return { siteId, instanceId: state.instanceId, books, bookItems, words, pack };
 }
 async function verifyAudio(db, data, verifiedAudioBytes) {
-  const pack = await db.contentPack.findUnique({ where: { id: 'audio-v1' } });
   const source = JSON.parse(
-    fs.readFileSync(new URL('../data/audio-pack.manifest.json', import.meta.url), 'utf8'),
+    fs.readFileSync(new URL('../data/word-audio-v2.manifest.json', import.meta.url), 'utf8'),
   );
+  const pack = await db.contentPack.findUnique({ where: { id: source.id } });
   requireCheck(
     pack?.status === 'ready' &&
-      pack.entryCount === 17596 &&
+      pack.entryCount === source.entryCount &&
       pack.sha256 === source.source.sha256 &&
       object(pack.tagCounts).kind === 'audio',
     'audio_pack_not_ready',
@@ -501,13 +501,117 @@ async function verifyAudio(db, data, verifiedAudioBytes) {
   for (const entry of media) await verifiedAudioBytes(entry);
   requireCheck(
     media.some((entry) => entry.kind === 'recorded') &&
-      media.some((entry) => entry.kind === 'synthesized'),
+      media.every((entry) => ['recorded', 'synthesized'].includes(entry.kind)),
     'audio_sample_coverage_incomplete',
   );
   return {
     audio: data.words.reduce((n, word) => n + word.audio.length, 0),
     sampleFiles: media.length,
   };
+}
+async function verifyPrebuiltAdditions(db, verifiedAudioBytes) {
+  const summary = {};
+  for (const filename of ['word-audio-v2.manifest.json', 'sentence-audio.manifest.json']) {
+    const file = new URL('../data/' + filename, import.meta.url);
+    requireCheck(fs.existsSync(file), 'prebuilt_audio_manifest_missing', { filename });
+    const pin = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const pack = await db.contentPack.findUnique({ where: { id: pin.id } });
+    requireCheck(
+      pack?.status === 'ready' &&
+        pack.sha256 === pin.source.sha256 &&
+        pack.entryCount === pin.entryCount &&
+        object(pack.tagCounts).kind === 'audio',
+      'prebuilt_audio_pack_not_ready',
+      { id: pin.id },
+    );
+    const sourceFile = path.join(
+      process.env.AUDIO_CACHE_DIR || '.local/audio',
+      pin.id + '.sources.manifest.json',
+    );
+    requireCheck(
+      sha(fs.readFileSync(sourceFile)) === pin.sourceManifestSha256,
+      'prebuilt_audio_source_hash_mismatch',
+      { id: pin.id },
+    );
+    if (pin.id === 'word-audio-v2') {
+      const manifestFile = path.join(
+        process.env.AUDIO_CACHE_DIR || '.local/audio',
+        pin.id + '.manifest.json',
+      );
+      const manifestBytes = fs.readFileSync(manifestFile);
+      requireCheck(sha(manifestBytes) === pin.manifestSha256, 'word_audio_manifest_hash_mismatch');
+      const recordedEntries = JSON.parse(manifestBytes).entries.filter(
+        (entry) => entry.kind === 'recorded',
+      );
+      requireCheck(
+        recordedEntries.length === pin.recordedCount &&
+          recordedEntries.every(
+            (entry) =>
+              present(entry.accentEvidence) ||
+              present(entry.commonsAccentEvidence) ||
+              entry.sourceUrl.startsWith('https://commons.wikimedia.org/wiki/File:'),
+          ),
+        'recorded_audio_provenance_incomplete',
+      );
+      const samples = await db.wordAudio.findMany({
+        where: { status: 'ready', kind: 'recorded' },
+        take: 12,
+        orderBy: { id: 'asc' },
+      });
+      requireCheck(samples.length > 0, 'recorded_audio_overlay_missing');
+      for (const entry of samples) await verifiedAudioBytes(entry);
+    }
+    if (pin.id === 'sentence-audio-v1') {
+      const count = await db.sentenceAudio.count({ where: { status: 'ready' } });
+      requireCheck(count === pin.entryCount, 'sentence_audio_coverage_incomplete', {
+        count,
+        expected: pin.entryCount,
+      });
+      const samples = await db.sentenceAudio.findMany({
+        where: { status: 'ready' },
+        take: 8,
+        orderBy: { id: 'asc' },
+      });
+      const normalize = (value) =>
+        value
+          .normalize('NFKC')
+          .replace(/[’‘]/g, "'")
+          .replace(/[“”]/g, '"')
+          .replace(/\s+/g, ' ')
+          .trim();
+      for (const entry of samples) {
+        requireCheck(
+          sha(normalize(entry.text)) === entry.textHash,
+          'sentence_audio_hash_binding_mismatch',
+        );
+        await verifiedAudioBytes(entry);
+      }
+    }
+    summary[pin.id] = {
+      entries: pin.entryCount,
+      recorded: pin.recordedCount,
+      synthesized: pin.synthesizedCount,
+    };
+  }
+  const exam = JSON.parse(
+    fs.readFileSync(new URL('../data/exam-books.manifest.json', import.meta.url), 'utf8'),
+  );
+  const books = await db.book.findMany({
+    where: { ownerId: null, version: exam.id, status: 'published' },
+    include: { _count: { select: { items: true } } },
+  });
+  requireCheck(books.length === exam.books.length, 'exam_book_catalog_incomplete');
+  for (const book of books)
+    requireCheck(
+      book._count.items ===
+        exam.books.find((entry) => book.id === `content-${exam.id}-${entry.id}`)?.wordCount,
+      'exam_book_count_mismatch',
+      {
+        id: book.id,
+        count: book._count.items,
+      },
+    );
+  return summary;
 }
 function verifyPhrases(
   data,
@@ -713,13 +817,12 @@ async function readPhrases(db, bundle) {
   return { books, words, collocations, pack };
 }
 async function verifyPhraseAudio(db, data, verifiedAudioBytes) {
-  const pack = await db.contentPack.findUnique({ where: { id: 'phrase-audio-v1' } });
   const source = JSON.parse(
-    fs.readFileSync(new URL('../data/phrase-audio.manifest.json', import.meta.url), 'utf8'),
+    fs.readFileSync(new URL('../data/word-audio-v2.manifest.json', import.meta.url), 'utf8'),
   );
+  const pack = await db.contentPack.findUnique({ where: { id: source.id } });
   requireCheck(
     pack?.status === 'ready' &&
-      pack.entryCount === 874 &&
       pack.sha256 === source.source.sha256 &&
       object(pack.tagCounts).kind === 'audio',
     'phrase_audio_pack_not_ready',
@@ -1128,6 +1231,9 @@ async function main() {
       const phraseAudio = phraseData
         ? await verifyPhraseAudio(db, phraseData, verifiedAudioBytes)
         : null;
+      const prebuiltAudio = values.snapshot
+        ? null
+        : await verifyPrebuiltAdditions(db, verifiedAudioBytes);
       console.log(
         JSON.stringify({
           action: 'install.verify',
@@ -1141,6 +1247,7 @@ async function main() {
           bilingual,
           phrases,
           ...phraseAudio,
+          prebuiltAudio,
           scope:
             'Pristine built-in installation acceptance; source or catalog edits fail explicitly rather than being rewritten.',
         }),

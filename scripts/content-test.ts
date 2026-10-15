@@ -16,12 +16,23 @@ import {
   stableWordId,
   verifyContentSource,
 } from './content-lib.js';
+import { loadExamBookManifest, readExamBookRows } from './exam-books-lib.js';
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nightstudy-content-test-'));
 let checked = 0;
 try {
   const fixture = writeContentFixture(directory);
   await verifyContentSource(fixture.sourcePath, fixture.manifest);
+  checked++;
+  // A membership pack adds books, not new dictionary entries. Validate its own
+  // scoped counts rather than assuming the whole site always has five books.
+  const examManifest = loadExamBookManifest();
+  const examRows = readExamBookRows(
+    fs.readFileSync(new URL(`../data/${examManifest.fileName}`, import.meta.url)),
+    examManifest,
+  );
+  assert.equal(examRows.length, examManifest.membershipCount);
+  assert.equal(new Set(examRows.map((row) => row.normalizedLemma)).size, examManifest.wordCount);
   checked++;
   const parsed = [];
   for await (const row of readEcdict(fixture.sourcePath)) parsed.push(row);

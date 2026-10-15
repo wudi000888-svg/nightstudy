@@ -19,3 +19,11 @@ Use one canonical word learning identity within a site. Stable session item IDs 
 Root owns dependency manifests, generated schema/migrations and lockfile during parallel work. Run typecheck/build and meaningful PostgreSQL integration checks before publishing code. Document exactly what is implemented, tested, and deferred; do not describe planned deployment or performance as verified.
 
 Secrets belong in environment/local ignored files. GitHub/CI contributions must not expose real accounts, database backups, tokens, or raw server configuration. Do not create paid hosted resources unless explicitly requested.
+
+## Content, audio and atmosphere direction, 2026-10-16
+
+The user requested implementation of expanded open-source examination wordbooks, rain-night visuals, administrator DIY wallpaper and measured performance improvements. Confirmed examination targets: IELTS, TOEFL, CET4, CET6, TEM4 and TEM8; "8" means TEM8 and "专6" was a typo. Keep fact-based wordbook membership separate from dictionary expressions and their respective licenses.
+
+The latest audio instruction explicitly allows Codex to generate missing-word audio and sentence audio locally, validate it and package it before release. Prefer existing, correctly attributed human recordings for words. This supersedes the earlier prohibition on all synthesized gap filling. Runtime must only play published files: no server synthesis endpoints, browser speech fallback, automatic voice-model downloads or cross-accent substitutions. Failed/missing artifacts remain unavailable. Preserve per-asset voice/accent/type/license/source/checksum evidence outside the ordinary learning UI.
+
+Use the existing H5 shell. Rain-night movement must be inexpensive and stop for background, covering screens, reduced motion and data-saving. Administrator wallpaper upload is site-scoped, validated and re-encoded; do not accept arbitrary remote URLs. Optimize demonstrated bottlenecks without rewriting FSRS or changing the stack just for a label.

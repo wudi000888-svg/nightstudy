@@ -15,6 +15,7 @@ import type { PageInfo } from '../lib/types';
 import { Empty, ErrorNotice, Loading, LoginPrompt, Notice } from '../components/UI';
 import { InteractiveEnglish } from '../components/InteractiveEnglish';
 import { ReadAloudRecorder } from './ReadAloudRecorder';
+import { SentenceAudioButton } from '../components/SentenceAudio';
 import { usePageLifetime } from './usePageLifetime';
 import './mobile-content.css';
 
@@ -240,6 +241,10 @@ export function AcademyPage() {
                         <InteractiveEnglish text={paragraph.en} />
                       </p>
                       {showChinese && <p lang="zh">{paragraph.zh}</p>}
+                      <SentenceAudioButton
+                        text={paragraph.en}
+                        accent={accent === 'uk' ? 'UK' : 'US'}
+                      />
                     </div>
                   ))}
                 </section>
@@ -441,9 +446,7 @@ export function AcademyPage() {
           ) : (
             <Empty title="这个分类暂时没有短课" description="选择其他分类，或稍后再来。" />
           )}
-          <p className="mobile-caption">
-            入门短课供日常练习，不是完整考试课程。听力使用本站已有单词音源；跟读的设备声音取决于浏览器和系统。
-          </p>
+          <p className="mobile-caption">选择一节短课，读一读、听一听，再试着用自己的声音表达。</p>
           <section>
             <h2 className="mobile-group-heading">我的练习记录</h2>
             <ErrorNotice error={history.error} onRetry={() => void history.refetch()} />

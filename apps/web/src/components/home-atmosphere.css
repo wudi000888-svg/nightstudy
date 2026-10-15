@@ -1,0 +1,304 @@
+/* Original window-and-city scene. Rain is two small tiled compositor layers. */
+.home-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: #0b1b29;
+  contain: layout paint;
+}
+.home-night-sky,
+.home-custom-wallpaper,
+.home-wallpaper-shade,
+.home-window-droplets,
+.home-rain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.home-night-sky {
+  background:
+    radial-gradient(ellipse at 74% 17%, #7395a945, transparent 41%),
+    radial-gradient(ellipse at 20% 59%, #63787e26, transparent 46%),
+    linear-gradient(172deg, #132c3e 0%, #1c3647 43%, #29424a 76%, #13262d);
+}
+.home-custom-wallpaper {
+  object-fit: cover;
+  object-position: var(--wallpaper-position, 50% 50%);
+}
+.home-moon-halo {
+  position: absolute;
+  width: 250px;
+  height: 250px;
+  right: -22px;
+  top: 3%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #e1e6d838 0 13%, #afc5d112 20%, transparent 66%);
+}
+.home-distant-city {
+  position: absolute;
+  left: -4%;
+  right: -4%;
+  top: 45%;
+  bottom: 0;
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  opacity: 0.65;
+}
+.home-distant-city > span {
+  flex: 1;
+  height: 69%;
+  border-top: 2px solid #66808a20;
+  background:
+    repeating-linear-gradient(0deg, #0d202d 0 15px, transparent 15px 20px),
+    repeating-linear-gradient(90deg, #112631 0 14px, #7b8d7b4d 14px 18px, #132c39 18px 25px);
+}
+.home-distant-city > span:nth-child(2n) {
+  height: 93%;
+  background:
+    repeating-linear-gradient(0deg, #10242f 0 18px, transparent 18px 23px),
+    repeating-linear-gradient(90deg, #10242f 0 17px, #c5a8784a 17px 20px, #10242f 20px 25px);
+}
+.home-distant-city > span:nth-child(3n) {
+  height: 55%;
+}
+.home-distant-city > span:nth-child(5) {
+  height: 83%;
+}
+.home-city-glow {
+  position: absolute;
+  inset: 52% -10% -8%;
+  background:
+    radial-gradient(ellipse at 25% 73%, #d79c4f34 0, #ae855c0d 19%, transparent 40%),
+    radial-gradient(ellipse at 81% 59%, #83b3ae20 0, transparent 35%),
+    linear-gradient(0deg, #0e1a23a8, transparent 80%);
+}
+.home-window-frame {
+  position: absolute;
+  left: -1%;
+  right: -1%;
+  bottom: 0;
+  height: 3.5%;
+  border-top: 2px solid #d8d8c518;
+  background: linear-gradient(#263936, #122327 22%, #0e1d24);
+  box-shadow: 0 -2px 18px #09152038;
+}
+.home-wallpaper-shade {
+  background:
+    linear-gradient(180deg, #07152122, transparent 37%, #06151e44 100%),
+    radial-gradient(ellipse at 50% 42%, transparent 34%, #06111d55);
+}
+.has-wallpaper .home-wallpaper-shade {
+  background: linear-gradient(0deg, #06131ddb, #06131d);
+  opacity: var(--wallpaper-dim, 0.4);
+}
+.home-window-droplets {
+  opacity: 0.23;
+  background-image:
+    radial-gradient(ellipse 1px 9px at 31px 46px, #bddee76b 10%, transparent 80%),
+    radial-gradient(ellipse 1px 6px at 95px 118px, #c3dfe969 10%, transparent 80%),
+    radial-gradient(ellipse 1px 14px at 152px 79px, #bed6df4d 10%, transparent 80%);
+  background-size: 191px 249px;
+}
+.home-rain {
+  opacity: 0.45;
+}
+.home-rain > span {
+  position: absolute;
+  inset: -96px -28px 0;
+  background-repeat: repeat;
+  will-change: transform;
+  animation: home-rain-fall 1.8s linear infinite;
+}
+.home-rain-far {
+  opacity: 0.4;
+  background-image: linear-gradient(103deg, transparent 48.8%, #c9dfef61 49.3%, transparent 50.1%);
+  background-size: 43px 96px;
+}
+.home-rain .home-rain-near {
+  opacity: 0.3;
+  background-image: linear-gradient(103deg, transparent 49%, #d6e7ee91 49.5%, transparent 50.2%);
+  background-size: 87px 96px;
+  animation-duration: 1.15s;
+  animation-delay: -0.4s;
+}
+@keyframes home-rain-fall {
+  from {
+    transform: translate3d(22px, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 96px, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-rain {
+    display: none;
+  }
+  .home-rain > span {
+    animation: none;
+    will-change: auto;
+  }
+}
+
+.admin-appearance-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.admin-appearance-heading h2 {
+  margin-bottom: 6px;
+}
+.admin-appearance-heading p {
+  margin: 0;
+}
+.admin-appearance-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.admin-wallpaper-preview {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  aspect-ratio: 390 / 760;
+  max-height: 520px;
+  border-radius: 23px;
+  overflow: hidden;
+  color: #f3f3e9;
+  box-shadow: 0 0 0 1px #344f5b38;
+}
+.admin-preview-avatar {
+  position: absolute;
+  top: 20px;
+  left: 16px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #3d5665;
+}
+.admin-preview-checkin {
+  position: absolute;
+  top: 23%;
+  left: 50%;
+  width: 85px;
+  height: 85px;
+  transform: translateX(-50%);
+  background: #38555ee6;
+  border: 1px solid #bdcfc840;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex-direction: column;
+  font-size: 13px;
+}
+.admin-preview-checkin > span {
+  font-size: 20px;
+}
+.admin-preview-actions {
+  position: absolute;
+  bottom: 17%;
+  left: 12px;
+  right: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.admin-preview-actions > span {
+  padding: 13px 12px;
+  border-radius: 12px;
+  background: #eee1cb;
+  color: #14252c;
+  font-size: 16px;
+  font-weight: 600;
+}
+.admin-preview-actions > span + span {
+  background: #d8e6e3;
+}
+.admin-wallpaper-preview > small {
+  position: absolute;
+  bottom: 18px;
+  width: 100%;
+  text-align: center;
+  color: #d7e1de;
+  font-size: 11px;
+}
+.admin-appearance-controls {
+  min-width: 0;
+}
+.admin-appearance-controls fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.admin-appearance-controls legend {
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.admin-appearance-controls .mobile-choice-row {
+  margin-bottom: 12px;
+}
+.admin-appearance-controls .fine-print {
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+}
+.admin-wallpaper-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.admin-wallpaper-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  margin-top: 10px;
+}
+.admin-wallpaper-range > output {
+  font-variant-numeric: tabular-nums;
+  color: var(--app-muted);
+}
+.admin-wallpaper-range > input {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  accent-color: var(--app-accent);
+}
+.admin-appearance-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.admin-appearance .button {
+  min-height: 44px;
+}
+@media (max-width: 620px) {
+  .admin-appearance-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 25px;
+  }
+  .admin-wallpaper-preview {
+    max-width: 210px;
+    justify-self: center;
+  }
+  .admin-appearance-heading {
+    flex-wrap: wrap;
+  }
+  .admin-appearance-buttons {
+    flex-direction: column;
+  }
+}

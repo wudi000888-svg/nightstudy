@@ -8,6 +8,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app.js';
 import { createDatabase } from './db.js';
 import type { AppConfig } from './config.js';
+import { sentenceTextHash } from './audio.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const suite = url ? describe : describe.skip;
@@ -32,6 +33,8 @@ suite('PostgreSQL pronunciation media and exact dictionary resolution', () => {
     email = `${prefix}@example.test`,
     password = 'Audio-integration-2026!';
   const audioPackId = `${prefix}-audio-pack`;
+  const sentence = `Original private test sentence ${letters}.`;
+  const sentenceHash = sentenceTextHash(sentence);
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'nightstudy-audio-pg-'));
   const cache = path.join(directory, 'cache'),
     files = path.join(cache, 'files'),
@@ -194,6 +197,23 @@ suite('PostgreSQL pronunciation media and exact dictionary resolution', () => {
         metadata(ids[2]!, 'US', usHash, usKey, 'failed'),
       ],
     });
+    await db.sentenceAudio.createMany({
+      data: ['US', 'UK'].map((accent) => ({
+        id: `${prefix}-sentence-${accent}`,
+        textHash: sentenceHash,
+        text: sentence,
+        accent,
+        kind: 'synthesized',
+        status: 'ready',
+        sourceName: 'Synthetic test tone; not speech',
+        sourceUrl: 'https://example.test/audio-test-fixture',
+        license: 'MIT',
+        attribution: 'Original test fixture only',
+        fileKey: accent === 'US' ? usKey : ukKey,
+        fileSha256: accent === 'US' ? usHash : ukHash,
+        mimeType: 'audio/wav',
+      })),
+    });
     app = (await buildApp(configuration(), false)).app;
     mounted = (await buildApp(configuration('/learn'), false)).app;
     const login = await app.inject({
@@ -219,6 +239,7 @@ suite('PostgreSQL pronunciation media and exact dictionary resolution', () => {
       },
     });
     await db.rateBucket.deleteMany({ where: { key: { startsWith: `audio:default:${userId}:` } } });
+    await db.sentenceAudio.deleteMany({ where: { id: { startsWith: `${prefix}-sentence-` } } });
     await db.user.deleteMany({ where: { id: userId } });
     await db.contentPack.deleteMany({ where: { id: audioPackId } });
     await db.word.deleteMany({ where: { id: { in: ids } } });
@@ -247,7 +268,8 @@ suite('PostgreSQL pronunciation media and exact dictionary resolution', () => {
       ),
     ).toBe(true);
     expect(value.recordedAudioAvailable).toBe(false);
-    expect(value.generationAvailable).toBe(false);
+    expect(value).not.toHaveProperty('generationAvailable');
+    expect(value).not.toHaveProperty('speech');
     for (const hidden of [cache, usKey, ukKey, usHash, ukHash, 'fileKey', 'fileSha256'])
       expect(response.body).not.toContain(hidden);
   });
@@ -369,11 +391,11 @@ suite('PostgreSQL pronunciation media and exact dictionary resolution', () => {
     }
   });
 
-  it('requires authentication for preparation and returns 503 when the local model profile is absent without starting jobs', async () => {
-    expect((await request('POST', `/pronunciation/${ids[0]}/prepare`, {})).statusCode).toBe(401);
-    const response = await request('POST', `/pronunciation/${ids[0]}/prepare`, {}, true);
-    expect(response.statusCode).toBe(503);
-    expect(response.json().code).toBe('audio_generation_unavailable');
+  it('has no online synthesis route and never starts pronunciation jobs', async () => {
+    for (const authenticated of [false, true]) {
+      const response = await request('POST', `/pronunciation/${ids[0]}/prepare`, {}, authenticated);
+      expect(response.statusCode).toBe(404);
+    }
     expect(
       await db.job.count({
         where: { id: { in: [`pronunciation:${ids[0]}:US`, `pronunciation:${ids[0]}:UK`] } },
@@ -418,30 +440,135 @@ suite('PostgreSQL pronunciation media and exact dictionary resolution', () => {
       word: { id: ids[3] },
     });
   });
-  it('rejects preparation without both normalized IPA fields before invoking any synthesis process', async () => {
-    // These marker files model only the availability predicate, not valid voice models.
-    // Missing IPA must reject before renderOne can start any subprocess.
-    const models = path.join(cache, 'models');
-    fs.mkdirSync(models);
-    fs.writeFileSync(path.join(models, 'en_US-ljspeech-high.onnx'), 'test marker; not a model');
-    fs.writeFileSync(path.join(models, 'en_GB-cori-high.onnx'), 'test marker; not a model');
-    process.env.AUDIO_PYTHON = process.execPath;
-    await db.word.update({ where: { id: ids[0]! }, data: { phoneticUs: '   ' } });
+  it('publishes only prebuilt sentence metadata and returns exact mounted audio bytes with ETag', async () => {
+    const detail = await request('GET', `/sentence-audio/${sentenceHash}`);
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json()).toMatchObject({ sentence: { textHash: sentenceHash, text: sentence } });
+    expect(detail.json().sentence.audio.map((e: { accent: string }) => e.accent)).toEqual([
+      'UK',
+      'US',
+    ]);
+    for (const hidden of ['fileKey', 'fileSha256', cache, 'sourceUrl'])
+      expect(detail.body).not.toContain(hidden);
+    const media = await request(
+      'GET',
+      `/sentence-audio/${sentenceHash}/audio/US`,
+      undefined,
+      false,
+      {},
+      true,
+    );
+    expect(media.rawPayload).toEqual(usBytes);
+    expect(media.headers.etag).toBe(`"${usHash}"`);
+    const again = await request(
+      'GET',
+      `/sentence-audio/${sentenceHash}/audio/US`,
+      undefined,
+      false,
+      { 'if-none-match': `"${usHash}"` },
+    );
+    expect(again.statusCode).toBe(304);
+    expect(again.rawPayload).toHaveLength(0);
+  });
+  it('leaves missing sentences empty, rejects unknown media and cannot generate arbitrary text', async () => {
+    const unknown = sentenceTextHash(`Unavailable ${runId}`);
+    expect((await request('GET', `/sentence-audio/${unknown}`)).json()).toEqual({
+      sentence: { textHash: unknown, text: null, audio: [] },
+    });
+    expect((await request('GET', `/sentence-audio/${unknown}/audio/US`)).statusCode).toBe(404);
+    expect((await request('GET', `/sentence-audio/${sentenceHash}/audio/AU`)).statusCode).toBe(400);
+    expect((await request('GET', '/sentence-audio/not-a-hash')).statusCode).toBe(400);
+    expect(
+      (await request('POST', `/sentence-audio/${sentenceHash}/prepare`, { text: sentence }, true))
+        .statusCode,
+    ).toBe(404);
+  });
+  it('checks sentence bytes before accepting an old ETag and hides failed sentence rows', async () => {
+    const changed = Buffer.from(usBytes);
+    changed[44] = changed[44]! ^ 1;
+    fs.writeFileSync(path.join(cache, usKey), changed);
     try {
-      const response = await request('POST', `/pronunciation/${ids[0]}/prepare`, {}, true);
-      expect(response.statusCode).toBe(409);
-      expect(response.json().code).toBe('audio_missing_phonetics');
-      expect(
-        await db.job.count({
-          where: { id: { in: [`pronunciation:${ids[0]}:US`, `pronunciation:${ids[0]}:UK`] } },
-        }),
-      ).toBe(0);
+      const response = await request(
+        'GET',
+        `/sentence-audio/${sentenceHash}/audio/US`,
+        undefined,
+        false,
+        { 'if-none-match': `"${usHash}"` },
+      );
+      expect(response.statusCode).toBe(503);
+      expect(response.json().code).toBe('audio_asset_invalid');
     } finally {
-      await db.word.update({ where: { id: ids[0]! }, data: { phoneticUs: '/tɛst/' } });
-      delete process.env.AUDIO_PYTHON;
-      fs.rmSync(models, { recursive: true, force: true });
+      fs.writeFileSync(path.join(cache, usKey), usBytes);
+    }
+    await db.sentenceAudio.update({
+      where: { textHash_accent: { textHash: sentenceHash, accent: 'US' } },
+      data: { status: 'failed' },
+    });
+    try {
+      const response = await request('GET', `/sentence-audio/${sentenceHash}`);
+      expect(response.json().sentence.audio.map((e: { accent: string }) => e.accent)).toEqual([
+        'UK',
+      ]);
+      expect((await request('GET', `/sentence-audio/${sentenceHash}/audio/US`)).statusCode).toBe(
+        404,
+      );
+    } finally {
+      await db.sentenceAudio.update({
+        where: { textHash_accent: { textHash: sentenceHash, accent: 'US' } },
+        data: { status: 'ready' },
+      });
     }
   });
+  it.skipIf(!process.env.TEST_DATABASE_URL_B)(
+    'resolves the same sentence hash only within the selected independent site database',
+    async () => {
+      const secondUrl = process.env.TEST_DATABASE_URL_B!;
+      if (!new URL(secondUrl).pathname.endsWith('_test'))
+        throw new Error('Sentence secondary realm must end in _test');
+      const secondaryDb = createDatabase(secondUrl);
+      const conf = configuration();
+      conf.sites[0]! = {
+        ...conf.sites[0]!,
+        databaseUrl: secondUrl,
+        hosts: ['sentence-secondary.test'],
+        publicUrl: 'http://sentence-secondary.test',
+      };
+      const other = (await buildApp(conf, false)).app;
+      try {
+        await secondaryDb.sentenceAudio.create({
+          data: {
+            id: `${prefix}-sentence-secondary`,
+            textHash: sentenceHash,
+            text: sentence,
+            accent: 'US',
+            kind: 'synthesized',
+            status: 'ready',
+            sourceName: 'Synthetic fixture',
+            sourceUrl: 'https://example.test/fixture',
+            license: 'MIT',
+            attribution: 'Original test tone',
+            fileKey: ukKey,
+            fileSha256: ukHash,
+            mimeType: 'audio/wav',
+          },
+        });
+        const media = await other.inject({
+          url: `/api/v2/sentence-audio/${sentenceHash}/audio/US`,
+          headers: { host: 'sentence-secondary.test' },
+        });
+        expect(media.rawPayload).toEqual(ukBytes);
+        expect(
+          (await request('GET', `/sentence-audio/${sentenceHash}/audio/US`)).rawPayload,
+        ).toEqual(usBytes);
+      } finally {
+        await other.close();
+        await secondaryDb.sentenceAudio.deleteMany({
+          where: { id: `${prefix}-sentence-secondary` },
+        });
+        await secondaryDb.$disconnect();
+      }
+    },
+  );
 
   it('supports a configured base path using the same published audio contract and exact resolver', async () => {
     const detail = await request('GET', `/pronunciation/${ids[0]}`, undefined, false, {}, true);

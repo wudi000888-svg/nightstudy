@@ -15,6 +15,7 @@ import {
   audioCacheRoot,
   audioPython,
   verifiedAudioBytes,
+  sentenceTextHash,
 } from '../apps/api/src/audio.js';
 
 const pinnedSource = z.object({
@@ -28,7 +29,13 @@ const pinnedSource = z.object({
 });
 const packSource = z
   .object({
-    id: z.enum(['audio-v1', 'phrase-audio-v1']),
+    id: z.enum([
+      'audio-v1',
+      'phrase-audio-v1',
+      'recorded-audio-v2',
+      'word-audio-v2',
+      'sentence-audio-v1',
+    ]),
     status: z.literal('ready'),
     source: pinnedSource,
     lemmaCount: z.number().int().positive(),
@@ -40,13 +47,15 @@ const packSource = z
     (source) =>
       source.id === 'audio-v1'
         ? source.lemmaCount === 8798 && source.entryCount === 17596
-        : source.lemmaCount === 437 && source.entryCount === 874,
+        : source.id === 'phrase-audio-v1'
+          ? source.lemmaCount === 437 && source.entryCount === 874
+          : source.lemmaCount <= 100000 && source.entryCount <= 200000,
     'audio_scope_mismatch',
   );
 const builtPack = z
   .object({
-    schemaVersion: z.literal(1),
-    version: z.literal('audio-v1'),
+    schemaVersion: z.union([z.literal(1), z.literal(2)]),
+    version: z.enum(['audio-v1', 'recorded-audio-v2', 'word-audio-v2', 'sentence-audio-v1']),
     status: z.literal('ready'),
     sourceManifestSha256: z.string(),
     statistics: z
@@ -58,7 +67,18 @@ const builtPack = z
         failedCount: z.literal(0),
       })
       .passthrough(),
-    entries: z.array(audioEntry).max(20000),
+    entries: z
+      .array(
+        audioEntry.extend({
+          lemma: z.string().min(1).max(3000),
+          textHash: z
+            .string()
+            .regex(/^[a-f0-9]{64}$/)
+            .optional(),
+          text: z.string().min(1).max(3000).optional(),
+        }),
+      )
+      .max(200000),
   })
   .passthrough();
 async function ensureCacheDirectory(directory: string) {
@@ -166,7 +186,7 @@ export async function installAudioFiles(source: z.infer<typeof packSource>) {
     let bytes: Buffer;
     try {
       const stat = await handle.stat();
-      if (!stat.isFile() || stat.size > 32 * 1024 ** 2) throw new Error('audio_manifest_invalid');
+      if (!stat.isFile() || stat.size > 128 * 1024 ** 2) throw new Error('audio_manifest_invalid');
       bytes = await handle.readFile();
     } finally {
       await handle.close();
@@ -180,7 +200,8 @@ export async function installAudioFiles(source: z.infer<typeof packSource>) {
   if (manifest) {
     try {
       if (
-        (await fileHash(path.join(root, 'sources.manifest.json'))) !== source.sourceManifestSha256
+        (await fileHash(path.join(root, `${source.id}.sources.manifest.json`))) !==
+        source.sourceManifestSha256
       )
         throw new Error('audio_sources_hash_mismatch');
       await validateAudioPack(manifest, source);
@@ -217,7 +238,7 @@ export async function installAudioFiles(source: z.infer<typeof packSource>) {
           path.join(root, 'licenses', filename),
           await fs.readFile(path.join(staging, 'licenses', filename)),
         );
-      await atomicCacheFile(path.join(root, 'sources.manifest.json'), original);
+      await atomicCacheFile(path.join(root, `${source.id}.sources.manifest.json`), original);
       await atomicCacheFile(marker, bytes);
     } finally {
       await fs.rm(staging, { recursive: true, force: true });
@@ -248,7 +269,9 @@ export async function validateAudioPack(
   if (
     unique.size !== source.entryCount ||
     lemmas.size !== source.lemmaCount ||
-    recorded !== (source.id === 'audio-v1' ? 3 : 0) ||
+    (source.id === 'audio-v1' && recorded !== 3) ||
+    (source.id === 'phrase-audio-v1' && recorded !== 0) ||
+    (source.id === 'recorded-audio-v2' && recorded !== source.entryCount) ||
     manifest.statistics.lemmaCount !== source.lemmaCount ||
     manifest.statistics.entryCount !== source.entryCount ||
     manifest.statistics.recordedCount !== recorded ||
@@ -308,10 +331,10 @@ export async function importAudioSite(
       );
     }
     await client.query(
-      `INSERT INTO "WordAudio" (id,"wordId",accent,kind,status,"sourceName","sourceUrl",license,attribution,"fileKey","fileSha256","mimeType","createdAt","updatedAt") SELECT 'wa_'||md5(w.id||a.accent),w.id,a.accent,a.kind,'ready',a.source_name,a.source_url,a.license,a.attribution,a.file_key,a.sha,a.mime,NOW(),NOW() FROM audio_import a JOIN "Word" w ON w."normalizedLemma"=a.lemma ON CONFLICT ("wordId",accent) ${source.id === 'phrase-audio-v1' ? 'DO NOTHING' : 'DO UPDATE SET kind=EXCLUDED.kind,status=\'ready\',"sourceName"=EXCLUDED."sourceName","sourceUrl"=EXCLUDED."sourceUrl",license=EXCLUDED.license,attribution=EXCLUDED.attribution,"fileKey"=EXCLUDED."fileKey","fileSha256"=EXCLUDED."fileSha256","mimeType"=EXCLUDED."mimeType","updatedAt"=NOW() WHERE ("WordAudio".kind,"WordAudio".status,"WordAudio"."sourceName","WordAudio"."sourceUrl","WordAudio".license,"WordAudio".attribution,"WordAudio"."fileKey","WordAudio"."fileSha256","WordAudio"."mimeType") IS DISTINCT FROM (EXCLUDED.kind,EXCLUDED.status,EXCLUDED."sourceName",EXCLUDED."sourceUrl",EXCLUDED.license,EXCLUDED.attribution,EXCLUDED."fileKey",EXCLUDED."fileSha256",EXCLUDED."mimeType")'}`,
+      `INSERT INTO "WordAudio" (id,"wordId",accent,kind,status,"sourceName","sourceUrl",license,attribution,"fileKey","fileSha256","mimeType","createdAt","updatedAt") SELECT 'wa_'||md5(w.id||a.accent),w.id,a.accent,a.kind,'ready',a.source_name,a.source_url,a.license,a.attribution,a.file_key,a.sha,a.mime,NOW(),NOW() FROM audio_import a JOIN "Word" w ON w."normalizedLemma"=a.lemma ON CONFLICT ("wordId",accent) ${source.id === 'phrase-audio-v1' ? 'DO NOTHING' : 'DO UPDATE SET kind=EXCLUDED.kind,status=\'ready\',"sourceName"=EXCLUDED."sourceName","sourceUrl"=EXCLUDED."sourceUrl",license=EXCLUDED.license,attribution=EXCLUDED.attribution,"fileKey"=EXCLUDED."fileKey","fileSha256"=EXCLUDED."fileSha256","mimeType"=EXCLUDED."mimeType","updatedAt"=NOW() WHERE (EXCLUDED.kind=\'recorded\' OR "WordAudio".kind<>\'recorded\') AND ("WordAudio".kind,"WordAudio".status,"WordAudio"."sourceName","WordAudio"."sourceUrl","WordAudio".license,"WordAudio".attribution,"WordAudio"."fileKey","WordAudio"."fileSha256","WordAudio"."mimeType") IS DISTINCT FROM (EXCLUDED.kind,EXCLUDED.status,EXCLUDED."sourceName",EXCLUDED."sourceUrl",EXCLUDED.license,EXCLUDED.attribution,EXCLUDED."fileKey",EXCLUDED."fileSha256",EXCLUDED."mimeType")'}`,
     );
     await client.query(
-      `INSERT INTO "ContentPack" (id,version,status,"sourceUrl",sha256,license,"entryCount","phoneticCount","definitionZhCount","definitionEnCount","tagCounts","installedAt","updatedAt") VALUES ($1,$1,'ready',$2,$3,'Per-entry MIT/CC-BY-SA-3.0/CC-BY-3.0-US',$4,0,0,0,$5::jsonb,NOW(),NOW()) ON CONFLICT (id) DO UPDATE SET status='ready',"sourceUrl"=EXCLUDED."sourceUrl",sha256=EXCLUDED.sha256,"entryCount"=EXCLUDED."entryCount","tagCounts"=EXCLUDED."tagCounts","updatedAt"=NOW() WHERE ("ContentPack".status,"ContentPack"."sourceUrl","ContentPack".sha256,"ContentPack"."entryCount","ContentPack"."tagCounts") IS DISTINCT FROM (EXCLUDED.status,EXCLUDED."sourceUrl",EXCLUDED.sha256,EXCLUDED."entryCount",EXCLUDED."tagCounts")`,
+      `INSERT INTO "ContentPack" (id,version,status,"sourceUrl",sha256,license,"entryCount","phoneticCount","definitionZhCount","definitionEnCount","tagCounts","installedAt","updatedAt") VALUES ($1,$1,'ready',$2,$3,'Per-entry licenses; see sources.manifest.json',$4,0,0,0,$5::jsonb,NOW(),NOW()) ON CONFLICT (id) DO UPDATE SET status='ready',"sourceUrl"=EXCLUDED."sourceUrl",sha256=EXCLUDED.sha256,"entryCount"=EXCLUDED."entryCount","tagCounts"=EXCLUDED."tagCounts","updatedAt"=NOW() WHERE ("ContentPack".status,"ContentPack"."sourceUrl","ContentPack".sha256,"ContentPack"."entryCount","ContentPack"."tagCounts") IS DISTINCT FROM (EXCLUDED.status,EXCLUDED."sourceUrl",EXCLUDED.sha256,EXCLUDED."entryCount",EXCLUDED."tagCounts")`,
       [
         source.id,
         source.source.url,
@@ -333,6 +356,53 @@ export async function importAudioSite(
     await client.end();
   }
 }
+export async function importSentenceAudioSite(
+  site: ReturnType<typeof readConfig>['sites'][number],
+  manifest: z.infer<typeof builtPack>,
+  source: z.infer<typeof packSource>,
+) {
+  for (const entry of manifest.entries)
+    if (!entry.text || !entry.textHash || sentenceTextHash(entry.text) !== entry.textHash)
+      throw new Error('sentence_audio_text_binding_mismatch');
+  const client = new Client({ connectionString: site.databaseUrl });
+  await client.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(89124616)');
+    const realm = await client.query<{ siteId: string }>(
+      'SELECT "siteId" FROM "SiteState" WHERE "id"=\'singleton\'',
+    );
+    if (realm.rows[0]?.siteId !== site.id) throw new Error('audio_site_binding_mismatch');
+    for (let start = 0; start < manifest.entries.length; start += 1000)
+      await client.query(
+        `INSERT INTO "SentenceAudio" (id,"textHash",text,accent,kind,status,"sourceName","sourceUrl",license,attribution,"fileKey","fileSha256","mimeType","createdAt","updatedAt")
+         SELECT 'sa_'||md5(d."textHash"||d.accent),d."textHash",d.text,d.accent,d.kind,'ready',d."sourceName",d."sourceUrl",d.license,d.attribution,d."fileKey",d."fileSha256",d."mimeType",NOW(),NOW()
+         FROM jsonb_to_recordset($1::jsonb) AS d("textHash" TEXT,text TEXT,accent TEXT,kind TEXT,"sourceName" TEXT,"sourceUrl" TEXT,license TEXT,attribution TEXT,"fileKey" TEXT,"fileSha256" TEXT,"mimeType" TEXT)
+         ON CONFLICT ("textHash",accent) DO UPDATE SET kind=EXCLUDED.kind,status='ready',"sourceName"=EXCLUDED."sourceName","sourceUrl"=EXCLUDED."sourceUrl",license=EXCLUDED.license,attribution=EXCLUDED.attribution,"fileKey"=EXCLUDED."fileKey","fileSha256"=EXCLUDED."fileSha256","mimeType"=EXCLUDED."mimeType","updatedAt"=NOW()
+         WHERE (EXCLUDED.kind='recorded' OR "SentenceAudio".kind<>'recorded') AND ("SentenceAudio".kind,"SentenceAudio".status,"SentenceAudio"."sourceName","SentenceAudio"."sourceUrl","SentenceAudio".license,"SentenceAudio".attribution,"SentenceAudio"."fileKey","SentenceAudio"."fileSha256","SentenceAudio"."mimeType") IS DISTINCT FROM (EXCLUDED.kind,EXCLUDED.status,EXCLUDED."sourceName",EXCLUDED."sourceUrl",EXCLUDED.license,EXCLUDED.attribution,EXCLUDED."fileKey",EXCLUDED."fileSha256",EXCLUDED."mimeType")`,
+        [JSON.stringify(manifest.entries.slice(start, start + 1000))],
+      );
+    await client.query(
+      `INSERT INTO "ContentPack" (id,version,status,"sourceUrl",sha256,license,"entryCount","phoneticCount","definitionZhCount","definitionEnCount","tagCounts","installedAt","updatedAt") VALUES ($1,$1,'ready',$2,$3,'Per-entry MIT/CC-BY-2.0-FR/CC-BY-4.0',$4,0,0,0,$5::jsonb,NOW(),NOW()) ON CONFLICT (id) DO UPDATE SET status='ready',"sourceUrl"=EXCLUDED."sourceUrl",sha256=EXCLUDED.sha256,"entryCount"=EXCLUDED."entryCount","tagCounts"=EXCLUDED."tagCounts","updatedAt"=NOW() WHERE ("ContentPack".status,"ContentPack"."sourceUrl","ContentPack".sha256,"ContentPack"."entryCount","ContentPack"."tagCounts") IS DISTINCT FROM (EXCLUDED.status,EXCLUDED."sourceUrl",EXCLUDED.sha256,EXCLUDED."entryCount",EXCLUDED."tagCounts")`,
+      [
+        source.id,
+        source.source.url,
+        source.source.sha256,
+        source.entryCount,
+        JSON.stringify({ kind: 'audio', unit: 'sentence', ...manifest.statistics }),
+      ],
+    );
+    await client.query('COMMIT');
+    console.log(
+      JSON.stringify({ action: 'sentence-audio.ready', siteId: site.id, ...manifest.statistics }),
+    );
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
 async function main() {
   if (existsSync('.env')) process.loadEnvFile('.env');
   const profile =
@@ -344,35 +414,16 @@ async function main() {
   if (profile !== 'standard') throw new Error('invalid_audio_profile');
   const root = audioCacheRoot();
   await ensureCacheDirectory(root);
-  // Unique staging paths and atomic renames make cache writes restartable.
-  // Per-site database imports have a PostgreSQL advisory lock.
-  {
+  // Install only the consolidated static word pack and static sentence pack.
+  // Neither installation downloads a voice model or invokes a speech engine.
+  for (const filename of ['word-audio-v2.manifest.json', 'sentence-audio.manifest.json']) {
     const source = packSource.parse(
-      JSON.parse(await fs.readFile('data/audio-pack.manifest.json', 'utf8')),
+      JSON.parse(await fs.readFile(path.join('data', filename), 'utf8')),
     );
-    const voices = JSON.parse(await fs.readFile('data/audio-voices.manifest.json', 'utf8')) as {
-      voices: Record<
-        string,
-        {
-          model: z.infer<typeof pinnedSource> & { fileName: string };
-          config: z.infer<typeof pinnedSource> & { fileName: string };
-        }
-      >;
-    };
-    for (const accent of ['US', 'UK'])
-      for (const item of [voices.voices[accent]!.model, voices.voices[accent]!.config]) {
-        if (!/^[A-Za-z0-9_.-]+$/.test(item.fileName))
-          throw new Error('audio_model_filename_invalid');
-        await pinnedDownload(path.join(root, 'models', item.fileName), pinnedSource.parse(item));
-      }
     const manifest = await installAudioFiles(source);
-    for (const site of readConfig().sites) await importAudioSite(site, manifest, source);
-    if (process.env.CONTENT_PACK !== 'demo') {
-      const phrases = packSource.parse(
-        JSON.parse(await fs.readFile('data/phrase-audio.manifest.json', 'utf8')),
-      );
-      const phraseManifest = await installAudioFiles(phrases);
-      for (const site of readConfig().sites) await importAudioSite(site, phraseManifest, phrases);
+    for (const site of readConfig().sites) {
+      if (source.id === 'sentence-audio-v1') await importSentenceAudioSite(site, manifest, source);
+      else await importAudioSite(site, manifest, source);
     }
   }
 }

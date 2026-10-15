@@ -170,6 +170,8 @@ def synthesis_identity(lemma: str, accent: str, source: dict) -> str:
 
 
 def make_phonemizer():
+    if importlib.metadata.version('piper-tts') != ENGINE_VERSION:
+        raise ValueError('unsupported_offline_phonemizer_engine_version')
     from piper.phonemize_espeak import EspeakPhonemizer
 
     return EspeakPhonemizer()
@@ -224,14 +226,18 @@ def validate_entry(entry: dict, output: Path, identity: str | None = None) -> bo
         if identity is not None and entry.get("cacheKey") != identity:
             return False
         key = entry["fileKey"]
-        if not re.fullmatch(r"files/[a-f0-9]{64}\.(wav|ogg)", key):
+        if not re.fullmatch(r"files/[a-f0-9]{64}\.(wav|ogg|mp3)", key):
             return False
         asset = output / key
         if not asset.is_file() or asset.stat().st_size != entry["sizeBytes"]:
             return False
         if sha_file(asset) != entry["fileSha256"]:
             return False
-        if entry["kind"] == "synthesized":
+        if entry["mimeType"] == "audio/mpeg":
+            raw = asset.read_bytes()
+            if not (raw[:3] == b"ID3" or (raw[0] == 255 and raw[1] & 224 == 224)):
+                return False
+        elif entry["kind"] == "synthesized":
             check_wav(asset)
         else:
             with asset.open("rb") as handle:
@@ -298,6 +304,7 @@ def synthesize_entry(lemma: str, accent: str, source: dict, voice, output: Path)
             "fileKey": key, "fileSha256": digest, "mimeType": "audio/wav", "sizeBytes": size,
             "cacheKey": synthesis_identity(lemma, accent, source),
             "engineVersion": ENGINE_VERSION, "voiceModelSha256": source["model"]["sha256"],
+            "inferenceBackend": "CPUExecutionProvider",
             "voiceConfigSha256": source["config"]["sha256"], **metrics,
         }
     finally:

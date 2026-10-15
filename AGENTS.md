@@ -1,10 +1,10 @@
 # NightStudy engineering guide
 
-## Latest user direction, 2026-10-15
+## Latest user direction, 2026-10-16
 
 Treat the product as a mobile H5 application, with desktop secondary. The home layout must follow the user's BBDC reference recording: full-screen wallpaper, avatar at the upper left, a separate check-in tile above center, paired Learn / Review actions near the bottom, and three bottom function icons. Learning, content and account/settings modules open as distinct application screens. Do not use a website header, marketing hero, long home bookshelf or dashboard as the primary home.
 
-Read `docs/H5_APP_REDESIGN.md` before the next redesign work. It supersedes the earlier 0.7 layout proposal where they differ. The user explicitly approved full implementation on 2026-10-16 after reviewing this design. Build and verify the complete H5 experience, then publish and deploy under the existing authorization. Future major redesigns still need reviewable design before a new implementation instruction.
+Read `docs/H5_APP_REDESIGN.md` before the next redesign work. It supersedes the earlier 0.7 layout proposal where they differ. The user explicitly approved full implementation on 2026-10-16 after reviewing this design. The H5 experience is implemented and published as 0.8.0-alpha.1; see the actual validation and deployment record in that document. Future major redesigns still need reviewable design before a new implementation instruction.
 
 The user allows all incompatible changes to the product, routes, APIs, database structures and learning flows. Do not maintain old data formats, old APIs or old-client compatibility layers. This permission does not itself request clearing production data or exposing secrets. Keep the actual approved work verifiable.
 

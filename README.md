@@ -79,7 +79,7 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 
 ## 验证记录
 
-0.8 本机通过 75 份测试文件、642 项真实双 PostgreSQL 与前端回归，以及格式、类型检查和生产构建。独立测试站点完成手机视口的三词回忆、拼写、保存、签到和收藏；模块重开恢复分类，PWA 只在用户确认后更新。完整范围见 [H5 应用改造](docs/H5_APP_REDESIGN.md#本轮实现与验收)。线上与镜像结果按实际发行补充。
+0.8 本机通过 75 份测试文件、642 项真实双 PostgreSQL 与前端回归，以及格式、类型检查和生产构建。独立测试站点完成手机视口的三词回忆、拼写、保存、签到和收藏；模块重开恢复分类，PWA 只在用户确认后更新。完整范围见 [H5 应用改造](docs/H5_APP_REDESIGN.md#本轮实现与验收)。运行源码为 [`1fc25da`](https://github.com/wudi000888-svg/nightstudy/commit/1fc25daf4a15322c2a3b445d4ed4fa4119f22dbf)，[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38769072734) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38769173777) 均通过 PostgreSQL 17 与完整 Compose 首装。本机 Native、VPS 已升级；两端各34项接口与静态资源检查通过，线上首页已在浏览器核对。VPS 新备份在独立测试库实际恢复，44表及14条迁移记录一致，测试库已清理。
 
 历史 `0.7.0-alpha.1` 的运行源码为 [`1ff2986`](https://github.com/wudi000888-svg/nightstudy/commit/1ff298678355debf533433f5a61550b2bc98438a)，62 份测试文件、563 项测试及类型、格式、构建检查通过；[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729429192) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729521782) 均成功。本机 Native 与 VPS 已升级且健康，移动浏览器已核验首页、内容、学堂与偏好；隔离环境的学习、句子收藏和偏好检查见 [移动端学习体验](docs/MOBILE_REDESIGN.md#本机验证)。本轮 VPS 备份已在独立测试库恢复，40 张业务表的行与列、13 条迁移记录核对一致，测试库已清理；未向业务库执行恢复。
 

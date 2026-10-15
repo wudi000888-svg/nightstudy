@@ -238,3 +238,9 @@ ghcr.io/wudi000888-svg/nightstudy@sha256:061e117fb448e973813849679a154844118f74c
 ```
 
 已按前文准备.env、随机密钥与HTTPS入口后，可将NIGHTSTUDY_IMAGE配置为上方0.7.0-alpha.1的当前摘要，使用 `docker compose up --detach --no-build --wait app` 从发行镜像启动。init仍负责默认首次admin、迁移与完整内容；凭据按前文私密导出。`scripts/install.sh` 是源码构建入口，使用发行摘要时不加--build。源码Compose也可自行构建；不要依赖浮动latest。[GitHub官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
+
+### 0.8 H5 发布验证
+
+v0.8.0-alpha.1 源码 `1fc25daf4a15322c2a3b445d4ed4fa4119f22dbf` 的[双PG17/Compose发行验证](https://github.com/wudi000888-svg/nightstudy/actions/runs/38769173777)通过，固定镜像为 `ghcr.io/wudi000888-svg/nightstudy@sha256:17b96c68bb342d74e38df7257ac46ffb84c8804c9ffd2cfc039e4ab6cd78418b`。本轮与0.7保持完全相同的Prisma schema、14份SQL迁移及Compose描述；目标VPS只重启app，未运行init、迁移或内容准备，44表/14账本停服核对一致。不能将本例“不需要迁移”用于其他版本。
+
+本轮新VPS备份已恢复到独立随机测试库并核对44表全部行列及14条账本，测试库清理、无业务库恢复。原收尾回执经独立核验补记，详细范围见 [H5部署记录](H5_APP_REDESIGN.md#发布与部署记录)。保留私密备份与环境配置，禁止通过Web发布备份、凭据或原始检查文件。Native本轮未重新备份数据库，仅在启动前核对保留数据。

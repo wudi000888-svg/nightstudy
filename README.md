@@ -11,15 +11,17 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前线上版本：[`0.6.0-alpha.4`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.4)。** 星星和钉子悬停立即显示功能名称，修复收藏时按钮位移导致点击失效的问题；成功后显示生词本入口，已保存的词可直接移除。生词本增加「已巩固」分类，个人中心也可直接进入。后台「AI 设置」可加密保存DeepSeek密钥并独立启用水平测试智能分析；用户明确选择后，按目标和本次答题生成薄弱点、逐词建议及可手动采用的计划。每份测试最多请求一次，失败仍提供基础报告；不自动改变成绩、熟词或复习证据。详细规则见 [AI配置](docs/AI_CONFIGURATION.md) 和 [CHANGELOG](CHANGELOG.md)。
+**当前线上版本：[`0.6.0-alpha.5`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.5)。** 后台「AI 设置」支持 DeepSeek 官方及「CC Switch · 自定义服务」，填写同一供应商的接口地址、模型、认证方式与真实密钥。兼容 OpenAI Chat Completions、Responses、Anthropic Messages 和 Gemini API；原有加密配置保留，更换服务目的地须重新填写对应密钥。水平测试使用所选服务，学习者的选择绑定其看到的配置，服务变更时保留基础报告，不向未经确认的新服务发送答案。每份测试最多请求一次，不自动改变成绩、熟词、复习证据或学习计划。详细配置见 [AI配置](docs/AI_CONFIGURATION.md) 和 [CHANGELOG](CHANGELOG.md)。
 
-本版代码 `4a7f4e5` 已通过52文件396项测试、类型/格式/构建和真实双PostgreSQL 17、完整隔离Compose安装验证：[CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38639404852)、[镜像发行](https://github.com/wudi000888-svg/nightstudy/actions/runs/38639482010)。公开amd64镜像已匿名拉取到VPS并按固定摘要部署，HTTPS健康返回alpha.4。升级前后全部40张业务表的原有字段逐行摘要一致，新增AI字段保持默认值；本次升级前备份在独立测试库实际恢复并完成同样的40表核对，临时库已清理，未恢复覆盖在线数据库。现有管理员密码和会话保持，生产浏览器确认新版AI设置与星星、钉子提示。
+本版代码 `f047a49` 已通过54文件516项测试、类型/格式/构建和真实双PostgreSQL 17、完整隔离Compose安装验证：[CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38662609334)、[镜像发行](https://github.com/wudi000888-svg/nightstudy/actions/runs/38662830726)。公开amd64镜像已匿名拉取、核对21项源码及Piper来源后按固定摘要部署，HTTPS健康返回alpha.5，线上静态资源与本机dist摘要一致。升级前后全部40张业务表的原有字段逐行摘要一致，仅新增四个配置字段及迁移13；本次升级前备份在独立测试库实际恢复并完成同样的40表核对，临时库已清理。现有管理员密码和会话保持，生产浏览器确认CC Switch入口及四种协议表单；未填写或调用真实供应商密钥。
 
-隔离本机浏览器实际验证收藏成功、已保存状态、取消固定、390×844仿真尺寸的词卡边界与分析报告；AI诊断使用受控模拟响应，选择关闭分析时不调用模型，手动采用计划后才更新每日目标。临时测试账户、数据库和独立运行目录已精确清理。未提供真实API密钥，本次付费推理请求为0；不将模拟结果描述为DeepSeek在线质量或更高准确率的证明，未进行容量压测或专家语义认证。
+本版隔离浏览器实际验证自定义服务保存、刷新保持、地址/协议变化须重新填写密钥、连接检测和水平测试的服务来源提示；两次检测使用受控模拟，外部模型调用为0，未开始水平测试或写入学习记录。临时测试账户、数据库及运行目录已精确清理。本机5198也升级至alpha.5，40表数据与旧迁移记录保留，全新物理备份已独立恢复核验。未提供真实API密钥，不将模拟结果描述为供应商在线质量或更高准确率的证明，未进行容量压测或专家语义认证。
+
+此前alpha.4修复星星和钉子的即时提示、收藏后按钮位移及生词本入口，增加「已巩固」分类；其52文件396项测试及390×844词卡、AI模拟分析和手动采用建议等浏览器记录属于 [alpha.4发行](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.4)。
 
 五书8,798词的独立中英文解释、8,786词的真实配对或原创用法，以及437词组的学习与英美音源保持安装。学习正文保留词性、解释、例句和两个发音选项，来源许可单独查看；日常复习不会触发付费请求。详细范围见 [双语内容](docs/BILINGUAL_CONTENT.md) 和 [内容包](docs/CONTENT.md)。此前alpha.3的363项测试、45项HTTPS/只读数据库混合检查和旧任务快照验收记录属于 [alpha.3发行](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.3)。
 
-[线上双语词卡](docs/media/bilingual-card-preview.jpg) · [DeepSeek 配置页面](docs/media/deepseek-preview.jpg)。IPA包覆盖统计按实测词条刷新，原始账号、词书与学习数据保持；词库完整收录不代表每个冷门词已有双语例句，五书覆盖范围及12个待核对词见内容文档。
+[线上双语词卡](docs/media/bilingual-card-preview.jpg) · [CC Switch 配置页面（供应商尚未填写）](docs/media/ccswitch-preview.png) · [历史DeepSeek页面](docs/media/deepseek-preview.jpg)。IPA包覆盖统计按实测词条刷新，原始账号、词书与学习数据保持；词库完整收录不代表每个冷门词已有双语例句，五书覆盖范围及12个待核对词见内容文档。
 
 **每日学习计划：** 桌面悬停英文立即打开清晰背景词卡，英美喇叭各在对应IPA前。每日计划按“复习 + 新学”的不同词总数安排：先预留到期复习，再补本书新词。选书先确认计划，支持暂停、延期、跨端继续、完成历史与七天复习负担。具体规则见 [每日任务](docs/DAILY_TASKS.md)、[个性化计划](docs/architecture/PERSONALIZATION.md) 和 [CHANGELOG](CHANGELOG.md)。0.5历史验收见 [0.5.0-alpha.2](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.5.0-alpha.2)。
 

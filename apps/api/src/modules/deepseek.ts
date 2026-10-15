@@ -14,17 +14,29 @@ import {
   sourceBoundPreview,
 } from './deepseek-preview.js';
 import { configuredDeepSeek, callDeepSeek } from './deepseek-service.js';
+import {
+  aiDestinationIdentity,
+  AI_PROVIDERS,
+  AI_PROTOCOLS,
+  AI_AUTH_MODES,
+  normalizedAiConnection,
+  validateAiKeyDestination,
+} from './ai-settings.js';
+import { deepSeekProviderError } from './deepseek-service.js';
 
 const settingsInput = z
   .object({
     enabled: z.boolean().optional(),
     assessmentEnabled: z.boolean().optional(),
-    model: z.enum(DEEPSEEK_MODELS).optional(),
-    baseUrl: z.literal(DEEPSEEK_BASE_URL).optional(),
+    provider: z.enum(AI_PROVIDERS).optional(),
+    model: z.string().trim().min(1).max(160).optional(),
+    baseUrl: z.string().trim().min(1).max(2048).optional(),
+    protocol: z.enum(AI_PROTOCOLS).optional(),
+    authMode: z.enum(AI_AUTH_MODES).optional(),
     apiKey: z
       .string()
       .trim()
-      .max(256)
+      .max(4096)
       .refine((value) => value === '' || validDeepSeekKey(value), '密钥格式无效')
       .optional(),
     removeKey: z.boolean().optional(),
@@ -35,6 +47,10 @@ type Setting = {
   enabled: boolean;
   assessmentEnabled: boolean;
   model: string;
+  provider: string;
+  baseUrl: string;
+  protocol: string;
+  authMode: string;
   keyCiphertext: string | null;
   keyPreview: string | null;
   updatedAt: Date;
@@ -46,7 +62,12 @@ function settingDto(setting: Setting | null) {
     configured: Boolean(setting?.keyCiphertext),
     model: setting?.model ?? DEEPSEEK_MODELS[0],
     models: [...DEEPSEEK_MODELS],
-    baseUrl: DEEPSEEK_BASE_URL,
+    provider: setting?.provider ?? 'deepseek',
+    baseUrl: setting?.baseUrl ?? DEEPSEEK_BASE_URL,
+    protocol: setting?.protocol ?? 'openai-chat',
+    authMode: setting?.authMode ?? 'bearer',
+    protocols: [...AI_PROTOCOLS],
+    authModes: [...AI_AUTH_MODES],
     keyPreview: setting?.keyCiphertext ? setting.keyPreview : null,
     updatedAt: setting?.updatedAt.toISOString() ?? null,
   };
@@ -77,6 +98,33 @@ export async function registerDeepSeek(
     const setting = await ctx.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(89124802)`;
       const previous = await tx.deepSeekSetting.findUnique({ where: { id: 'singleton' } });
+      let connection;
+      try {
+        connection = normalizedAiConnection(
+          {
+            provider: input.provider ?? previous?.provider ?? 'deepseek',
+            baseUrl: input.baseUrl ?? previous?.baseUrl ?? DEEPSEEK_BASE_URL,
+            protocol: input.protocol ?? previous?.protocol ?? 'openai-chat',
+            authMode: input.authMode ?? previous?.authMode ?? 'bearer',
+            model: input.model ?? previous?.model ?? DEEPSEEK_MODELS[0],
+          },
+          ctx.aiNetworkPolicy,
+        );
+      } catch (error) {
+        return deepSeekProviderError(error);
+      }
+      if (input.apiKey) validateAiKeyDestination(input.apiKey, connection, ctx.aiNetworkPolicy);
+      if (
+        previous?.keyCiphertext &&
+        !input.apiKey &&
+        !input.removeKey &&
+        aiDestinationIdentity(previous) !== aiDestinationIdentity(connection)
+      )
+        throw new HttpError(
+          400,
+          'ai_destination_key_required',
+          '更换服务地址、接口类型或认证方式时，请重新输入对应密钥；旧密钥不会自动转发',
+        );
       const keyCiphertext = input.removeKey
         ? null
         : input.apiKey
@@ -89,7 +137,7 @@ export async function registerDeepSeek(
           : (previous?.keyPreview ?? null);
       const enabled = input.removeKey ? false : (input.enabled ?? previous?.enabled ?? false);
       if (enabled && !keyCiphertext)
-        throw new HttpError(400, 'deepseek_key_required', '启用前请先保存 DeepSeek 密钥');
+        throw new HttpError(400, 'deepseek_key_required', '启用前请先保存对应服务的密钥');
       const assessmentEnabled =
         enabled && !input.removeKey
           ? (input.assessmentEnabled ?? previous?.assessmentEnabled ?? false)
@@ -97,7 +145,7 @@ export async function registerDeepSeek(
       const data = {
         enabled,
         assessmentEnabled,
-        model: input.model ?? previous?.model ?? DEEPSEEK_MODELS[0],
+        ...connection,
         keyCiphertext,
         keyPreview,
       };
@@ -115,6 +163,12 @@ export async function registerDeepSeek(
             enabled,
             assessmentEnabled,
             model: data.model,
+            provider: data.provider,
+            protocol: data.protocol,
+            authMode: data.authMode,
+            destinationChanged: Boolean(
+              previous && aiDestinationIdentity(previous) !== aiDestinationIdentity(connection),
+            ),
             keyChanged: Boolean(input.apiKey),
             keyRemoved: input.removeKey ?? false,
           },
@@ -146,7 +200,7 @@ export async function registerDeepSeek(
         { role: 'system', content: 'Return only valid JSON: {"ok":true}.' },
         { role: 'user', content: 'Connection check. Return {"ok":true} in JSON.' },
       ],
-      32,
+      config.provider === 'deepseek' ? 32 : 512,
     );
     requireAdmin(await getContext(req));
     try {
@@ -154,9 +208,9 @@ export async function registerDeepSeek(
         .strict()
         .parse(JSON.parse(result.content));
     } catch {
-      throw new HttpError(502, 'deepseek_response_invalid', 'DeepSeek 返回内容未通过连接测试校验');
+      throw new HttpError(502, 'deepseek_response_invalid', 'AI 服务返回内容未通过连接测试校验');
     }
-    return { ok: true, provider: 'deepseek', model: result.model, usage: result.usage };
+    return { ok: true, provider: config.provider, model: result.model, usage: result.usage };
   });
   app.post('/admin/ai/deepseek/preview', async (req) => {
     const ctx = await getContext(req),
@@ -212,7 +266,8 @@ export async function registerDeepSeek(
     ) => ({
       kind,
       review: 'pending',
-      provider: 'deepseek',
+      provider: config.provider,
+      protocol: config.protocol,
       model: config.model,
       promptVersion: DEEPSEEK_PROMPT_VERSION,
       sourceSenseId: source.sourceSenseId,

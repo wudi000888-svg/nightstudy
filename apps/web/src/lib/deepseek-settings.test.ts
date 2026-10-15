@@ -100,6 +100,11 @@ vi.mock('./api', async (importOriginal) => {
 });
 
 const config: DeepSeekConfig = {
+  provider: 'deepseek',
+  protocol: 'openai-chat',
+  authMode: 'bearer',
+  protocols: ['openai-chat', 'openai-responses', 'anthropic-messages', 'gemini'],
+  authModes: ['bearer', 'x-api-key', 'x-goog-api-key'],
   enabled: true,
   assessmentEnabled: false,
   configured: true,
@@ -242,7 +247,15 @@ it('requires saving the independent assessment switch and does not call the prov
   await vi.waitFor(() =>
     expect(post).toHaveBeenCalledExactlyOnceWith(
       'admin/ai/deepseek',
-      { enabled: true, assessmentEnabled: true, model: config.model },
+      {
+        enabled: true,
+        assessmentEnabled: true,
+        model: config.model,
+        provider: 'deepseek',
+        baseUrl: config.baseUrl,
+        protocol: 'openai-chat',
+        authMode: 'bearer',
+      },
       'PUT',
     ),
   );
@@ -255,7 +268,15 @@ it('preserves an empty key and only sends strict settings fields; saving a new k
   await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   expect(post).toHaveBeenLastCalledWith(
     'admin/ai/deepseek',
-    { enabled: true, assessmentEnabled: false, model: 'deepseek-flash' },
+    {
+      enabled: true,
+      assessmentEnabled: false,
+      model: 'deepseek-flash',
+      provider: 'deepseek',
+      baseUrl: config.baseUrl,
+      protocol: 'openai-chat',
+      authMode: 'bearer',
+    },
     'PUT',
   );
   await vi.waitFor(() => expect(state.slots[2]).toBe(null));
@@ -269,7 +290,16 @@ it('preserves an empty key and only sends strict settings fields; saving a new k
   await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(2));
   expect(post).toHaveBeenLastCalledWith(
     'admin/ai/deepseek',
-    { enabled: true, assessmentEnabled: false, model: 'deepseek-flash', apiKey: 'sk-ui-test-only' },
+    {
+      enabled: true,
+      assessmentEnabled: false,
+      model: 'deepseek-flash',
+      apiKey: 'sk-ui-test-only',
+      provider: 'deepseek',
+      baseUrl: config.baseUrl,
+      protocol: 'openai-chat',
+      authMode: 'bearer',
+    },
     'PUT',
   );
   await vi.waitFor(() => expect(state.slots[2]).toBe(null));
@@ -391,6 +421,218 @@ it('drops the private subtree on account scope changes and does not render it fo
   state.role = 'user';
   expect(DeepSeekSettings()).toBeNull();
   expect(state.remoteCalls).toEqual([]);
+});
+
+it('requires a new key for provider and endpoint binding changes without reading or forwarding the saved key', async () => {
+  change(
+    find(renderContent(), (element) => element.props.name === 'ai-provider'),
+    'custom',
+  );
+  let tree = renderContent();
+  expect(find(tree, (element) => element.props.name === 'ai-base-url').props.value).toBe('');
+  expect(find(tree, (element) => element.props.name === 'ai-custom-model').props.value).toBe('');
+  change(
+    find(tree, (element) => element.props.name === 'ai-base-url'),
+    'https://provider.example.test/api/v1',
+  );
+  tree = renderContent();
+  change(
+    find(tree, (element) => element.props.name === 'ai-custom-model'),
+    'cc/model-42',
+  );
+  tree = renderContent();
+  expect(button(tree, '保存设置').props.disabled).toBe(true);
+  expect(button(tree, '检测连接').props.disabled).toBe(true);
+  expect(text(tree)).toContain('原密钥不会转发到新服务');
+  submit(find(tree, (element) => element.type === 'form'));
+  await Promise.resolve();
+  expect(post).not.toHaveBeenCalled();
+  expect(api).not.toHaveBeenCalled();
+  change(
+    find(renderContent(), (element) => element.props.name === 'deepseek-api-key'),
+    'new-key-for-first-service',
+  );
+  change(
+    find(renderContent(), (element) => element.props.name === 'ai-base-url'),
+    'https://another-provider.example.test/v1',
+  );
+  tree = renderContent();
+  expect(find(tree, (element) => element.props.name === 'deepseek-api-key').props.value).toBe('');
+  expect(button(tree, '保存设置').props.disabled).toBe(true);
+});
+
+it('saves explicit custom fields and a long key without a prefix restriction, then uses only the accepted configuration', async () => {
+  change(
+    find(renderContent(), (element) => element.props.name === 'ai-provider'),
+    'custom',
+  );
+  change(
+    find(renderContent(), (element) => element.props.name === 'ai-protocol'),
+    'openai-responses',
+  );
+  change(
+    find(renderContent(), (element) => element.props.name === 'ai-base-url'),
+    'https://provider.example.test/custom/v1/',
+  );
+  const model = find(renderContent(), (element) => element.props.name === 'ai-custom-model');
+  expect(new RegExp(String(model.props.pattern), 'v').test('cc/model-42:large')).toBe(true);
+  change(model, 'cc/model-42:large');
+  const key = 'custom-test-only-' + 'A'.repeat(3000);
+  const input = find(renderContent(), (element) => element.props.name === 'deepseek-api-key');
+  expect(input.props.maxLength).toBe(4096);
+  change(input, key);
+  const accepted: DeepSeekConfig = {
+    ...config,
+    provider: 'custom',
+    baseUrl: 'https://provider.example.test/custom/v1',
+    model: 'cc/model-42:large',
+    protocol: 'openai-responses',
+    authMode: 'bearer',
+  };
+  vi.mocked(post).mockResolvedValue(accepted);
+  let tree = renderContent();
+  expect(button(tree, '保存设置').props.disabled).toBe(false);
+  expect(button(tree, '检测连接').props.disabled).toBe(true);
+  submit(find(tree, (element) => element.type === 'form'));
+  await vi.waitFor(() =>
+    expect(post).toHaveBeenCalledExactlyOnceWith(
+      'admin/ai/deepseek',
+      {
+        enabled: true,
+        assessmentEnabled: false,
+        provider: 'custom',
+        baseUrl: accepted.baseUrl,
+        protocol: 'openai-responses',
+        authMode: 'bearer',
+        model: accepted.model,
+        apiKey: key,
+      },
+      'PUT',
+    ),
+  );
+  await vi.waitFor(() => expect(state.slots[2]).toBe(null));
+  tree = renderContent();
+  expect(find(tree, (element) => element.props.name === 'deepseek-api-key').props.value).toBe('');
+  expect(button(tree, '检测连接').props.disabled).toBe(false);
+  expect(api).not.toHaveBeenCalled();
+});
+
+it('chooses explicit protocol-specific authentication defaults and permits the configured alternative', () => {
+  change(
+    find(renderContent(), (element) => element.props.name === 'ai-provider'),
+    'custom',
+  );
+  for (const [protocol, expected, options] of [
+    ['anthropic-messages', 'x-api-key', ['bearer', 'x-api-key']],
+    ['gemini', 'x-goog-api-key', ['x-goog-api-key']],
+    ['openai-chat', 'bearer', ['bearer']],
+    ['openai-responses', 'bearer', ['bearer']],
+  ] as const) {
+    change(
+      find(renderContent(), (element) => element.props.name === 'ai-protocol'),
+      protocol,
+    );
+    expect(
+      find(renderContent(), (element) => element.props.name === 'ai-auth-mode').props.value,
+    ).toBe(expected);
+    const auth = find(renderContent(), (element) => element.props.name === 'ai-auth-mode');
+    expect(
+      elements(auth)
+        .filter((element) => element.type === 'option')
+        .map((element) => element.props.value),
+    ).toEqual(options);
+  }
+  change(
+    find(renderContent(), (element) => element.props.name === 'ai-protocol'),
+    'anthropic-messages',
+  );
+  change(
+    find(renderContent(), (element) => element.props.name === 'ai-auth-mode'),
+    'bearer',
+  );
+  expect(
+    find(renderContent(), (element) => element.props.name === 'ai-auth-mode').props.value,
+  ).toBe('bearer');
+  expect(post).not.toHaveBeenCalled();
+});
+
+it('leaves proxy-placeholder policy to the server and shows its rejection without a paid request', async () => {
+  vi.mocked(post).mockRejectedValue(
+    new ApiError(
+      400,
+      '此代理地址未获授权使用代理占位密钥，请填写真实供应商密钥。',
+      'compatible_ai_proxy_placeholder_rejected',
+    ),
+  );
+  change(
+    find(renderContent(), (element) => element.props.name === 'deepseek-api-key'),
+    'PROXY_MANAGED',
+  );
+  submit(find(renderContent(), (element) => element.type === 'form'));
+  await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(post).mock.calls[0]?.[0]).toBe('admin/ai/deepseek');
+  expect(vi.mocked(post).mock.calls[0]?.[1]).toMatchObject({ apiKey: 'PROXY_MANAGED' });
+  expect(vi.mocked(post).mock.calls[0]?.[2]).toBe('PUT');
+  await vi.waitFor(() => expect(state.slots[2]).toBe(null));
+  expect(api).not.toHaveBeenCalled();
+  expect(button(renderContent(), '检测连接').props.disabled).toBe(true);
+  const markup = renderToStaticMarkup(React.createElement(MemoryRouter, null, renderContent()));
+  expect(markup).toContain('代理占位值');
+  expect(markup).toContain('此代理地址未获授权');
+  expect(markup).toContain('保存时由服务器校验');
+  expect(markup).toContain('部署者已配置受信任代理入口');
+  expect(markup).not.toContain('本站管理员已明确授权');
+});
+
+it('accepts a server-authorized proxy placeholder without starting a test or content preview', async () => {
+  vi.mocked(post).mockResolvedValue({ ...config, keyPreview: 'redacted-preview-only-AGED' });
+  change(
+    find(renderContent(), (element) => element.props.name === 'deepseek-api-key'),
+    'PROXY_MANAGED',
+  );
+  submit(find(renderContent(), (element) => element.type === 'form'));
+  await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  await vi.waitFor(() =>
+    expect(
+      find(renderContent(), (element) => element.props.name === 'deepseek-api-key').props.value,
+    ).toBe(''),
+  );
+  expect(vi.mocked(post).mock.calls[0]?.[1]).toMatchObject({ apiKey: 'PROXY_MANAGED' });
+  expect(api).not.toHaveBeenCalled();
+});
+
+it('permits model changes at an unchanged saved binding but requires a fresh key when only authentication changes', async () => {
+  state.config = {
+    ...config,
+    provider: 'custom',
+    baseUrl: 'https://provider.example.test/v1',
+    protocol: 'anthropic-messages',
+    model: 'old-model',
+  };
+  change(
+    find(renderContent(), (element) => element.props.name === 'ai-custom-model'),
+    'new-model',
+  );
+  vi.mocked(post).mockResolvedValue({ ...state.config, model: 'new-model' });
+  submit(find(renderContent(), (element) => element.type === 'form'));
+  await vi.waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(post).mock.calls[0]?.[1]).toEqual({
+    enabled: true,
+    assessmentEnabled: false,
+    provider: 'custom',
+    baseUrl: 'https://provider.example.test/v1',
+    model: 'new-model',
+    protocol: 'anthropic-messages',
+    authMode: 'bearer',
+  });
+  await vi.waitFor(() => expect(state.slots[2]).toBe(null));
+  change(
+    find(renderContent(), (element) => element.props.name === 'ai-auth-mode'),
+    'x-api-key',
+  );
+  expect(button(renderContent(), '保存设置').props.disabled).toBe(true);
+  expect(button(renderContent(), '检测连接').props.disabled).toBe(true);
+  expect(post).toHaveBeenCalledTimes(1);
 });
 
 it('shows the server-bound source rather than stale lookup text and links to the exact candidate sense', () => {

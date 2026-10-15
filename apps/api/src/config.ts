@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { readAiNetworkPolicy } from './providers/ai-network-policy.js';
+import type { CompatibleAiNetworkPolicy } from './providers/compatible-ai.js';
 
 const pathSchema = z
   .string()
@@ -56,6 +58,7 @@ export interface AppConfig {
   poolSize: number;
   maxSites: number;
   clientIpProfile?: 'socket' | 'render-public';
+  aiNetworkPolicy?: CompatibleAiNetworkPolicy;
 }
 
 function envSecret(name: string, maximum = Infinity): string {
@@ -206,5 +209,6 @@ export function readConfig(): AppConfig {
       .parse(process.env.DB_POOL_SIZE || 5),
     maxSites,
     clientIpProfile,
+    aiNetworkPolicy: readAiNetworkPolicy(process.env.AI_PRIVATE_ENDPOINTS_JSON),
   };
 }

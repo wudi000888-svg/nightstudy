@@ -51,7 +51,7 @@ describe('DeepSeek API key authenticated encryption', () => {
   it.each([
     '',
     'short',
-    'x'.repeat(257),
+    'x'.repeat(4097),
     ' leading-space',
     'trailing-space ',
     'embedded space',
@@ -63,7 +63,7 @@ describe('DeepSeek API key authenticated encryption', () => {
     expect(validDeepSeekKey(value)).toBe(false);
     expect(() => encryptDeepSeekKey(secret, binding, value)).toThrow('deepseek_key_invalid');
   });
-  it.each(['x'.repeat(8), 'x'.repeat(256)])(
+  it.each(['x'.repeat(8), 'x'.repeat(256), 'cc-switch-no-prefix-' + 'x'.repeat(4076)])(
     'accepts supported key-length boundary case %#',
     (value) => {
       expect(validDeepSeekKey(value)).toBe(true);
@@ -99,9 +99,9 @@ describe('DeepSeek API key authenticated encryption', () => {
       [version, iv, tag + '+', encrypted].join('.'),
       [version, Buffer.alloc(11).toString('base64url'), tag, encrypted].join('.'),
       [version, iv, Buffer.alloc(15).toString('base64url'), encrypted].join('.'),
-      [version, iv, tag, Buffer.alloc(257).toString('base64url')].join('.'),
+      [version, iv, tag, Buffer.alloc(4097).toString('base64url')].join('.'),
       envelope + '.unexpected',
-      'v1.' + 'x'.repeat(1024),
+      'v1.' + 'x'.repeat(6000),
     ];
     for (const value of malformed) {
       let error: unknown;

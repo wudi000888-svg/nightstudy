@@ -51,6 +51,55 @@ export interface AssessmentAnalysisResult {
   reason: string | null;
   generatedAt: string | null;
 }
+export interface AssessmentAiCapabilities {
+  aiAvailable: boolean;
+  aiServiceName: string;
+  aiServiceOrigin: string | null;
+  aiConfigurationRevision: string | null;
+}
+interface AssessmentAiConsent {
+  seen: boolean;
+  checked: boolean;
+  revision: string | null;
+}
+function assessmentAiRevision(service: AssessmentAiCapabilities | undefined) {
+  const revision = service?.aiConfigurationRevision;
+  return service?.aiAvailable && typeof revision === 'string' && revision.trim() ? revision : null;
+}
+export function assessmentAiConsentForCapabilities(
+  consent: AssessmentAiConsent,
+  service: AssessmentAiCapabilities | undefined,
+): AssessmentAiConsent {
+  if (!service) return consent;
+  const revision = assessmentAiRevision(service);
+  if (!consent.seen) return { seen: true, checked: !!revision, revision };
+  return revision === consent.revision ? consent : { seen: true, checked: false, revision };
+}
+export function assessmentFinishRequest(
+  service: AssessmentAiCapabilities | undefined,
+  consent: AssessmentAiConsent,
+  hasBaseReport = false,
+): { useAi: false } | { useAi: true; expectedAiConfigurationRevision: string } {
+  const revision = assessmentAiRevision(service);
+  return !hasBaseReport && consent.checked && revision && consent.revision === revision
+    ? { useAi: true, expectedAiConfigurationRevision: revision }
+    : { useAi: false };
+}
+export function AssessmentServiceDisclosure({ service }: { service: AssessmentAiCapabilities }) {
+  let origin: string | null = null;
+  try {
+    const url = new URL(service.aiServiceOrigin ?? '');
+    if (['https:', 'http:'].includes(url.protocol)) origin = url.origin;
+  } catch {
+    /* Historical capabilities may not contain an origin. */
+  }
+  return (
+    <small className="fine-print">
+      由 {service.aiServiceName?.trim() || '本站 AI 服务'}
+      {origin ? `（${origin}）` : ''} 分析本次目标、题目与答案，不包含账户身份。
+    </small>
+  );
+}
 
 export function AssessmentAnalysis({
   analysis,
@@ -145,7 +194,11 @@ function AssessmentContent() {
   const client = useQueryClient();
   const [goal, setGoal] = useState<Goal>('daily');
   const [size, setSize] = useState(12);
-  const [useAi, setUseAi] = useState(true);
+  const [aiConsent, setAiConsent] = useState<AssessmentAiConsent>({
+    seen: false,
+    checked: true,
+    revision: null,
+  });
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [answer, setAnswer] = useState('');
@@ -153,6 +206,7 @@ function AssessmentContent() {
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState('');
   const running = useRef(false);
+  const baseReportReady = useRef(false);
   const answers = useRef<AssessmentAnswerSender<Assessment> | null>(null);
   answers.current ??= new AssessmentAnswerSender<Assessment>();
   const active = useRef(true);
@@ -163,11 +217,16 @@ function AssessmentContent() {
     };
   }, []);
   const savedSettings = useRemote<{ settings: Settings }>('settings', 'me/settings', !!user);
-  const capabilities = useRemote<{ aiAvailable: boolean }>(
+  const capabilities = useRemote<AssessmentAiCapabilities>(
     'assessment-capabilities',
     'assessments/capabilities',
     !!user,
   );
+  const aiRevision = assessmentAiRevision(capabilities.data);
+  const aiConsentActive = assessmentFinishRequest(capabilities.data, aiConsent).useAi;
+  useEffect(() => {
+    setAiConsent((current) => assessmentAiConsentForCapabilities(current, capabilities.data));
+  }, [capabilities.data?.aiAvailable, capabilities.data?.aiConfigurationRevision]);
   useEffect(() => {
     if (savedSettings.data && !assessment) setGoal(savedSettings.data.settings.goal);
   }, [savedSettings.data]);
@@ -181,6 +240,7 @@ function AssessmentContent() {
     try {
       const result = await post<{ assessment: Assessment }>('assessments', { goal, size });
       if (active.current) {
+        baseReportReady.current = false;
         answers.current?.reset();
         setAssessment(result.assessment);
       }
@@ -214,7 +274,10 @@ function AssessmentContent() {
             answers.current?.reset();
             setAssessment(fresh.assessment);
             setAnswer('');
-            if (fresh.report) setReport(fresh.report);
+            if (fresh.report) {
+              baseReportReady.current = true;
+              setReport(fresh.report);
+            }
             setNotice('答题进度已更新，请从当前题目继续。');
           }
         } catch (readError) {
@@ -227,15 +290,17 @@ function AssessmentContent() {
     }
   }
   async function finish() {
-    if (!assessment || running.current) return;
+    if (!assessment || running.current || baseReportReady.current || report) return;
     running.current = true;
     setBusy(true);
     setError(null);
     try {
-      const data = await post<{ report: Report }>(`assessments/${assessment.id}/finish`, {
-        useAi: !!capabilities.data?.aiAvailable && useAi,
-      });
+      const data = await post<{ report: Report }>(
+        `assessments/${assessment.id}/finish`,
+        assessmentFinishRequest(capabilities.data, aiConsent, baseReportReady.current || !!report),
+      );
       if (!active.current) return;
+      baseReportReady.current = true;
       setReport(data.report);
       void client.invalidateQueries({ queryKey: [scope] });
     } catch (value) {
@@ -258,7 +323,10 @@ function AssessmentContent() {
         answers.current?.reset();
         setAssessment(data.assessment);
         setAnswer('');
-        if (data.report) setReport(data.report);
+        if (data.report) {
+          baseReportReady.current = true;
+          setReport(data.report);
+        }
       }
     } catch (value) {
       if (active.current) setError(value);
@@ -481,20 +549,24 @@ function AssessmentContent() {
               description="提交后查看实测结果与建议计划。"
               action={
                 <div className="form-stack">
-                  {capabilities.data?.aiAvailable && (
+                  {capabilities.data && aiRevision && (
                     <label className="field assessment-ai-choice">
                       <span>
                         <input
                           type="checkbox"
-                          checked={useAi}
+                          checked={aiConsentActive}
                           disabled={busy}
-                          onChange={(event) => setUseAi(event.target.checked)}
+                          onChange={(event) =>
+                            setAiConsent({
+                              seen: true,
+                              checked: event.target.checked,
+                              revision: aiRevision,
+                            })
+                          }
                         />{' '}
                         完成后分析学习情况
                       </span>
-                      <small className="fine-print">
-                        仅将本次目标、题目与答案提交 DeepSeek，不包含账户身份。
-                      </small>
+                      <AssessmentServiceDisclosure service={capabilities.data} />
                     </label>
                   )}
                   <button className="button primary" disabled={busy} onClick={() => void finish()}>
@@ -534,19 +606,23 @@ function AssessmentContent() {
               </select>
             </label>
           </div>
-          {capabilities.data?.aiAvailable && (
+          {capabilities.data && aiRevision && (
             <label className="field assessment-ai-choice">
               <span>
                 <input
                   type="checkbox"
-                  checked={useAi}
-                  onChange={(event) => setUseAi(event.target.checked)}
+                  checked={aiConsentActive}
+                  onChange={(event) =>
+                    setAiConsent({
+                      seen: true,
+                      checked: event.target.checked,
+                      revision: aiRevision,
+                    })
+                  }
                 />{' '}
                 完成后分析学习情况
               </span>
-              <small className="fine-print">
-                仅将学习目标和本次题目、答案交给 DeepSeek 分析，不包含账户身份。
-              </small>
+              <AssessmentServiceDisclosure service={capabilities.data} />
             </label>
           )}
           <button className="button primary" disabled={busy} onClick={() => void start()}>

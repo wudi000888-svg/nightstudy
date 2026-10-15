@@ -10,6 +10,11 @@ import { AdminConfirm, type AdminConfirmation } from './AdminConfirm';
 import { Empty, ErrorNotice, Loading, Notice, Panel } from './UI';
 
 export interface DeepSeekConfig {
+  provider: 'deepseek' | 'custom';
+  protocol: 'openai-chat' | 'openai-responses' | 'anthropic-messages' | 'gemini';
+  authMode: 'bearer' | 'x-api-key' | 'x-goog-api-key';
+  protocols: DeepSeekConfig['protocol'][];
+  authModes: DeepSeekConfig['authMode'][];
   enabled: boolean;
   assessmentEnabled: boolean;
   configured: boolean;
@@ -61,6 +66,35 @@ interface Resolution {
   matchType: 'exact' | 'inflection' | 'not-found';
 }
 const path = 'admin/ai/deepseek';
+const officialBaseUrl = 'https://api.deepseek.com';
+const protocolNames: Record<DeepSeekConfig['protocol'], string> = {
+  'openai-chat': 'OpenAI · Chat Completions',
+  'openai-responses': 'OpenAI · Responses',
+  'anthropic-messages': 'Anthropic · Messages',
+  gemini: 'Google Gemini',
+};
+const authenticationNames: Record<DeepSeekConfig['authMode'], string> = {
+  bearer: 'Bearer Token',
+  'x-api-key': 'API Key（x-api-key）',
+  'x-goog-api-key': 'Google API Key（x-goog-api-key）',
+};
+const defaultAuthentication: Record<DeepSeekConfig['protocol'], DeepSeekConfig['authMode']> = {
+  'openai-chat': 'bearer',
+  'openai-responses': 'bearer',
+  'anthropic-messages': 'x-api-key',
+  gemini: 'x-goog-api-key',
+};
+const protocolAuthentication: Record<DeepSeekConfig['protocol'], DeepSeekConfig['authMode'][]> = {
+  'openai-chat': ['bearer'],
+  'openai-responses': ['bearer'],
+  'anthropic-messages': ['bearer', 'x-api-key'],
+  gemini: ['x-goog-api-key'],
+};
+const normalizeAddress = (value: string) => value.trim().replace(/\/+$/, '');
+type ConfigurationDraft = Pick<
+  DeepSeekConfig,
+  'enabled' | 'assessmentEnabled' | 'provider' | 'baseUrl' | 'protocol' | 'authMode' | 'model'
+>;
 const modelNames: Record<string, string> = {
   'deepseek-flash': 'DeepSeek Flash',
   'deepseek-v4-pro': 'DeepSeek V4 Pro',
@@ -175,11 +209,7 @@ function DeepSeekSettingsContent() {
   const { scope } = useApp();
   const client = useQueryClient();
   const remote = useRemote<DeepSeekConfig>('admin-deepseek', path);
-  const [draft, setDraft] = useState<{
-    enabled: boolean;
-    assessmentEnabled: boolean;
-    model: string;
-  } | null>(null);
+  const [draft, setDraft] = useState<ConfigurationDraft | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -198,18 +228,52 @@ function DeepSeekSettingsContent() {
       active.current = false;
     };
   }, []);
-  const config = remote.data;
+  const config = remote.data && {
+    ...remote.data,
+    provider: remote.data.provider ?? 'deepseek',
+    protocol: remote.data.protocol ?? 'openai-chat',
+    authMode: remote.data.authMode ?? 'bearer',
+  };
   const form = draft ?? config;
+  const bindingChanged = Boolean(
+    config &&
+    form &&
+    (form.provider !== config.provider ||
+      normalizeAddress(form.baseUrl) !== normalizeAddress(config.baseUrl) ||
+      form.protocol !== config.protocol ||
+      form.authMode !== config.authMode),
+  );
+  const needsNewKey = Boolean(config?.configured && bindingChanged && !apiKey.trim());
   const dirty =
     Boolean(apiKey.trim()) ||
     Boolean(
       config &&
       form &&
-      (form.enabled !== config.enabled ||
+      (bindingChanged ||
+        form.enabled !== config.enabled ||
         form.model !== config.model ||
         form.assessmentEnabled !== config.assessmentEnabled),
     );
   const canRequest = Boolean(config?.enabled && config.configured && !dirty && !busy);
+  const availableAuthentication = form
+    ? protocolAuthentication[form.protocol].filter((mode) =>
+        config?.authModes ? config.authModes.includes(mode) : true,
+      )
+    : [];
+  function updateDraft(value: Partial<ConfigurationDraft>) {
+    if (!form) return;
+    if (
+      (value.provider !== undefined && value.provider !== form.provider) ||
+      (value.baseUrl !== undefined &&
+        normalizeAddress(value.baseUrl) !== normalizeAddress(form.baseUrl)) ||
+      (value.protocol !== undefined && value.protocol !== form.protocol) ||
+      (value.authMode !== undefined && value.authMode !== form.authMode)
+    )
+      setApiKey('');
+    setDraft({ ...form, ...value });
+    setTested(null);
+    setCandidate(null);
+  }
 
   async function perform(action: string, run: () => Promise<void>) {
     if (running.current) return;
@@ -237,6 +301,18 @@ function DeepSeekSettingsContent() {
   }
   async function save() {
     if (!form || busy) return;
+    if (needsNewKey) {
+      setError(new Error('服务设置已改变，请重新输入当前服务的密钥。原密钥不会转发到新的服务。'));
+      return;
+    }
+    if (!form.model.trim() || !normalizeAddress(form.baseUrl)) {
+      setError(new Error('请填写接口地址和模型名称后保存。'));
+      return;
+    }
+    if (form.model.trim().length > 160 || !/^[A-Za-z0-9._:/-]+$/.test(form.model.trim())) {
+      setError(new Error('模型名称最多160字符，可使用字母、数字和 . _ : / -。'));
+      return;
+    }
     await perform('save', async () => {
       await client.cancelQueries({ queryKey: [scope, 'admin-deepseek', path], exact: true });
       if (!active.current) return;
@@ -245,7 +321,11 @@ function DeepSeekSettingsContent() {
         {
           enabled: form.enabled,
           assessmentEnabled: form.assessmentEnabled,
-          model: form.model,
+          provider: form.provider,
+          baseUrl: normalizeAddress(form.baseUrl),
+          protocol: form.protocol,
+          authMode: form.authMode,
+          model: form.model.trim(),
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
         },
         'PUT',
@@ -260,7 +340,7 @@ function DeepSeekSettingsContent() {
       if (!active.current) return;
       const value = await post<DeepSeekConfig>(path, { removeKey: true }, 'PUT');
       acceptConfig(value);
-      if (active.current) setNotice('密钥已删除，DeepSeek 已关闭。');
+      if (active.current) setNotice('密钥已删除，AI 服务已关闭。');
     });
   }
   async function test() {
@@ -269,7 +349,7 @@ function DeepSeekSettingsContent() {
     await perform('test', async () => {
       const result = await post<{
         ok: true;
-        provider: 'deepseek';
+        provider: 'deepseek' | 'custom';
         model: string;
         usage: Usage | null;
       }>(`${path}/test`, {});
@@ -316,7 +396,7 @@ function DeepSeekSettingsContent() {
       <Panel>
         <div className="panel-title">
           <KeyRound size={18} />
-          <h2>DeepSeek 设置</h2>
+          <h2>AI 服务设置</h2>
         </div>
         <p className="fine-print">
           仅管理员可配置。连接检测、内容预览和启用后的水平测试分析会使用 API 额度。
@@ -332,47 +412,158 @@ function DeepSeekSettingsContent() {
             }}
           >
             <label className="field">
+              服务提供方式
+              <select
+                name="ai-provider"
+                value={form.provider}
+                disabled={!!busy}
+                onChange={(event) => {
+                  if (event.target.value === 'deepseek') {
+                    updateDraft({
+                      provider: 'deepseek',
+                      baseUrl: officialBaseUrl,
+                      protocol: 'openai-chat',
+                      authMode: 'bearer',
+                      model: config.models.includes(form.model)
+                        ? form.model
+                        : (config.models[0] ?? ''),
+                    });
+                  } else {
+                    updateDraft({
+                      provider: 'custom',
+                      baseUrl: '',
+                      model: '',
+                      protocol: 'openai-chat',
+                      authMode: 'bearer',
+                    });
+                  }
+                }}
+              >
+                <option value="deepseek">DeepSeek 官方</option>
+                <option value="custom">CC Switch · 自定义服务</option>
+              </select>
+            </label>
+            {form.provider === 'custom' && (
+              <>
+                <p className="fine-print">
+                  按 CC Switch 或供应商提供的配置手动填写。这里不会读取本机配置。
+                </p>
+                <label className="field">
+                  接口类型
+                  <select
+                    name="ai-protocol"
+                    value={form.protocol}
+                    disabled={!!busy}
+                    onChange={(event) => {
+                      const protocol = event.target.value as DeepSeekConfig['protocol'];
+                      updateDraft({ protocol, authMode: defaultAuthentication[protocol] });
+                    }}
+                  >
+                    {(
+                      config.protocols ??
+                      (Object.keys(protocolNames) as DeepSeekConfig['protocol'][])
+                    ).map((protocol) => (
+                      <option key={protocol} value={protocol}>
+                        {protocolNames[protocol] ?? protocol}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="fine-print">
+                    按服务配置选择接口类型，不能只根据模型名称判断。
+                  </small>
+                </label>
+                <label className="field">
+                  接口地址
+                  <input
+                    name="ai-base-url"
+                    type="url"
+                    required
+                    maxLength={2048}
+                    value={form.baseUrl}
+                    disabled={!!busy}
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    placeholder="粘贴 CC Switch 的 Base URL"
+                    onChange={(event) => updateDraft({ baseUrl: event.target.value })}
+                  />
+                  <small className="fine-print">
+                    保留供应商的路径前缀；不要粘贴含密钥参数的链接。
+                  </small>
+                </label>
+                <label className="field">
+                  模型名称
+                  <input
+                    name="ai-custom-model"
+                    required
+                    maxLength={160}
+                    pattern={String.raw`[A-Za-z0-9._:\/\-]+`}
+                    value={form.model}
+                    disabled={!!busy}
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    placeholder="粘贴服务配置中的模型名称"
+                    onChange={(event) => updateDraft({ model: event.target.value })}
+                  />
+                </label>
+                <label className="field">
+                  认证方式
+                  <select
+                    name="ai-auth-mode"
+                    value={form.authMode}
+                    disabled={!!busy}
+                    onChange={(event) =>
+                      updateDraft({ authMode: event.target.value as DeepSeekConfig['authMode'] })
+                    }
+                  >
+                    {availableAuthentication.map((mode) => (
+                      <option key={mode} value={mode}>
+                        {authenticationNames[mode] ?? mode}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
+            <label className="field">
               服务状态
               <select
                 value={form.enabled ? 'enabled' : 'disabled'}
                 disabled={!!busy}
                 onChange={(event) => {
-                  setDraft({ ...form, enabled: event.target.value === 'enabled' });
-                  setTested(null);
-                  setCandidate(null);
+                  updateDraft({ enabled: event.target.value === 'enabled' });
                 }}
               >
                 <option value="disabled">关闭</option>
                 <option value="enabled">启用</option>
               </select>
             </label>
-            <label className="field">
-              模型
-              <select
-                value={form.model}
-                disabled={!!busy}
-                onChange={(event) => {
-                  setDraft({ ...form, model: event.target.value });
-                  setTested(null);
-                  setCandidate(null);
-                }}
-              >
-                {config.models.map((model) => (
-                  <option key={model} value={model}>
-                    {modelNames[model] ?? model}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {form.provider === 'deepseek' && (
+              <label className="field">
+                模型
+                <select
+                  value={form.model}
+                  disabled={!!busy}
+                  onChange={(event) => {
+                    updateDraft({ model: event.target.value });
+                  }}
+                >
+                  {config.models.map((model) => (
+                    <option key={model} value={model}>
+                      {modelNames[model] ?? model}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="field">
               水平测试智能分析
               <select
                 value={form.assessmentEnabled ? 'enabled' : 'disabled'}
                 disabled={!!busy}
                 onChange={(event) => {
-                  setDraft({ ...form, assessmentEnabled: event.target.value === 'enabled' });
-                  setTested(null);
-                  setCandidate(null);
+                  updateDraft({ assessmentEnabled: event.target.value === 'enabled' });
                 }}
               >
                 <option value="disabled">关闭，仅使用答题成绩</option>
@@ -389,23 +580,38 @@ function DeepSeekSettingsContent() {
                 name="deepseek-api-key"
                 autoComplete="off"
                 value={apiKey}
-                maxLength={256}
+                maxLength={4096}
                 disabled={!!busy}
                 onChange={(event) => {
                   setApiKey(event.target.value);
                   setTested(null);
                   setCandidate(null);
                 }}
-                placeholder={config.configured ? '留空保留已保存的密钥' : '输入新的 API 密钥'}
+                placeholder={
+                  needsNewKey
+                    ? '服务已变更，请输入此服务的密钥'
+                    : config.configured
+                      ? '留空保留已保存的密钥'
+                      : '粘贴此服务的 API 密钥'
+                }
               />
               <small className="fine-print">
                 {config.configured
                   ? `已保存密钥${config.keyPreview ? ` · 尾号 ${config.keyPreview.slice(-4)}` : ''}`
                   : '尚未保存密钥'}
               </small>
+              <small className="fine-print">
+                默认请使用真实供应商密钥。PROXY_MANAGED
+                是代理占位值，仅在部署者已配置受信任代理入口时可用；保存时由服务器校验。
+              </small>
+              {bindingChanged && config.configured && (
+                <small className="fine-print" role="status">
+                  服务提供方式、地址、接口类型或认证方式已变更，必须重新输入密钥。原密钥不会转发到新服务。
+                </small>
+              )}
             </label>
             <div className="action-row">
-              <button type="submit" className="button primary" disabled={!!busy}>
+              <button type="submit" className="button primary" disabled={!!busy || needsNewKey}>
                 <Save size={15} /> {busy === 'save' ? '正在保存…' : '保存设置'}
               </button>
               <button
@@ -414,8 +620,9 @@ function DeepSeekSettingsContent() {
                 disabled={!!busy || !config.configured}
                 onClick={() =>
                   setConfirmation({
-                    title: '删除本站 DeepSeek 密钥？',
-                    message: '已保存的密钥将被删除，AI 服务会同时关闭。再次使用需要重新输入密钥。',
+                    title: '删除本站 AI 服务密钥？',
+                    message:
+                      '已保存的密钥将被删除，AI 服务会同时关闭。未保存的服务设置不会自动应用。再次使用需要重新输入密钥。',
                     label: '删除密钥并关闭',
                     run: removeKey,
                   })
@@ -424,7 +631,10 @@ function DeepSeekSettingsContent() {
                 <Trash2 size={15} /> 删除密钥
               </button>
             </div>
-            <p className="fine-print">服务地址：{config.baseUrl}</p>
+            <p className="fine-print ai-service-address">
+              已保存服务：{config.provider === 'deepseek' ? 'DeepSeek 官方' : '自定义服务'} ·{' '}
+              {config.baseUrl}
+            </p>
           </form>
         )}
       </Panel>

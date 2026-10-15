@@ -1,11 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createHash, randomUUID } from 'node:crypto';
+import { createCipheriv, createHash, hkdfSync, randomUUID } from 'node:crypto';
+import { EventEmitter } from 'node:events';
+import type { ClientRequest, IncomingMessage } from 'node:http';
+import { Readable } from 'node:stream';
 import { hashPassword } from 'better-auth/crypto';
 import type { FastifyInstance } from 'fastify';
 import type { DeepSeekSetting, RateBucket } from '@prisma/client';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Client } from 'pg';
 import { buildApp } from '../app.js';
 import { createDatabase } from '../db.js';
 import type { AppConfig } from '../config.js';
@@ -16,6 +20,11 @@ import {
   type DeepSeekTransport,
 } from '../providers/deepseek.js';
 import { decryptDeepSeekKey } from './deepseek-crypto.js';
+import {
+  requestCompatibleAi,
+  type CompatibleAiHttpRequest,
+  type CompatibleAiRequest,
+} from '../providers/compatible-ai.js';
 
 const databaseA = process.env.TEST_DATABASE_URL,
   databaseB = process.env.TEST_DATABASE_URL_B;
@@ -57,6 +66,13 @@ suite('DeepSeek real PostgreSQL/authentication and mock-only upstream', () => {
     callCount = 0;
   let behavior: 'ok' | 'hold' | 'auth-failed' | 'bad-schema' | 'key-leak' = 'ok';
   const pending: Array<() => void> = [];
+  const seenRequests: DeepSeekRequest[] = [];
+  const wireRequests: Array<{
+    url: string;
+    headers: NonNullable<Parameters<CompatibleAiHttpRequest>[1]['headers']>;
+    payload: Record<string, unknown>;
+  }> = [];
+  let useCompatibleAdapter = false;
   const neverFetch = vi.fn(() => {
     throw new Error('Real fetch is forbidden in DeepSeek integration tests');
   });
@@ -131,6 +147,7 @@ suite('DeepSeek real PostgreSQL/authentication and mock-only upstream', () => {
   };
   const transport: DeepSeekTransport = async (input) => {
     callCount++;
+    seenRequests.push(input);
     if (behavior === 'hold') await new Promise<void>((resolve) => pending.push(resolve));
     if (behavior === 'auth-failed')
       throw new DeepSeekProviderError(502, 'deepseek_authentication_failed');
@@ -138,6 +155,63 @@ suite('DeepSeek real PostgreSQL/authentication and mock-only upstream', () => {
     if (behavior === 'bad-schema') result.content = '{"secret":"invalid schema"}';
     if (behavior === 'key-leak')
       result.content = JSON.stringify({ ok: true, unexpected: input.apiKey });
+    if (useCompatibleAdapter && input.provider === 'custom') {
+      const raw =
+        input.protocol === 'openai-chat'
+          ? { choices: [{ finish_reason: 'stop', message: { content: result.content } }] }
+          : input.protocol === 'openai-responses'
+            ? {
+                status: 'completed',
+                output: [
+                  {
+                    type: 'message',
+                    role: 'assistant',
+                    status: 'completed',
+                    content: [{ type: 'output_text', text: result.content }],
+                  },
+                ],
+              }
+            : input.protocol === 'anthropic-messages'
+              ? {
+                  type: 'message',
+                  role: 'assistant',
+                  stop_reason: 'end_turn',
+                  content: [{ type: 'text', text: result.content }],
+                }
+              : {
+                  candidates: [
+                    {
+                      finishReason: 'STOP',
+                      content: { role: 'model', parts: [{ text: result.content }] },
+                    },
+                  ],
+                };
+      const fakeRequest: CompatibleAiHttpRequest = (url, options, callback) => {
+        const request = new EventEmitter() as ClientRequest;
+        request.destroy = (() => request) as ClientRequest['destroy'];
+        request.end = ((body: Buffer) => {
+          wireRequests.push({
+            url: url.toString(),
+            headers: options.headers ?? {},
+            payload: JSON.parse(body.toString('utf8')),
+          });
+          queueMicrotask(() => {
+            const response = new Readable({ read() {} }) as IncomingMessage;
+            response.statusCode = 200;
+            response.headers = { 'content-type': 'application/json' };
+            callback(response);
+            response.push(Buffer.from(JSON.stringify(raw)));
+            response.push(null);
+          });
+          return request;
+        }) as ClientRequest['end'];
+        return request;
+      };
+      return requestCompatibleAi(input as CompatibleAiRequest, {
+        resolveFn: async () => [{ address: '93.184.216.34', family: 4 }],
+        requestFn: fakeRequest,
+      });
+    }
     return result;
   };
   function request(
@@ -247,6 +321,9 @@ suite('DeepSeek real PostgreSQL/authentication and mock-only upstream', () => {
     behavior = 'ok';
     callCount = 0;
     pending.splice(0);
+    seenRequests.splice(0);
+    wireRequests.splice(0);
+    useCompatibleAdapter = false;
     await Promise.all([
       dbA.rateBucket.deleteMany({ where: bucketWhere }),
       dbB.rateBucket.deleteMany({ where: bucketWhere }),
@@ -254,15 +331,34 @@ suite('DeepSeek real PostgreSQL/authentication and mock-only upstream', () => {
       dbB.deepSeekRequestLease.deleteMany({ where: { actorId: { in: actorIds } } }),
     ]);
     expect(
-      (await request('PUT', '', { enabled: true, model: 'deepseek-flash', apiKey: fakeKeyA }))
-        .statusCode,
+      (
+        await request('PUT', '', {
+          enabled: true,
+          assessmentEnabled: false,
+          provider: 'deepseek',
+          baseUrl: 'https://api.deepseek.com',
+          protocol: 'openai-chat',
+          authMode: 'bearer',
+          model: 'deepseek-flash',
+          apiKey: fakeKeyA,
+        })
+      ).statusCode,
     ).toBe(200);
     expect(
       (
         await request(
           'PUT',
           '',
-          { enabled: true, model: 'deepseek-flash', apiKey: fakeKeyB },
+          {
+            enabled: true,
+            assessmentEnabled: false,
+            provider: 'deepseek',
+            baseUrl: 'https://api.deepseek.com',
+            protocol: 'openai-chat',
+            authMode: 'bearer',
+            model: 'deepseek-flash',
+            apiKey: fakeKeyB,
+          },
           adminB,
           true,
         )
@@ -311,6 +407,387 @@ suite('DeepSeek real PostgreSQL/authentication and mock-only upstream', () => {
       expect((await request(method, route, body, learner)).statusCode).toBe(403);
     }
     expect(callCount).toBe(0);
+  });
+  it('reads the pre-custom v1 ciphertext format without changing its encryption or official destination', async () => {
+    // Construct the original, documented v1 envelope independently of the
+    // current encrypt helper; the deployment's realm identity is unchanged.
+    const key = Buffer.from(
+      hkdfSync(
+        'sha256',
+        Buffer.from(authSecretA),
+        Buffer.from(JSON.stringify([instanceA, 'default'])),
+        Buffer.from('nightstudy-deepseek-api-key-v1'),
+        32,
+      ),
+    );
+    const iv = Buffer.from('00112233445566778899aabb', 'hex');
+    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    cipher.setAAD(
+      Buffer.from(
+        JSON.stringify(['nightstudy-deepseek-api-key-v1', instanceA, 'default', 'singleton']),
+      ),
+    );
+    const encrypted = Buffer.concat([cipher.update(fakeKeyA, 'utf8'), cipher.final()]);
+    const legacy = [
+      'v1',
+      iv.toString('base64url'),
+      cipher.getAuthTag().toString('base64url'),
+      encrypted.toString('base64url'),
+    ].join('.');
+    await dbA.deepSeekSetting.update({
+      where: { id: 'singleton' },
+      data: { keyCiphertext: legacy },
+    });
+    const read = await request('GET', '');
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toMatchObject({
+      configured: true,
+      provider: 'deepseek',
+      baseUrl: 'https://api.deepseek.com',
+      protocol: 'openai-chat',
+      authMode: 'bearer',
+      model: 'deepseek-flash',
+      keyPreview: '••••1234',
+    });
+    expect(read.body).not.toContain(legacy);
+    expect((await request('POST', '/test', {})).statusCode).toBe(200);
+    expect(seenRequests[0]).toMatchObject({
+      apiKey: fakeKeyA,
+      provider: 'deepseek',
+      model: 'deepseek-flash',
+    });
+    expect(
+      (await dbA.deepSeekSetting.findUniqueOrThrow({ where: { id: 'singleton' } })).keyCiphertext,
+    ).toBe(legacy);
+  });
+  it.each([
+    ['openai-chat', 'bearer', 'vendor/chat-1', '/v1/chat/completions'],
+    ['openai-responses', 'bearer', 'vendor/responses-1', '/v1/responses'],
+    ['anthropic-messages', 'x-api-key', 'claude-vendor-1', '/v1/messages'],
+    ['anthropic-messages', 'bearer', 'claude-relay-1', '/v1/messages'],
+    [
+      'gemini',
+      'x-goog-api-key',
+      'models/gemini-vendor-1',
+      '/v1beta/models/gemini-vendor-1:generateContent',
+    ],
+  ] as const)(
+    'binds %s/%s settings and source preview to the selected model and exactly one wire auth header',
+    async (protocol, authMode, model, suffix) => {
+      const relayKey = 'relay_synthetic_no_sk_prefix_Abcd9876';
+      const configured = await request('PUT', '', {
+        provider: 'custom',
+        baseUrl: 'https://gateway.example',
+        protocol,
+        authMode,
+        model,
+        apiKey: relayKey,
+        enabled: true,
+      });
+      expect(configured.statusCode, configured.body).toBe(200);
+      expect(configured.json()).toMatchObject({
+        provider: 'custom',
+        protocol,
+        authMode,
+        model,
+        baseUrl: 'https://gateway.example',
+        configured: true,
+        keyPreview: '••••9876',
+      });
+      useCompatibleAdapter = true;
+      const test = await request('POST', '/test', {});
+      expect(test.statusCode, test.body).toBe(200);
+      expect(test.json()).toMatchObject({ ok: true, provider: 'custom', model });
+      const preview = await request('POST', '/preview', { wordId });
+      expect(preview.statusCode, preview.body).toBe(200);
+      expect(preview.json().preview).toMatchObject({ wordId, lemma: 'rain', applied: false });
+      expect(preview.json().preview.definitions[0]).toMatchObject({
+        sourceSenseId: senseId,
+        sourceTextSha256: createHash('sha256').update('雨；雨水 ').digest('hex'),
+        contentMetadata: { provider: 'custom', protocol, model, review: 'pending' },
+      });
+      expect(wireRequests).toHaveLength(2);
+      for (const sent of wireRequests) {
+        expect(sent.url).toBe('https://gateway.example' + suffix);
+        const headers = Object.fromEntries(
+          Object.entries(sent.headers).map(([name, value]) => [name.toLowerCase(), value]),
+        );
+        expect(headers.authorization).toBe(
+          authMode === 'bearer' ? 'Bearer ' + relayKey : undefined,
+        );
+        expect(headers['x-api-key']).toBe(authMode === 'x-api-key' ? relayKey : undefined);
+        expect(headers['x-goog-api-key']).toBe(
+          authMode === 'x-goog-api-key' ? relayKey : undefined,
+        );
+        if (protocol === 'anthropic-messages')
+          expect(headers['anthropic-version']).toBe('2023-06-01');
+        if (protocol === 'gemini') {
+          expect(sent.payload).toMatchObject({
+            contents: [{ role: 'user' }],
+            generationConfig: { responseMimeType: 'application/json' },
+          });
+          expect(sent.payload).not.toHaveProperty('model');
+        } else expect(sent.payload.model).toBe(model);
+      }
+      expect(
+        seenRequests.every(
+          (value) =>
+            value.provider === 'custom' &&
+            value.protocol === protocol &&
+            value.authMode === authMode &&
+            value.model === model,
+        ),
+      ).toBe(true);
+      expect(test.body + preview.body + configured.body).not.toContain(relayKey);
+      expect((await request('GET', '', undefined, adminB, true)).json()).toMatchObject({
+        provider: 'deepseek',
+        keyPreview: '••••9876',
+      });
+      expect((await request('POST', '/test', {}, learner)).statusCode).toBe(403);
+      expect((await request('POST', '/test', {}, adminA, true)).statusCode).toBe(401);
+    },
+  );
+  it.each([
+    ['base URL', { baseUrl: 'https://another-gateway.example' }],
+    ['protocol', { protocol: 'openai-responses' }],
+    ['auth mode', { protocol: 'anthropic-messages', authMode: 'x-api-key' }],
+    [
+      'provider',
+      {
+        provider: 'deepseek',
+        baseUrl: 'https://api.deepseek.com',
+        protocol: 'openai-chat',
+        authMode: 'bearer',
+        model: 'deepseek-flash',
+      },
+    ],
+  ])('requires a replacement key or explicit removal before changing %s', async (_name, change) => {
+    expect(
+      (
+        await request('PUT', '', {
+          provider: 'custom',
+          baseUrl: 'https://gateway.example',
+          protocol: 'openai-chat',
+          authMode: 'bearer',
+          model: 'vendor/model-1',
+          apiKey: fakeKeyA,
+        })
+      ).statusCode,
+    ).toBe(200);
+    const old = await dbA.deepSeekSetting.findUniqueOrThrow({ where: { id: 'singleton' } });
+    const blocked = await request('PUT', '', change);
+    expect(blocked.statusCode, blocked.body).toBe(400);
+    expect(blocked.json().code).toBe('ai_destination_key_required');
+    expect(await dbA.deepSeekSetting.findUniqueOrThrow({ where: { id: 'singleton' } })).toEqual(
+      old,
+    );
+    expect((await request('PUT', '', { ...change, apiKey: '' })).json().code).toBe(
+      'ai_destination_key_required',
+    );
+    const removed = await request('PUT', '', { ...change, removeKey: true });
+    expect(removed.statusCode, removed.body).toBe(200);
+    expect(removed.json()).toMatchObject({ enabled: false, configured: false, keyPreview: null });
+    expect((await request('POST', '/test', {})).statusCode).toBe(503);
+    expect(callCount).toBe(0);
+  });
+  it('accepts long non-sk keys, stores only ciphertext, and never puts the key or envelope into responses or audits', async () => {
+    const relayKey = 'A'.repeat(4092) + 'TAIL';
+    const response = await request('PUT', '', {
+      provider: 'custom',
+      baseUrl: 'https://gateway.example:8443/api',
+      protocol: 'openai-chat',
+      authMode: 'bearer',
+      model: 'vendor/model-1',
+      apiKey: relayKey,
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    const stored = await dbA.deepSeekSetting.findUniqueOrThrow({ where: { id: 'singleton' } });
+    expect(
+      decryptDeepSeekKey(
+        authSecretA,
+        { siteId: 'default', instanceId: instanceA },
+        stored.keyCiphertext!,
+      ),
+    ).toBe(relayKey);
+    expect(response.json().keyPreview).toBe('••••TAIL');
+    const read = await request('GET', '');
+    const audit = await dbA.adminAuditLog.findMany({
+      where: { actorId: adminA, action: 'ai.deepseek.configure' },
+    });
+    for (const value of [response.body, read.body, JSON.stringify(audit)]) {
+      expect(value).not.toContain(relayKey);
+      expect(value).not.toContain(stored.keyCiphertext!);
+    }
+    expect((await request('POST', '/test', {})).statusCode).toBe(200);
+    expect((await request('PUT', '', { apiKey: 'ABCDEFGH' })).statusCode).toBe(200);
+    expect((await request('PUT', '', { apiKey: 'A'.repeat(4097) })).statusCode).toBe(400);
+    expect((await request('PUT', '', { apiKey: 'bad\nkey' })).statusCode).toBe(400);
+  });
+  it('rejects private/metadata destinations and credential-bearing URLs before any transport or configuration write', async () => {
+    const before = await dbA.deepSeekSetting.findUniqueOrThrow({ where: { id: 'singleton' } });
+    for (const baseUrl of [
+      'http://127.0.0.1:15721',
+      'https://127.0.0.1',
+      'https://169.254.169.254',
+      'https://[::1]',
+      'https://metadata.google.internal',
+      'https://user:password@gateway.example',
+      'https://gateway.example?api_key=synthetic',
+      'https://gateway.example/path#secret',
+    ]) {
+      const value = await request('PUT', '', {
+        provider: 'custom',
+        baseUrl,
+        protocol: 'openai-chat',
+        authMode: 'bearer',
+        model: 'vendor/model-1',
+        apiKey: fakeKeyA,
+      });
+      expect(value.statusCode, value.body).toBe(400);
+      expect(await dbA.deepSeekSetting.findUniqueOrThrow({ where: { id: 'singleton' } })).toEqual(
+        before,
+      );
+    }
+    expect(callCount).toBe(0);
+  });
+  it('preserves ciphertext for a model-only change on the same destination but discards its in-flight preview', async () => {
+    expect(
+      (
+        await request('PUT', '', {
+          provider: 'custom',
+          baseUrl: 'https://gateway.example',
+          protocol: 'openai-chat',
+          authMode: 'bearer',
+          model: 'vendor/model-1',
+          apiKey: fakeKeyA,
+        })
+      ).statusCode,
+    ).toBe(200);
+    const stored = await dbA.deepSeekSetting.findUniqueOrThrow({ where: { id: 'singleton' } });
+    expect((await request('PUT', '', { model: 'vendor/model-2' })).statusCode).toBe(200);
+    expect(
+      (await dbA.deepSeekSetting.findUniqueOrThrow({ where: { id: 'singleton' } })).keyCiphertext,
+    ).toBe(stored.keyCiphertext);
+    const source = await dbA.sense.findUniqueOrThrow({ where: { id: senseId } });
+    behavior = 'hold';
+    const held = request('POST', '/preview', { wordId }).then((value) => value);
+    await waitPending(1);
+    try {
+      expect(
+        (await request('PUT', '', { model: 'vendor/model-3' }, adminA2, false, true)).statusCode,
+      ).toBe(200);
+      expect(
+        (await dbA.deepSeekSetting.findUniqueOrThrow({ where: { id: 'singleton' } })).keyCiphertext,
+      ).toBe(stored.keyCiphertext);
+      behavior = 'ok';
+      pending.shift()!();
+      const response = await held;
+      expect(response.statusCode, response.body).toBe(409);
+      expect(response.json().code).toBe('deepseek_configuration_changed');
+      expect(await dbA.sense.findUniqueOrThrow({ where: { id: senseId } })).toEqual(source);
+      expect(callCount).toBe(1);
+      expect(await dbA.deepSeekRequestLease.count({ where: { actorId: adminA } })).toBe(0);
+    } finally {
+      behavior = 'ok';
+      for (const resolve of pending.splice(0)) resolve();
+      await held;
+    }
+  });
+  it('rechecks model, enabled state and destination after a blocked PG lease claim before any upstream call', async () => {
+    const source = await dbA.word.findUniqueOrThrow({
+      where: { id: wordId },
+      include: { senses: true, examples: true },
+    });
+    const actorRatePrefix =
+      createHash('sha256')
+        .update(JSON.stringify(['deepseek', 'default', 'actor', adminA]))
+        .digest('hex') + ':';
+    const changes = [
+      { model: 'deepseek-v4-pro' },
+      { enabled: false },
+      {
+        provider: 'custom',
+        baseUrl: 'https://another-gateway.example',
+        protocol: 'openai-chat',
+        authMode: 'bearer',
+        model: 'vendor/model-1',
+        apiKey: fakeKeyB,
+      },
+    ];
+    for (const change of changes) {
+      expect(
+        (
+          await request('PUT', '', {
+            provider: 'deepseek',
+            baseUrl: 'https://api.deepseek.com',
+            protocol: 'openai-chat',
+            authMode: 'bearer',
+            model: 'deepseek-flash',
+            apiKey: fakeKeyA,
+            enabled: true,
+          })
+        ).statusCode,
+      ).toBe(200);
+      const beforeCount = (
+        await dbA.rateBucket.findMany({
+          where: { key: { startsWith: actorRatePrefix } },
+        })
+      ).reduce((sum, bucket) => sum + bucket.count, 0);
+      // This is the real lock used by acquireRequest, in the same isolated _test DB.
+      // Holding it prevents the service from creating its lease or invoking transport.
+      const blocker = new Client({ connectionString: databaseA });
+      await blocker.connect();
+      let inTransaction = false;
+      let attempt: Promise<Awaited<ReturnType<typeof request>>> | undefined;
+      try {
+        await blocker.query('BEGIN');
+        inTransaction = true;
+        await blocker.query('SELECT pg_advisory_xact_lock($1)', [89124801]);
+        attempt = request('POST', '/preview', { wordId }).then((response) => response);
+        let waiting = false;
+        for (let n = 0; n < 100 && !waiting; n++) {
+          const result = await blocker.query<{ waiting: boolean }>(
+            `SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype='advisory'
+              AND objid=$1 AND NOT granted
+              AND database=(SELECT oid FROM pg_database WHERE datname=current_database())) AS waiting`,
+            [89124801],
+          );
+          waiting = result.rows[0]?.waiting === true;
+          if (!waiting) await new Promise<void>((resolve) => setTimeout(resolve, 5));
+        }
+        expect(waiting).toBe(true);
+        const acquiredCount = (
+          await dbA.rateBucket.findMany({
+            where: { key: { startsWith: actorRatePrefix } },
+          })
+        ).reduce((sum, bucket) => sum + bucket.count, 0);
+        expect(acquiredCount).toBe(beforeCount + 1);
+        expect(callCount).toBe(0);
+        expect(await dbA.deepSeekRequestLease.count({ where: { actorId: adminA } })).toBe(0);
+        // The other replica can change configuration without needing the lease lock.
+        expect((await request('PUT', '', change, adminA2, false, true)).statusCode).toBe(200);
+        await blocker.query('COMMIT');
+        inTransaction = false;
+        const response = await attempt;
+        expect(response.statusCode, response.body).toBe(409);
+        expect(response.json().code).toBe('deepseek_configuration_changed');
+        expect(response.body).not.toContain(fakeKeyA);
+        expect(response.body).not.toContain(fakeKeyB);
+        expect(callCount).toBe(0);
+        expect(seenRequests).toHaveLength(0);
+        expect(await dbA.deepSeekRequestLease.count({ where: { actorId: adminA } })).toBe(0);
+        expect(
+          await dbA.word.findUniqueOrThrow({
+            where: { id: wordId },
+            include: { senses: true, examples: true },
+          }),
+        ).toEqual(source);
+      } finally {
+        if (inTransaction) await blocker.query('ROLLBACK');
+        await blocker.end();
+        await attempt;
+      }
+    }
   });
   it('encrypts keys, returns only masked preview, preserves blank keys and strips keys from audits', async () => {
     const stored = await dbA.deepSeekSetting.findUniqueOrThrow({ where: { id: 'singleton' } });

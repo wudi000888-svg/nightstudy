@@ -83,6 +83,7 @@ export class SiteRegistry {
       fleetSecret: runtime.config.authSecret,
       registrationOpen: state.registrationOpenOverride ?? runtime.config.registrationOpen,
       translation: runtime.config.translation,
+      aiNetworkPolicy: this.config.aiNetworkPolicy,
       prisma: runtime.prisma,
       user:
         user && !user.disabled

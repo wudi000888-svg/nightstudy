@@ -18,13 +18,17 @@ export class DeepSeekProviderError extends Error {
 }
 export interface DeepSeekRequest {
   apiKey: string;
-  model: DeepSeekModel;
+  model: string;
+  provider?: 'deepseek' | 'custom';
+  baseUrl?: string;
+  protocol?: 'openai-chat' | 'openai-responses' | 'anthropic-messages' | 'gemini';
+  authMode?: 'bearer' | 'x-api-key' | 'x-goog-api-key';
   messages: Array<{ role: 'system' | 'user'; content: string }>;
   maxTokens: number;
 }
 export interface DeepSeekResult {
   content: string;
-  model: DeepSeekModel;
+  model: string;
   usage: { promptTokens: number; completionTokens: number; totalTokens: number } | null;
 }
 export type DeepSeekTransport = (input: DeepSeekRequest) => Promise<DeepSeekResult>;
@@ -88,8 +92,8 @@ export async function requestDeepSeek(
 ): Promise<DeepSeekResult> {
   if (
     typeof input.apiKey !== 'string' ||
-    !/^[\x21-\x7e]{8,256}$/.test(input.apiKey) ||
-    !DEEPSEEK_MODELS.includes(input.model) ||
+    !/^[\x21-\x7e]{8,4096}$/.test(input.apiKey) ||
+    !DEEPSEEK_MODELS.some((model) => model === input.model) ||
     input.maxTokens < 1 ||
     input.maxTokens > 2400 ||
     !Number.isInteger(input.maxTokens) ||

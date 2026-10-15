@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { HttpError, requireUser, type ContextResolver } from '../context.js';
 import type { DeepSeekTransport } from '../providers/deepseek.js';
+import { aiServiceDisclosure, normalizedAiConnection, aiConsentRevision } from './ai-settings.js';
 import { assessmentAiDto, enrichAssessmentReport } from './assessment-ai.js';
 import {
   parse,
@@ -100,10 +101,23 @@ export async function registerAssessment(
     requireUser(ctx);
     const setting = await ctx.prisma.deepSeekSetting.findUnique({
       where: { id: 'singleton' },
-      select: { enabled: true, assessmentEnabled: true, keyCiphertext: true },
     });
+    let valid = false;
+    if (setting) {
+      try {
+        normalizedAiConnection(setting, ctx.aiNetworkPolicy);
+        valid = true;
+      } catch {
+        /* Configuration must be usable before offering analysis. */
+      }
+    }
+    const aiAvailable = Boolean(
+      valid && setting?.enabled && setting.assessmentEnabled && setting.keyCiphertext,
+    );
     return {
-      aiAvailable: Boolean(setting?.enabled && setting.assessmentEnabled && setting.keyCiphertext),
+      aiAvailable,
+      ...aiServiceDisclosure(setting),
+      aiConfigurationRevision: aiAvailable && setting ? aiConsentRevision(setting, ctx) : null,
     };
   });
   app.post('/assessments', async (req) => {
@@ -292,7 +306,18 @@ export async function registerAssessment(
     const ctx = await getContext(req),
       user = requireUser(ctx),
       params = parse(z.object({ id }), req.params),
-      input = parse(z.object({ useAi: z.boolean().optional() }).strict(), req.body ?? {});
+      input = parse(
+        z
+          .object({
+            useAi: z.boolean().optional(),
+            expectedAiConfigurationRevision: z
+              .string()
+              .regex(/^[a-f0-9]{64}$/)
+              .optional(),
+          })
+          .strict(),
+        req.body ?? {},
+      );
     const local = await transact(ctx.prisma, async (tx) => {
       const lock = await tx.$queryRaw<
         { id: string }[]
@@ -419,6 +444,7 @@ export async function registerAssessment(
       req,
       getContext,
       options.transport,
+      input.expectedAiConfigurationRevision,
     );
     return { report, plan: local.plan };
   });

@@ -4075,6 +4075,9 @@ td strong {
   line-height: 1.6;
   color: var(--muted);
 }
+.ai-service-address {
+  overflow-wrap: anywhere;
+}
 .word-card-heading h2 {
   margin: 0;
   font-family: inherit;

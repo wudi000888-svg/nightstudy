@@ -23,7 +23,7 @@ function aad(binding: DeepSeekKeyBinding) {
   return Buffer.from(JSON.stringify([purpose, binding.instanceId, binding.siteId, 'singleton']));
 }
 export function validDeepSeekKey(value: string) {
-  return /^[\x21-\x7e]{8,256}$/.test(value);
+  return /^[\x21-\x7e]{8,4096}$/.test(value);
 }
 export function deepSeekKeyPreview(value: string) {
   return `••••${value.slice(-4)}`;
@@ -51,7 +51,7 @@ export function decryptDeepSeekKey(secret: string, binding: DeepSeekKeyBinding, 
       !rawIv ||
       !rawTag ||
       !rawCiphertext ||
-      envelope.length > 1024
+      envelope.length > 6000
     )
       throw new Error('invalid');
     const decode = (value: string) => {
@@ -63,7 +63,8 @@ export function decryptDeepSeekKey(secret: string, binding: DeepSeekKeyBinding, 
     const iv = decode(rawIv),
       tag = decode(rawTag),
       encrypted = decode(rawCiphertext);
-    if (iv.length !== 12 || tag.length !== 16 || encrypted.length > 256) throw new Error('invalid');
+    if (iv.length !== 12 || tag.length !== 16 || encrypted.length > 4096)
+      throw new Error('invalid');
     const decipher = createDecipheriv('aes-256-gcm', encryptionKey(secret, binding), iv);
     decipher.setAAD(aad(binding));
     decipher.setAuthTag(tag);

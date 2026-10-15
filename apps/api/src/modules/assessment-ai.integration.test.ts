@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash, randomUUID } from 'node:crypto';
 import { hashPassword } from 'better-auth/crypto';
 import fs from 'node:fs';
@@ -11,6 +11,7 @@ import { createDatabase } from '../db.js';
 import type { AppConfig } from '../config.js';
 import {
   DeepSeekProviderError,
+  DEEPSEEK_MODELS,
   type DeepSeekRequest,
   type DeepSeekTransport,
 } from '../providers/deepseek.js';
@@ -125,11 +126,34 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
     const r = await request(
       'PUT',
       '/admin/ai/deepseek',
-      { enabled: true, assessmentEnabled, apiKey: fakeKey },
+      {
+        enabled: true,
+        assessmentEnabled,
+        provider: 'deepseek',
+        baseUrl: 'https://api.deepseek.com',
+        protocol: 'openai-chat',
+        authMode: 'bearer',
+        model: DEEPSEEK_MODELS[0],
+        apiKey: fakeKey,
+      },
       adminId,
     );
     expect(r.statusCode).toBe(200);
     expect(r.json().assessmentEnabled).toBe(assessmentEnabled);
+  };
+  const currentConsent = async () => {
+    const r = await request('GET', '/assessments/capabilities');
+    expect(r.statusCode).toBe(200);
+    const capabilities = r.json() as {
+      aiAvailable: boolean;
+      aiConfigurationRevision: string | null;
+    };
+    expect(capabilities.aiAvailable).toBe(true);
+    expect(capabilities.aiConfigurationRevision).toMatch(/^[a-f0-9]{64}$/);
+    return {
+      useAi: true,
+      expectedAiConfigurationRevision: capabilities.aiConfigurationRevision!,
+    };
   };
   const completeAnswers = async (rainFixture = false) => {
     let id: string;
@@ -248,6 +272,14 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
       );
     }
   });
+  beforeEach(async () => {
+    behavior = 'ok';
+    resolveHold = undefined;
+    requests.splice(0);
+    calls = 0;
+    await db.rateBucket.deleteMany({ where: bucketWhere });
+    await db.deepSeekRequestLease.deleteMany({ where: { actorId: { in: actors } } });
+  });
   afterAll(async () => {
     resolveHold?.();
     await Promise.allSettled([app?.close(), replica?.close()]);
@@ -266,14 +298,17 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
     await configure(false);
     expect((await request('GET', '/assessments/capabilities')).json()).toEqual({
       aiAvailable: false,
+      aiServiceName: 'DeepSeek',
+      aiServiceOrigin: 'https://api.deepseek.com',
+      aiConfigurationRevision: null,
     });
     const id = await completeAnswers(),
       before = calls;
     const local = await request('POST', `/assessments/${id}/finish`, { useAi: true });
     expect(local.statusCode).toBe(200);
     expect(local.json().report.aiAnalysis).toMatchObject({
-      status: 'disabled',
-      reason: 'not_enabled',
+      status: 'unavailable',
+      reason: 'configuration_changed',
       payload: null,
     });
     expect(calls).toBe(before);
@@ -293,8 +328,9 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
   it('adds bounded AI advice from actual answers without replacing objective scores, evidence or FSRS history', async () => {
     await configure(true);
     behavior = 'ok';
+    const consent = await currentConsent();
     const id = await completeAnswers(true);
-    const r = await request('POST', `/assessments/${id}/finish`, { useAi: true });
+    const r = await request('POST', `/assessments/${id}/finish`, consent);
     expect(r.statusCode).toBe(200);
     const report = r.json().report;
     expect(report.aiAnalysis.status).toBe('available');
@@ -321,9 +357,7 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
     expect(last.messages[1]!.content).not.toContain(learnerId);
     expect(last.messages[1]!.content).not.toContain('@example.test');
     const before = calls;
-    expect((await request('POST', `/assessments/${id}/finish`, { useAi: true })).statusCode).toBe(
-      200,
-    );
+    expect((await request('POST', `/assessments/${id}/finish`, consent)).statusCode).toBe(200);
     expect((await request('GET', `/assessments/${id}`)).json().report.aiAnalysis.status).toBe(
       'available',
     );
@@ -335,17 +369,12 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
     await configure(true);
     behavior = 'hold';
     resolveHold = undefined;
+    const consent = await currentConsent();
     const id = await completeAnswers(),
       before = calls;
-    const first = request('POST', `/assessments/${id}/finish`, { useAi: true });
+    const first = request('POST', `/assessments/${id}/finish`, consent);
     await waitHold();
-    const second = await request(
-      'POST',
-      `/assessments/${id}/finish`,
-      { useAi: true },
-      learnerId,
-      true,
-    );
+    const second = await request('POST', `/assessments/${id}/finish`, consent, learnerId, true);
     expect(second.statusCode).toBe(200);
     expect(second.json().report.aiAnalysis.status).toBe('pending');
     expect(calls).toBe(before + 1);
@@ -357,18 +386,19 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
   });
   it('falls back to the completed objective report on timeout or key-bearing invalid model output, without retries', async () => {
     await configure(true);
+    const consent = await currentConsent();
     for (const kind of ['timeout', 'invalid'] as const) {
       behavior = kind;
       const id = await completeAnswers(),
         before = calls;
-      const r = await request('POST', `/assessments/${id}/finish`, { useAi: true });
+      const r = await request('POST', `/assessments/${id}/finish`, consent);
       expect(r.statusCode).toBe(200);
       expect(r.json().report.aiAnalysis.status).toBe('unavailable');
       expect(r.json().report.aiAnalysis.payload).toBeNull();
       expect(JSON.stringify(r.json())).not.toContain(fakeKey);
       expect((await db.assessment.findUniqueOrThrow({ where: { id } })).status).toBe('completed');
       expect(calls).toBe(before + 1);
-      await request('POST', `/assessments/${id}/finish`, { useAi: true });
+      await request('POST', `/assessments/${id}/finish`, consent);
       expect(calls).toBe(before + 1);
     }
     behavior = 'ok';
@@ -377,8 +407,9 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
     await configure(true);
     behavior = 'hold';
     resolveHold = undefined;
+    const consent = await currentConsent();
     const id = await completeAnswers();
-    const pending = request('POST', `/assessments/${id}/finish`, { useAi: true });
+    const pending = request('POST', `/assessments/${id}/finish`, consent);
     await waitHold();
     await configure(false);
     resolveHold!();
@@ -393,6 +424,8 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
     resolveHold = undefined;
   });
   it('reports an expired durable claim without charging or mutating its objective report during GET', async () => {
+    await configure(true);
+    const consent = await currentConsent();
     const id = await completeAnswers();
     await request('POST', `/assessments/${id}/finish`, { useAi: false });
     await db.assessment.update({
@@ -414,7 +447,7 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
       payload: null,
     });
     expect(await db.assessment.findUniqueOrThrow({ where: { id } })).toEqual(before);
-    await request('POST', `/assessments/${id}/finish`, { useAi: true });
+    await request('POST', `/assessments/${id}/finish`, consent);
     expect(calls).toBe(count);
     expect((await db.assessment.findUniqueOrThrow({ where: { id } })).reportJson).toEqual(
       before.reportJson,
@@ -434,12 +467,130 @@ suite('PostgreSQL assessment AI completion with mock-only upstream', () => {
     ).toBe(401);
     expect(calls).toBe(before);
   });
+  it.each(['destination', 'disabled'] as const)(
+    'keeps objective scores and makes no request for the previously consented configuration after %s changes',
+    async (change) => {
+      await configure(true);
+      const oldConsent = await currentConsent();
+      const id = await completeAnswers(true);
+      if (change === 'destination') {
+        const updated = await request(
+          'PUT',
+          '/admin/ai/deepseek',
+          {
+            provider: 'custom',
+            enabled: true,
+            assessmentEnabled: true,
+            baseUrl: 'https://gateway.example',
+            protocol: 'openai-responses',
+            authMode: 'bearer',
+            model: 'vendor/consent-target',
+            apiKey: 'synthetic-new-destination-key-9876',
+          },
+          adminId,
+        );
+        expect(updated.statusCode).toBe(200);
+        const newConsent = await currentConsent();
+        expect(newConsent.expectedAiConfigurationRevision).not.toBe(
+          oldConsent.expectedAiConfigurationRevision,
+        );
+      } else {
+        await configure(false);
+      }
+      const before = calls;
+      const result = await request('POST', `/assessments/${id}/finish`, oldConsent);
+      expect(result.statusCode).toBe(200);
+      expect(result.json().report.aiAnalysis).toMatchObject({
+        status: 'unavailable',
+        reason: 'configuration_changed',
+        payload: null,
+      });
+      const stored = await db.assessment.findUniqueOrThrow({ where: { id } });
+      expect(stored.status).toBe('completed');
+      expect(result.json().report.accuracy).toEqual(
+        (stored.reportJson as Record<string, unknown>).accuracy,
+      );
+      expect(stored.reportJson).not.toHaveProperty('aiAnalysis');
+      expect(calls).toBe(before);
+      expect(await db.deepSeekRequestLease.count({ where: { actorId: learnerId } })).toBe(0);
+      expect(await db.reviewLog.count({ where: { userId: learnerId } })).toBe(0);
+      expect(await db.studyProgress.count({ where: { userId: learnerId } })).toBe(0);
+    },
+  );
+  it('does not send answers for legacy explicit opt-in without a configuration revision', async () => {
+    await configure(true);
+    await currentConsent();
+    const id = await completeAnswers(true);
+    const before = calls;
+    const result = await request('POST', `/assessments/${id}/finish`, { useAi: true });
+    expect(result.statusCode).toBe(200);
+    expect(result.json().report.aiAnalysis).toMatchObject({
+      status: 'unavailable',
+      reason: 'configuration_changed',
+      payload: null,
+    });
+    const stored = await db.assessment.findUniqueOrThrow({ where: { id } });
+    expect(stored.status).toBe('completed');
+    expect(result.json().report.accuracy).toEqual(
+      (stored.reportJson as Record<string, unknown>).accuracy,
+    );
+    expect(calls).toBe(before);
+  });
+  it('sends a matching custom configuration once and never recharges a finished report', async () => {
+    const configured = await request(
+      'PUT',
+      '/admin/ai/deepseek',
+      {
+        provider: 'custom',
+        enabled: true,
+        assessmentEnabled: true,
+        baseUrl: 'https://gateway.example',
+        protocol: 'anthropic-messages',
+        authMode: 'x-api-key',
+        model: 'vendor/assessment-model',
+        apiKey: 'synthetic-custom-assessment-key-8765',
+      },
+      adminId,
+    );
+    expect(configured.statusCode).toBe(200);
+    behavior = 'ok';
+    const consent = await currentConsent();
+    expect((await request('GET', '/assessments/capabilities')).json()).toMatchObject({
+      aiAvailable: true,
+      aiServiceName: 'AI 服务',
+      aiServiceOrigin: 'https://gateway.example',
+      aiConfigurationRevision: consent.expectedAiConfigurationRevision,
+    });
+    const id = await completeAnswers(true);
+    const before = calls;
+    const finished = await request('POST', `/assessments/${id}/finish`, consent);
+    expect(finished.statusCode).toBe(200);
+    expect(finished.json().report.aiAnalysis.status).toBe('available');
+    expect(calls).toBe(before + 1);
+    expect(requests.at(-1)).toMatchObject({
+      provider: 'custom',
+      baseUrl: 'https://gateway.example',
+      protocol: 'anthropic-messages',
+      authMode: 'x-api-key',
+      model: 'vendor/assessment-model',
+    });
+    const stored = await db.assessment.findUniqueOrThrow({ where: { id } });
+    expect(finished.json().report.accuracy).toEqual(
+      (stored.reportJson as Record<string, unknown>).accuracy,
+    );
+    const repeated = await request('POST', `/assessments/${id}/finish`, consent);
+    const fetched = await request('GET', `/assessments/${id}`);
+    expect(repeated.json().report).toEqual(finished.json().report);
+    expect(fetched.json().report).toEqual(finished.json().report);
+    expect(calls).toBe(before + 1);
+  });
   it('refuses the old report when the learner loses authentication during an in-flight call', async () => {
     await configure(true);
     behavior = 'hold';
     resolveHold = undefined;
+    const consent = await currentConsent();
     const id = await completeAnswers();
-    const waiting = request('POST', `/assessments/${id}/finish`, { useAi: true });
+    const waiting = request('POST', `/assessments/${id}/finish`, consent);
     await waitHold();
     await db.user.update({ where: { id: learnerId }, data: { disabled: true } });
     resolveHold!();

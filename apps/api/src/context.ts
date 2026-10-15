@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { FastifyRequest } from 'fastify';
 import type { TranslationConfig } from './config.js';
+import type { CompatibleAiNetworkPolicy } from './providers/compatible-ai.js';
 
 export interface UserView {
   id: string;
@@ -19,6 +20,7 @@ export interface RequestContext {
   prisma: PrismaClient;
   user: UserView | null;
   translation?: TranslationConfig;
+  aiNetworkPolicy?: CompatibleAiNetworkPolicy;
 }
 export type ContextResolver = (request: FastifyRequest) => Promise<RequestContext>;
 

@@ -6,6 +6,7 @@ import type { DeepSeekTransport } from '../providers/deepseek.js';
 import { callDeepSeek, configuredDeepSeek } from './deepseek-service.js';
 import { digest, json, obj, transact } from './shared.js';
 import { randomUUID } from 'node:crypto';
+import { aiConfigurationFingerprint, aiConsentRevision } from './ai-settings.js';
 
 export const ASSESSMENT_AI_PROMPT_VERSION = 'nightstudy-assessment-advice-v1';
 export const ASSESSMENT_AI_CLAIM_MS = 90000;
@@ -164,6 +165,7 @@ export async function enrichAssessmentReport(
   req: FastifyRequest,
   getContext: ContextResolver,
   transport?: DeepSeekTransport,
+  expectedAiConfigurationRevision?: string,
 ) {
   const claim = await transact(ctx.prisma, async (tx) => {
     const rows = await tx.$queryRaw<
@@ -197,6 +199,23 @@ export async function enrichAssessmentReport(
     }
     if (value.aiStatus !== 'not_requested') return { value, call: false as const };
     const setting = await tx.deepSeekSetting.findUnique({ where: { id: 'singleton' } });
+    if (
+      useAi &&
+      (!expectedAiConfigurationRevision ||
+        !setting ||
+        aiConsentRevision(setting, ctx) !== expectedAiConfigurationRevision)
+    ) {
+      value = await tx.assessment.update({
+        where: { id: assessmentId },
+        data: {
+          aiStatus: 'unavailable',
+          aiCompletedAt: new Date(),
+          aiResultJson: json({ reason: 'configuration_changed' }),
+        },
+        include: { items: { orderBy: { ordinal: 'asc' } } },
+      });
+      return { value, call: false as const };
+    }
     if (!useAi || !setting?.enabled || !setting.assessmentEnabled || !setting.keyCiphertext) {
       value = await tx.assessment.update({
         where: { id: assessmentId },
@@ -211,12 +230,7 @@ export async function enrichAssessmentReport(
     }
     const claimId = randomUUID(),
       sourceHash = snapshotHash(value);
-    const configHash = digest({
-      key: setting.keyCiphertext,
-      model: setting.model,
-      enabled: setting.enabled,
-      assessmentEnabled: setting.assessmentEnabled,
-    });
+    const configHash = digest(aiConfigurationFingerprint(setting));
     value = await tx.assessment.update({
       where: { id: assessmentId },
       data: {
@@ -232,6 +246,8 @@ export async function enrichAssessmentReport(
   if (claim.call) {
     const began = Date.now();
     let requestedModel: string | null = null;
+    let requestedProvider: string | null = null;
+    let requestedProtocol: string | null = null;
     let payload: ReturnType<typeof parseAssessmentAdvice> | null = null,
       reason: string | null = null,
       usage: unknown = null;
@@ -239,15 +255,12 @@ export async function enrichAssessmentReport(
       const config = await configuredDeepSeek(ctx);
       if (
         !config.setting.assessmentEnabled ||
-        digest({
-          key: config.setting.keyCiphertext,
-          model: config.model,
-          enabled: config.setting.enabled,
-          assessmentEnabled: config.setting.assessmentEnabled,
-        }) !== claim.configHash
+        digest(aiConfigurationFingerprint(config.setting)) !== claim.configHash
       )
         throw new HttpError(409, 'deepseek_configuration_changed');
       requestedModel = config.model;
+      requestedProvider = config.provider;
+      requestedProtocol = config.protocol;
       const result = await callDeepSeek(
         ctx,
         actorId,
@@ -289,7 +302,9 @@ export async function enrichAssessmentReport(
           ? 'busy'
           : code === 'deepseek_configuration_changed'
             ? 'configuration_changed'
-            : code === 'deepseek_response_invalid' || !code
+            : code === 'deepseek_response_invalid' ||
+                code === 'compatible_ai_response_invalid' ||
+                !code
               ? 'invalid_response'
               : 'unavailable';
     }
@@ -312,15 +327,7 @@ export async function enrichAssessmentReport(
         reason = 'unavailable';
       }
       const setting = await tx.deepSeekSetting.findUnique({ where: { id: 'singleton' } });
-      if (
-        !setting ||
-        digest({
-          key: setting.keyCiphertext,
-          model: setting.model,
-          enabled: setting.enabled,
-          assessmentEnabled: setting.assessmentEnabled,
-        }) !== claim.configHash
-      ) {
+      if (!setting || digest(aiConfigurationFingerprint(setting)) !== claim.configHash) {
         payload = null;
         reason = 'configuration_changed';
       }
@@ -334,7 +341,8 @@ export async function enrichAssessmentReport(
             reason,
             metadata: {
               usage,
-              provider: 'deepseek',
+              provider: requestedProvider,
+              protocol: requestedProtocol,
               model: requestedModel,
               elapsedMs: Date.now() - began,
               promptVersion: ASSESSMENT_AI_PROMPT_VERSION,

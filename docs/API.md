@@ -250,18 +250,20 @@ forecast的days含localDate/startsAt/endsAt/dueUnique/overdueCarry。dueUnique�
 
 词书/字典/生词本/admin词列表已分页，用户/公告/审计等接口仍有上述读取上限。operator可通过固定摘要的工具批量安装源内容；自定义词书使用前述标准文档导入，当前没有管理员通用内容上传、媒体上传或OpenAPI导出。生产客户端应固定版本并在升级时核对 [CHANGELOG](../CHANGELOG.md) 与 [部署文档](DEPLOYMENT.md)。
 
-## 可选 DeepSeek 管理接口
+## 可选 AI 管理接口
 
-全部要求本站admin；固定官方api.deepseek.com，不接受任意baseUrl。模型ID为当前代码支持的deepseek-flash/deepseek-v4-pro。默认无key、不请求；保存设置不调用上游，只有管理员明确test/preview才使用其服务商额度。
+全部要求本站admin。`provider=deepseek`保留官方固定地址与deepseek-flash/deepseek-v4-pro模型；`provider=custom`支持CC Switch供应商的baseUrl、实际model、四种protocol（openai-chat/openai-responses/anthropic-messages/gemini）及匹配的authMode（bearer/x-api-key/x-goog-api-key）。默认无key、不请求，保存配置不调用上游；管理员主动test/preview或学习者选择已启用的测试分析时使用对应供应商额度。
 
-| 方法与相对路径                    | 契约                                                                                              |
-| --------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `GET /admin/ai/deepseek`          | enabled/configured/model/models/baseUrl/keyPreview/updatedAt；不返回明文key                       |
-| `PUT /admin/ai/deepseek`          | enabled?/model?/apiKey?/removeKey?；删除key同时禁用，空key保留已有配置                            |
-| `POST /admin/ai/deepseek/test`    | JSON `{}`；主动检查，最多32输出tokens，返回ok/provider/model/usage                                |
-| `POST /admin/ai/deepseek/preview` | `{wordId}`；已发布单词的缺项候选，preview包含definitions/examples/review/applied=false，另有usage |
+| 方法与相对路径                    | 契约                                                                                                                                         |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /admin/ai/deepseek`          | enabled/assessmentEnabled/configured/provider/model/models/baseUrl/protocol/protocols/authMode/authModes/keyPreview/updatedAt；不返回明文key |
+| `PUT /admin/ai/deepseek`          | enabled?/assessmentEnabled?/provider?/baseUrl?/protocol?/authMode?/model?/apiKey?/removeKey?；删除key同时禁用，空key仅在原目的地保留         |
+| `POST /admin/ai/deepseek/test`    | JSON `{}`；主动检查，官方最多32、自定义最多512输出tokens，返回ok/provider/model/usage                                                        |
+| `POST /admin/ai/deepseek/preview` | `{wordId}`；已发布单词的缺项候选，preview包含definitions/examples/review/applied=false，另有usage                                            |
 
 预览不修改词典或FSRS，也没有候选应用接口。无缺项返回reason=no_missing_content/usage=null，不调用上游；同Sense空字段及原文SHA校验，源文/配置/权限变化时丢弃候选。单次20秒/64KiB、最大2400输出tokens，无自动重试；站点20次/分钟、管理员6次/分钟，site2/actor1并发lease。配置与加密/备份边界、收费责任及受控上游测试范围见 [AI_CONFIGURATION.md](AI_CONFIGURATION.md)。
+
+输入key支持8–4096可打印ASCII字符，不要求sk前缀；baseUrl最多2048字符，model最多160。已有key时更换provider/baseUrl/protocol/authMode必须提供新key或removeKey=true（同时关闭），不能将旧key自动发往新目的地。默认仅公网HTTPS，审核全部DNS并固定连接IP；operator可用部署环境的AI_PRIVATE_ENDPOINTS_JSON授权精确origin+固定IP的代理，HTTP请求不能提供该权限。CC Switch的代理占位值默认拒绝，仅相应operator受信任入口允许；Google OAuth账号授权不属于APIkey兼容范围。
 
 ## 版本检测
 
@@ -303,9 +305,9 @@ update包含status/checkedAt/latestVersion/releaseUrl/message/channel，另有ca
 
 ### 水平测试可选智能分析
 
-`GET /assessments/capabilities` 要求登录，返回 `{aiAvailable: boolean}`，只读取当前站点开关与配 key 状态，不验证上游在线状态。`PUT /admin/ai/deepseek` 新增 `assessmentEnabled`，独立默认关闭；关闭服务总开关或删除 key 会关闭此功能。
+`GET /assessments/capabilities` 要求登录，返回 `{aiAvailable: boolean, aiServiceName: string, aiServiceOrigin: string|null, aiConfigurationRevision: string|null}`，只读取当前站点开关、配key与合法配置状态，不验证上游在线状态；服务来源仅origin，不含key或上游usage。`PUT /admin/ai/deepseek` 的 `assessmentEnabled` 独立默认关闭；关闭服务总开关或删除key会关闭此功能。
 
-`POST /assessments/:id/finish` 接受严格 JSON `{useAi?: boolean}`。只有显式 `useAi: true` 且管理员开关与密钥都可用时才尝试；省略字段的旧客户端仍只获取本地报告。前端应让学习者明确选择并显示发送本次目标、题目和答案的说明。客观计分始终先完成，原 `report.accuracy`、`verifiedWordIds`、`byStratum` 与 `suggestedPlan` 保持；另返回 `report.aiAnalysis`：
+`POST /assessments/:id/finish` 接受严格 JSON `{useAi?: boolean, expectedAiConfigurationRevision?: string}`。只有显式 `useAi: true`、确认时的64位十六进制配置revision与当前一致且管理员开关与密钥都可用时才尝试；缺失或过期revision只返回基础成绩与configuration_changed，不把答案发往新服务。省略useAi的旧客户端仍只获取本地报告。前端应让学习者明确选择并显示发送本次目标、题目和答案的说明；配置改变后撤销旧勾选，须重新确认。客观计分始终先完成，原 `report.accuracy`、`verifiedWordIds`、`byStratum` 与 `suggestedPlan` 保持；另返回 `report.aiAnalysis`：
 
 ```json
 {

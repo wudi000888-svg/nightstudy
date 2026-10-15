@@ -4,7 +4,7 @@ export default defineConfig({
     include: [
       'packages/**/*.test.ts',
       'apps/api/src/**/*.test.ts',
-      'apps/web/src/lib/**/*.test.ts',
+      'apps/web/src/**/*.test.{ts,tsx}',
       'scripts/**/*.test.ts',
     ],
     fileParallelism: false,

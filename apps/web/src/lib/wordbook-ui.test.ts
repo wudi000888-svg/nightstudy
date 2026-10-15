@@ -25,7 +25,7 @@ const state = vi.hoisted(() => ({
   wordbookItems: [] as WordbookItem[],
   listOptions: [] as {
     queryKey: unknown[];
-    queryFn: (context: { pageParam: string | null }) => unknown;
+    queryFn: (context: { pageParam: string | null; signal?: AbortSignal }) => unknown;
   }[],
 }));
 // Exercise the actual pointer/focus and save handlers without adding a DOM library.
@@ -119,7 +119,8 @@ function renderCard() {
 }
 function renderWordbook() {
   state.cursor = state.refCursor = 0;
-  return LookupPage({ initialTab: 'wordbook' });
+  const wrapper = LookupPage({ initialTab: 'wordbook' });
+  return (wrapper.type as (props: unknown) => ReactElement)(wrapper.props);
 }
 async function openHover() {
   const wrapper = renderCard();
@@ -318,9 +319,11 @@ it('separates active and consolidated pagination keys and offers re-add rather t
   tree = renderWordbook();
   const options = state.listOptions.at(-1)!;
   expect(options.queryKey).toEqual([state.scope, 'wordbook', 'pages', 'consolidated']);
-  await options.queryFn({ pageParam: 'scoped-cursor' });
+  const signal = new AbortController().signal;
+  await options.queryFn({ pageParam: 'scoped-cursor', signal });
   expect(vi.mocked(api)).toHaveBeenLastCalledWith(
     'wordbook?limit=50&status=consolidated&cursor=scoped-cursor',
+    { signal },
   );
   expect(elements(tree).some((element) => element.props['aria-label'] === '编辑 water 备注')).toBe(
     false,

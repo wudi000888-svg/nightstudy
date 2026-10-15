@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Bookmark, Search, Trash2, Pause, Play, Pencil, ArrowRight, Languages } from 'lucide-react';
+import {
+  Bookmark,
+  Search,
+  Trash2,
+  Pause,
+  Play,
+  Pencil,
+  ArrowLeft,
+  ArrowRight,
+  Languages,
+} from 'lucide-react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp, useRemote } from '../AppContext';
 import { api, post } from '../lib/api';
@@ -26,22 +36,21 @@ import {
   WordView,
   formatDate,
 } from '../components/UI';
+import './mobile-lookup.css';
 
 export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 'wordbook' }) {
+  const { scope } = useApp();
+  return <LookupContent key={`${scope}:${initialTab}`} initialTab={initialTab} />;
+}
+
+function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
   const { user, scope } = useApp();
   const client = useQueryClient();
   const currentScope = useRef(scope);
   currentScope.current = scope;
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<'lookup' | 'wordbook' | 'translation'>(initialTab);
   const [query, setQuery] = useState(params.get('q') ?? '');
-  useEffect(() => {
-    const value = params.get('q');
-    if (value !== null) {
-      setQuery(value);
-      setTab('lookup');
-    }
-  }, [params]);
   const [results, setResults] = useState<Word[]>([]);
   const [selected, setSelected] = useState<Word | null>(null);
   const [page, setPage] = useState<PageInfo | null>(null);
@@ -49,6 +58,22 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
   const [detailBusy, setDetailBusy] = useState(false);
   const [detailError, setDetailError] = useState<unknown>(null);
   const selection = useRef(0);
+  const alive = useRef(true);
+  const searchGeneration = useRef(0);
+  const searchFlight = useRef(false);
+  const searchController = useRef<AbortController | null>(null);
+  const detailController = useRef<AbortController | null>(null);
+  const hydratedTerm = useRef('');
+  const activeEntry = useRef<string | null>(null);
+  const listElement = useRef<HTMLElement | null>(null);
+  const listPosition = useRef({ page: 0, list: 0 });
+  const detailOrigin = useRef<'lookup' | 'wordbook'>('lookup');
+  const previousLocation = useRef({
+    query: params.get('q')?.trim() ?? '',
+    entry: params.get('entry'),
+  });
+  const returnedToList = useRef(false);
+  const mobileDetail = !!params.get('entry');
   const [translationText, setTranslationText] = useState('');
   const [busy, setBusy] = useState(false);
   const saveBusy = useRef(false);
@@ -60,9 +85,10 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
   const [wordbookStatus, setWordbookStatus] = useState<'active' | 'consolidated'>('active');
   const wordbook = useInfiniteQuery({
     queryKey: [scope, 'wordbook', 'pages', wordbookStatus],
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam, signal }) =>
       api<{ items: WordbookItem[]; page: PageInfo }>(
         `wordbook?limit=50&status=${wordbookStatus}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
+        { signal },
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (last) =>
@@ -80,14 +106,18 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
   );
   const wordbookPage = wordbook.data?.pages.at(-1)?.page;
   useEffect(() => {
-    setEditing(null);
-    setNote('');
-    setNotice('');
-    setError(null);
-    setBusy(false);
-    saveBusy.current = false;
-    setWordbookStatus('active');
-  }, [scope]);
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      searchGeneration.current++;
+      selection.current++;
+      searchController.current?.abort();
+      detailController.current?.abort();
+      hydratedTerm.current = '';
+      activeEntry.current = null;
+      searchFlight.current = false;
+    };
+  }, []);
   const selectedCollection = useRemote<WordbookEntryResponse>(
     'wordbook-entry',
     wordbookEntryPath(selected?.id ?? ''),
@@ -96,30 +126,83 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
   const selectedSaved = !!selected && isWordbookSaved(selectedCollection.data, selected.id);
   const selectedConsolidated =
     !!selected && selectedCollection.data?.consolidatedItem?.wordId === selected.id;
-  async function choose(word: Word) {
+  function isCurrent() {
+    return alive.current && currentScope.current === scope;
+  }
+  function rememberList() {
+    listPosition.current = { page: window.scrollY, list: listElement.current?.scrollTop ?? 0 };
+  }
+  function entryUrl(term: string, wordId?: string) {
+    const next = new URLSearchParams();
+    if (term) next.set('q', term);
+    if (wordId) next.set('entry', wordId);
+    return next;
+  }
+  async function choose(word: Word, navigate = true) {
+    if (navigate) {
+      rememberList();
+      detailOrigin.current = tab === 'wordbook' ? 'wordbook' : 'lookup';
+      if (params.get('entry') !== word.id) setParams(entryUrl(searchQuery || word.lemma, word.id));
+    }
+    activeEntry.current = word.id;
     const request = ++selection.current;
+    detailController.current?.abort();
+    const controller = new AbortController();
+    detailController.current = controller;
     setSelected(word);
     setDetailBusy(true);
     setDetailError(null);
     try {
-      const result = await api<{ word: Word }>(`words/${encodeURIComponent(word.id)}`);
-      if (request === selection.current) setSelected(result.word);
+      const result = await api<{ word: Word }>(`words/${encodeURIComponent(word.id)}`, {
+        signal: controller.signal,
+      });
+      if (!isCurrent() || controller.signal.aborted || request !== selection.current) return;
+      if (result.word.id !== word.id) throw new Error('词条暂未正确载入，请重新选择。');
+      setSelected(result.word);
     } catch (value) {
-      if (request === selection.current) setDetailError(value);
+      if (isCurrent() && !controller.signal.aborted && request === selection.current)
+        setDetailError(value);
     } finally {
-      if (request === selection.current) setDetailBusy(false);
+      if (isCurrent() && request === selection.current) setDetailBusy(false);
     }
   }
-  async function search(more = false) {
-    const term = more ? searchQuery : query.trim();
-    if (!term || busy || (more && !page?.nextCursor)) return;
+  async function search(more = false, requestedTerm?: string, requestedEntry?: string | null) {
+    const term = requestedTerm ?? (more ? searchQuery : query.trim());
+    if (!term || (more && (searchFlight.current || !page?.nextCursor))) return;
+    const request = ++searchGeneration.current;
+    searchController.current?.abort();
+    const controller = new AbortController();
+    searchController.current = controller;
+    searchFlight.current = true;
+    hydratedTerm.current = term;
+    if (!more) {
+      detailOrigin.current = 'lookup';
+      selection.current++;
+      detailController.current?.abort();
+      setSelected(null);
+      setDetailBusy(false);
+      setDetailError(null);
+      if (params.get('q') !== term) setParams(entryUrl(term));
+    }
     setBusy(true);
     setError(null);
     setNotice('');
     try {
-      const data = await api<{ items: Word[]; page: PageInfo }>(
-        `dictionary?q=${encodeURIComponent(term)}&limit=20${more ? `&cursor=${encodeURIComponent(page!.nextCursor!)}` : ''}`,
-      );
+      const [listed, resolved] = await Promise.allSettled([
+        api<{ items: Word[]; page: PageInfo }>(
+          `dictionary?q=${encodeURIComponent(term)}&limit=20${more ? `&cursor=${encodeURIComponent(page!.nextCursor!)}` : ''}`,
+          { signal: controller.signal },
+        ),
+        more
+          ? Promise.resolve(null)
+          : api<{ word: Word | null; matchType: 'exact' | 'inflection' | 'not-found' }>(
+              `dictionary/resolve?text=${encodeURIComponent(term)}`,
+              { signal: controller.signal },
+            ),
+      ]);
+      if (!isCurrent() || controller.signal.aborted || request !== searchGeneration.current) return;
+      if (listed.status === 'rejected') throw listed.reason;
+      const data = listed.value;
       setResults((current) =>
         more
           ? [...new Map([...current, ...data.items].map((word) => [word.id, word])).values()]
@@ -129,21 +212,85 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
       setSearchQuery(term);
       setSearched(true);
       if (!more) {
-        selection.current++;
-        if (data.items[0]) void choose(data.items[0]);
+        const exact = resolved.status === 'fulfilled' ? resolved.value?.word : null;
+        if (requestedEntry) {
+          if (exact?.id === requestedEntry) {
+            activeEntry.current = exact.id;
+            setSelected(exact);
+          } else {
+            const brief = data.items.find((row) => row.id === requestedEntry);
+            await choose(brief ?? { id: requestedEntry, lemma: '' }, false);
+          }
+        } else if (
+          exact &&
+          resolved.status === 'fulfilled' &&
+          resolved.value?.matchType !== 'not-found'
+        ) {
+          activeEntry.current = exact.id;
+          setSelected(exact);
+          detailOrigin.current = 'lookup';
+          setParams(entryUrl(term, exact.id), { replace: true });
+        } else if (data.items[0]) void choose(data.items[0], false);
         else {
           setSelected(null);
           setDetailError(null);
           setDetailBusy(false);
         }
       }
+      if (!isCurrent() || controller.signal.aborted || request !== searchGeneration.current) return;
       if (!data.items.length && !more)
         setNotice('本站词库中暂时没有匹配到这个单词前缀。请检查拼写，或在网页翻译中查询语境。');
     } catch (value) {
-      setError(value);
+      if (isCurrent() && !controller.signal.aborted && request === searchGeneration.current)
+        setError(value);
     } finally {
-      setBusy(false);
+      if (isCurrent() && request === searchGeneration.current) {
+        searchFlight.current = false;
+        setBusy(saveBusy.current);
+      }
     }
+  }
+  useEffect(() => {
+    const term = params.get('q')?.trim() ?? '';
+    const entry = params.get('entry');
+    const previous = previousLocation.current;
+    returnedToList.current = !!previous.entry && !entry && previous.query === term;
+    previousLocation.current = { query: term, entry };
+    if (term && term !== hydratedTerm.current) {
+      setQuery(term);
+      setTab('lookup');
+      void search(false, term, entry);
+    } else if (entry && entry !== activeEntry.current) {
+      if (searchFlight.current) {
+        searchController.current?.abort();
+        searchGeneration.current++;
+        searchFlight.current = false;
+        setBusy(saveBusy.current);
+      }
+      setTab('lookup');
+      const brief = results.find((row) => row.id === entry);
+      void choose(brief ?? { id: entry, lemma: '' }, false);
+    }
+  }, [params.get('q'), params.get('entry')]);
+  useEffect(() => {
+    if (mobileDetail || !searched || !returnedToList.current) return;
+    if (searchFlight.current) {
+      searchController.current?.abort();
+      searchGeneration.current++;
+      searchFlight.current = false;
+      setBusy(saveBusy.current);
+    }
+    if (detailOrigin.current === 'wordbook') setTab('wordbook');
+    const frame = window.requestAnimationFrame(() => {
+      if (!isCurrent()) return;
+      if (listElement.current) listElement.current.scrollTop = listPosition.current.list;
+      window.scrollTo({ top: listPosition.current.page, behavior: 'instant' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [mobileDetail]);
+  function returnToResults() {
+    setParams(entryUrl(searchQuery || query.trim()), { replace: true });
+    if (detailOrigin.current === 'wordbook') setTab('wordbook');
   }
   async function collect(wordId: string) {
     if (!user) {
@@ -157,14 +304,8 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
     setNotice('');
     try {
       const remove = selectedSaved && selected?.id === wordId;
-      const receipt = await mutateWordbook(
-        client,
-        scope,
-        wordId,
-        remove,
-        () => currentScope.current === scope,
-      );
-      if (receipt && currentScope.current === scope)
+      const receipt = await mutateWordbook(client, scope, wordId, remove, () => isCurrent());
+      if (receipt && isCurrent())
         setNotice(
           remove
             ? selectedConsolidated
@@ -173,11 +314,11 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
             : '已加入生词本，可在“我的生词本”查看。',
         );
     } catch (value) {
-      if (currentScope.current === scope) setError(value);
+      if (isCurrent()) setError(value);
     } finally {
-      if (currentScope.current === scope) {
+      if (isCurrent()) {
         saveBusy.current = false;
-        setBusy(false);
+        setBusy(searchFlight.current);
       }
     }
   }
@@ -188,20 +329,14 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
     setBusy(true);
     try {
       if (method === 'DELETE') {
-        await mutateWordbook(
-          client,
-          scope,
-          item.wordId,
-          true,
-          () => currentScope.current === scope,
-        );
+        await mutateWordbook(client, scope, item.wordId, true, () => isCurrent());
       } else {
         const result = await post<{ item: WordbookItem }>(
           wordbookEntryPath(item.wordId),
           input,
           method,
         );
-        if (currentScope.current !== scope) return;
+        if (!isCurrent()) return;
         client.setQueryData<WordbookEntryResponse>(
           wordbookEntryKey(scope, item.wordId),
           (previous) => ({
@@ -211,16 +346,16 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
         );
         void client.resetQueries({ queryKey: [scope, 'wordbook'] }).catch(() => {});
       }
-      if (currentScope.current === scope) {
+      if (isCurrent()) {
         setEditing(null);
         setNotice(method === 'DELETE' ? '已从生词本移除，学习进度仍保留。' : '生词本记录已保存。');
       }
     } catch (value) {
-      if (currentScope.current === scope) setError(value);
+      if (isCurrent()) setError(value);
     } finally {
-      if (currentScope.current === scope) {
+      if (isCurrent()) {
         saveBusy.current = false;
-        setBusy(false);
+        setBusy(searchFlight.current);
       }
     }
   }
@@ -230,28 +365,24 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
     setBusy(true);
     setError(null);
     try {
-      const receipt = await mutateWordbook(
-        client,
-        scope,
-        item.wordId,
-        false,
-        () => currentScope.current === scope,
-      );
-      if (receipt && currentScope.current === scope) {
+      const receipt = await mutateWordbook(client, scope, item.wordId, false, () => isCurrent());
+      if (receipt && isCurrent()) {
         setWordbookStatus('active');
         setNotice('已重新加入生词本，学习进度与备注仍保留。');
       }
     } catch (value) {
-      if (currentScope.current === scope) setError(value);
+      if (isCurrent()) setError(value);
     } finally {
-      if (currentScope.current === scope) {
+      if (isCurrent()) {
         saveBusy.current = false;
-        setBusy(false);
+        setBusy(searchFlight.current);
       }
     }
   }
   return (
-    <div className="page">
+    <div
+      className={`page lookup-page${mobileDetail && tab === 'lookup' ? ' has-mobile-detail' : ''}`}
+    >
       <Heading
         eyebrow="查词 · 先解决眼前的问题"
         title={
@@ -323,93 +454,112 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
               <ArrowRight size={15} />
             </button>
           </form>
-          {searched && results.length > 0 && (
-            <div className="dictionary-layout">
-              <aside className="dictionary-results" aria-label="词典搜索结果">
-                <div className="dictionary-results-heading">
-                  “{searchQuery}” · {page?.total ?? results.length} 个匹配
-                </div>
-                {results.map((word) => (
-                  <button
-                    key={word.id}
-                    className={selected?.id === word.id ? 'active' : ''}
-                    onClick={() => void choose(word)}
-                  >
-                    <strong>{word.lemma}</strong>
-                    <span>
-                      {dictionaryText(
-                        word.senses?.find((sense) => sense.definitionZh?.trim())?.definitionZh,
-                      ) ||
-                        word.senses?.find((sense) => sense.definitionEn?.trim())?.definitionEn ||
-                        '查看完整词条'}
-                    </span>
-                  </button>
-                ))}
-                {page?.hasMore && (
-                  <button
-                    className="button ghost"
-                    disabled={busy}
-                    onClick={() => void search(true)}
-                  >
-                    {busy ? '正在读取…' : '更多匹配词'}
-                  </button>
-                )}
-              </aside>
-              <div className="dictionary-detail">
-                {selected ? (
-                  <Panel className="lookup-card">
-                    <div className="section-heading">
-                      <span className="lookup-word-label">
-                        {selected.entryKind === 'phrase' ? '词组' : '释义'}
+          {busy && !searched && <Loading text="正在查找完整词条…" />}
+          {(searched || mobileDetail) &&
+            (results.length > 0 || mobileDetail || !!selected || !!detailError) && (
+              <div
+                className={`dictionary-layout lookup-workspace${mobileDetail ? ' has-mobile-detail' : ''}`}
+              >
+                <aside ref={listElement} className="dictionary-results" aria-label="词典搜索结果">
+                  <div className="dictionary-results-heading">
+                    “{searchQuery}” · {page?.total ?? results.length} 个匹配
+                  </div>
+                  {results.map((word) => (
+                    <button
+                      key={word.id}
+                      className={selected?.id === word.id ? 'active' : ''}
+                      disabled={busy}
+                      aria-label={`查看 ${word.lemma} 完整词条`}
+                      onClick={() => void choose(word)}
+                    >
+                      <strong>{word.lemma}</strong>
+                      <span>
+                        {dictionaryText(
+                          word.senses?.find((sense) => sense.definitionZh?.trim())?.definitionZh,
+                        ) ||
+                          word.senses?.find((sense) => sense.definitionEn?.trim())?.definitionEn ||
+                          '查看完整词条'}
                       </span>
-                      <div className="action-row">
-                        <button
-                          className="icon-button"
-                          aria-label="翻译这个词"
-                          title="翻译这个词"
-                          onClick={() => {
-                            setTranslationText(selected.lemma);
-                            setTab('translation');
-                          }}
-                        >
-                          <Languages size={18} />
-                        </button>
-                        <WordSaveButton
-                          lemma={selected.lemma}
-                          saved={selectedSaved}
-                          consolidated={selectedConsolidated}
-                          busy={busy}
-                          disabled={
-                            !!user &&
-                            (selectedCollection.isFetching ||
-                              !!selectedCollection.error ||
-                              !selectedCollection.data)
-                          }
-                          onClick={() => void collect(selected.id)}
-                        />
+                    </button>
+                  ))}
+                  {page?.hasMore && (
+                    <button
+                      className="button ghost"
+                      disabled={busy}
+                      onClick={() => void search(true)}
+                    >
+                      {busy ? '正在读取…' : '更多匹配词'}
+                    </button>
+                  )}
+                </aside>
+                <div className="dictionary-detail">
+                  {selected || mobileDetail || detailBusy || detailError ? (
+                    <Panel className="lookup-card">
+                      <button className="dictionary-back" type="button" onClick={returnToResults}>
+                        <ArrowLeft size={18} />{' '}
+                        {detailOrigin.current === 'wordbook' ? '返回我的生词本' : '返回匹配词'}
+                      </button>
+                      <div className="section-heading">
+                        <span className="lookup-word-label">
+                          {selected?.entryKind === 'phrase' ? '词组' : '释义'}
+                        </span>
+                        {selected?.lemma && (
+                          <div className="action-row">
+                            <button
+                              className="icon-button"
+                              aria-label="翻译这个词"
+                              title="翻译这个词"
+                              onClick={() => {
+                                setTranslationText(selected.lemma);
+                                setTab('translation');
+                              }}
+                            >
+                              <Languages size={18} />
+                            </button>
+                            <WordSaveButton
+                              lemma={selected.lemma}
+                              saved={selectedSaved}
+                              consolidated={selectedConsolidated}
+                              busy={busy}
+                              disabled={
+                                !!user &&
+                                (selectedCollection.isFetching ||
+                                  !!selectedCollection.error ||
+                                  !selectedCollection.data)
+                              }
+                              onClick={() => void collect(selected.id)}
+                            />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    {detailBusy ? (
-                      <Loading text="正在读取完整释义…" />
-                    ) : (
-                      <>
-                        <ErrorNotice
-                          error={detailError || selectedCollection.error}
-                          onRetry={() => {
-                            void choose(selected);
-                            if (selectedCollection.error) void selectedCollection.refetch();
-                          }}
-                        />
-                        {detailError && <Notice>暂时只能显示简略释义，请重试。</Notice>}
-                        <WordView word={selected} />
-                      </>
-                    )}
-                  </Panel>
-                ) : null}
+                      {detailBusy ? (
+                        <Loading text="正在读取完整释义…" />
+                      ) : (
+                        <>
+                          <ErrorNotice
+                            error={detailError || selectedCollection.error}
+                            onRetry={() => {
+                              const target =
+                                selected ??
+                                (params.get('entry')
+                                  ? { id: params.get('entry')!, lemma: '' }
+                                  : null);
+                              if (target) void choose(target, false);
+                              if (selectedCollection.error) void selectedCollection.refetch();
+                            }}
+                          />
+                          {detailError && selected?.lemma && (
+                            <Notice>暂时只能显示简略释义，请重试。</Notice>
+                          )}
+                          {selected?.lemma && <WordView word={selected} />}
+                        </>
+                      )}
+                    </Panel>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          )}
-          {!searched && (
+            )}
+          {!searched && !busy && !mobileDetail && (
             <Empty
               title="从你真正遇到的一个词开始。"
               description="查清词义，看一句语境，再决定是否把它留下。"
@@ -435,12 +585,17 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
                   <button
                     className="word-link"
                     onClick={() => {
+                      rememberList();
+                      detailOrigin.current = 'wordbook';
                       setTab('lookup');
+                      setQuery(item.word.lemma);
                       setResults([item.word]);
                       setSearched(true);
                       setSearchQuery(item.word.lemma);
                       setPage(null);
-                      void choose(item.word);
+                      hydratedTerm.current = item.word.lemma;
+                      setParams(entryUrl(item.word.lemma, item.word.id));
+                      void choose(item.word, false);
                     }}
                   >
                     <strong>{item.word.lemma}</strong>

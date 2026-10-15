@@ -1,12 +1,21 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, GraduationCap, Search, Sparkles, Check } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import {
+  ArrowRight,
+  BookOpen,
+  GraduationCap,
+  Search,
+  Sparkles,
+  RotateCcw,
+  Settings2,
+} from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
 import { goalLabels, goalNames, type Book, type Goal } from '../lib/types';
 import { Empty, ErrorNotice, Heading, Loading, Panel } from '../components/UI';
 import { NightScene } from '../components/NightScene';
 import { useBookPlan } from '../components/tasks/useBookPlan';
-import { TaskOverview } from '../components/tasks/TaskOverview';
+import { HomeLearning } from './HomeLearning';
+import './mobile-content.css';
 
 export function bookKindLabel(book: Pick<Book, 'kind'>) {
   return book.kind === 'phrases' ? '词组本' : '词书';
@@ -78,88 +87,123 @@ export function HomePage() {
   const planning = useBookPlan();
   const books = useRemote<{ items: Book[] }>('books', 'books');
   const plan = planning.query;
-  const currentBook = books.data?.items.find((book) => book.id === plan.data?.plan.bookId);
+  const active = plan.data?.plan;
+  const currentBook = books.data?.items.find((book) => book.id === active?.bookId);
   const availableBooks = books.data?.items.filter((book) => !book.isDemo) ?? [];
-  const date = new Intl.DateTimeFormat('zh-CN', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  }).format(new Date());
+  const date = active?.localDate
+    ? new Intl.DateTimeFormat('zh-CN', {
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long',
+        timeZone: 'UTC',
+      }).format(new Date(`${active.localDate}T12:00:00Z`))
+    : new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(
+        new Date(),
+      );
   return (
-    <div className="page home-page">
-      <section className="home-hero">
-        <div className="hero-copy">
-          <span className="eyebrow">
-            <i className="warm-dot" /> 雨夜自习室 · {date}
-          </span>
-          <h1>
-            今晚，读懂
-            <br />
-            <em>一点英语。</em>
-          </h1>
-          <p>
-            在安静里，查清一个词。
-            <br />
-            再让它在下一次回忆中，留下来。
-          </p>
-          <div className="hero-actions">
-            <Link className="button primary" to={user ? '/learn' : '/auth'}>
-              <GraduationCap size={18} />
-              {user ? '查看今日任务' : '连接我的自习室'}
-              <ArrowRight size={16} />
-            </Link>
-            <Link className="button ghost" to="/lookup">
-              <Search size={17} />
-              查一个词
-            </Link>
-          </div>
-          <div className="hero-quote">
-            <span>“</span>
-            <p>
-              不赶进度，先让今天的词留下来。
-              <small>No rush. Let tonight’s words stay with you.</small>
-            </p>
-          </div>
+    <div className="page mobile-home">
+      <section className="mobile-home-stage" aria-label="今日学习">
+        <div className="mobile-home-scene" aria-hidden="true">
+          <NightScene />
         </div>
-        <NightScene />
-        <div className="scene-caption">
-          <i /> 一盏灯，一点积累。
+        <header className="mobile-home-top">
+          <span>
+            夜读英语 <small>NIGHT STUDY</small>
+          </span>
+          <span>{date}</span>
+          <Link to={user ? '/me?section=preferences' : '/auth'} aria-label="我的学习偏好">
+            <Settings2 size={19} />
+          </Link>
+        </header>
+        <div className="mobile-home-intro">
+          <span className="mobile-kicker">留一点安静，给自己。</span>
+          <h1>
+            在雨声里，
+            <br />
+            慢慢记住。
+          </h1>
+          <p>不赶进度，让今天的词留下来。</p>
+        </div>
+        <div className="mobile-home-session">
+          <Link className="mobile-current-book" to="/books">
+            <BookOpen size={18} />
+            <span>
+              <small>正在学习</small>
+              <strong>{currentBook?.title ?? active?.bookTitle ?? '选择一本词书'}</strong>
+            </span>
+            <ArrowRight size={18} />
+          </Link>
+          {user && active ? (
+            <>
+              <div className="mobile-today-line">
+                <span>今日已评价的不同词</span>
+                <strong>
+                  {active.completedUnique}
+                  <small> / {active.dailyTotalGoal}</small>
+                </strong>
+              </div>
+              <div
+                className="mobile-home-progress"
+                role="progressbar"
+                aria-label="今日总词数进度"
+                aria-valuemin={0}
+                aria-valuemax={Math.max(active.dailyTotalGoal, active.completedUnique)}
+                aria-valuenow={active.completedUnique}
+              >
+                <i
+                  style={{
+                    width: `${Math.min(100, (active.completedUnique / active.dailyTotalGoal) * 100)}%`,
+                  }}
+                />
+              </div>
+              <p className="mobile-home-counts">
+                新学 {active.completedNew} · 复习 {active.completedReview} · 本组上限{' '}
+                {active.groupSize} 词
+              </p>
+            </>
+          ) : (
+            <p className="mobile-home-counts">每天的总词数，包含新学与复习。登录后跨设备继续。</p>
+          )}
+          <div className="mobile-home-actions">
+            <Link to={user ? '/learn?start=1' : '/auth'} className="mobile-study-action">
+              <Sparkles size={23} />
+              <span>
+                <strong>{active?.activeTaskId ? '继续学习' : '新学'}</strong>
+                <small>
+                  {active ? `计划待新学 ${active.newRemaining} 词` : '从今天的一小组开始'}
+                </small>
+              </span>
+              <ArrowRight size={17} />
+            </Link>
+            <Link to={user ? '/review?start=1' : '/auth'} className="mobile-study-action review">
+              <RotateCcw size={23} />
+              <span>
+                <strong>复习</strong>
+                <small>
+                  {active ? `现在到期 ${active.dueNowCount} 词` : '在下一次回忆中留下来'}
+                </small>
+              </span>
+              <ArrowRight size={17} />
+            </Link>
+          </div>
+          <p className="mobile-home-rule">
+            今日计划先复习，再学新词；同词只计一次。
+            {pending > 0 ? ` ${pending} 条操作等待同步。` : ''}
+          </p>
+          {user && plan.isPending && <Loading text="正在读取今日计划…" />}
+          <ErrorNotice error={plan.error} onRetry={() => void plan.refetch()} />
         </div>
       </section>
-      <div className="section-heading">
+      <HomeLearning plan={active ?? null} />
+      <div className="mobile-section-title">
         <div>
-          <span className="eyebrow">今晚的方向</span>
-          <h2>{currentBook?.title || '选择一本词书，开始这一晚。'}</h2>
+          <span className="tiny-label">选择你的方向</span>
+          <h2>我的书架</h2>
         </div>
-        <Link className="text-link" to="/books">
-          词书与词组本 <ArrowRight size={15} />
+        <Link to="/books">
+          全部词书 <ArrowRight size={15} />
         </Link>
       </div>
-      <ErrorNotice error={plan.error} onRetry={() => void plan.refetch()} />
-      {user && plan.isPending && <Loading />}
-      {plan.data ? (
-        <TaskOverview plan={plan.data.plan} pending={pending} compact />
-      ) : (
-        !user && (
-          <Panel className="today-plan">
-            <span className="tiny-label">给每一天一点可持续的积累</span>
-            <h3>每天总词数，包含复习与新学。</h3>
-            <p>先复习到期的词，再从选好的书里学新词。同一个词当天只计一次，换设备也可以继续。</p>
-            <Link className="text-link" to="/auth">
-              登录，制定自己的计划 <ArrowRight size={15} />
-            </Link>
-          </Panel>
-        )
-      )}
-      <div className="section-heading compact">
-        <div>
-          <span className="eyebrow">从语境开始</span>
-          <h2>选一本书，给积累一点方向。</h2>
-        </div>
-      </div>
-      <p className="content-caption">
-        从单词到常用词组，按照自己的节奏学习。也可以导入只属于你的词书。
-      </p>
       <ErrorNotice error={books.error} onRetry={() => void books.refetch()} />
       {books.isPending ? (
         <Loading text="正在打开词书…" />
@@ -172,24 +216,24 @@ export function HomePage() {
           }}
         />
       ) : (
-        <Empty title="这一页还没有词书。" description="管理员发布学习内容后，词书会出现在这里。" />
+        <Empty title="还没有可选词书" description="管理员发布学习内容后，词书会出现在这里。" />
       )}
-      <div className="discovery-grid">
-        <Link to={user ? '/assessment' : '/auth'}>
-          <Sparkles size={20} />
-          <div>
-            <strong>了解自己的词汇水平</strong>
-            <small>做一组小测验，找到合适的起点。</small>
-          </div>
-          <ArrowRight size={17} />
+      <div className="mobile-quick-links">
+        <Link to="/books/mine">
+          <BookOpen size={18} />
+          我的词书
         </Link>
-        <Link to={user ? '/known' : '/auth'}>
-          <Check size={20} />
-          <div>
-            <strong>把已熟悉的词带进来</strong>
-            <small>导入熟词，保留低频抽查。</small>
-          </div>
-          <ArrowRight size={17} />
+        <Link to="/books/import">
+          <ArrowRight size={18} />
+          导入词书
+        </Link>
+        <Link to="/content">
+          <Search size={18} />
+          内容中心
+        </Link>
+        <Link to={user ? '/assessment' : '/auth'}>
+          <GraduationCap size={18} />
+          了解我的水平
         </Link>
       </div>
       {planning.dialog}
@@ -200,7 +244,19 @@ export function BooksPage() {
   const planning = useBookPlan();
   const books = useRemote<{ items: Book[] }>('books', 'books');
   const [goal, setGoal] = useState<Goal | 'all'>('all');
-  const [kind, setKind] = useState<'all' | 'vocabulary' | 'phrases'>('all');
+  const [params, setParams] = useSearchParams();
+  const kind =
+    params.get('kind') === 'phrases'
+      ? 'phrases'
+      : params.get('kind') === 'vocabulary'
+        ? 'vocabulary'
+        : 'all';
+  const setKind = (value: 'all' | 'vocabulary' | 'phrases') => {
+    const next = new URLSearchParams(params);
+    if (value === 'all') next.delete('kind');
+    else next.set('kind', value);
+    setParams(next);
+  };
   const filteredBooks =
     books.data?.items.filter(
       (book) =>

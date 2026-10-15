@@ -8,7 +8,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../app.js';
 import { createDatabase } from '../db.js';
 import type { AppConfig } from '../config.js';
-import { json, freshCard, wordDto, wordInclude, learningDayWindow } from './shared.js';
+import { json, obj, freshCard, wordDto, wordInclude, learningDayWindow } from './shared.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const suite = url ? describe : describe.skip;
@@ -54,7 +54,7 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
   let app: FastifyInstance, passwordHash: string;
   const request = (
     actor: string | null,
-    method: 'GET' | 'POST' | 'PATCH',
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT',
     route: string,
     payload?: unknown,
   ) =>
@@ -312,6 +312,162 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     expect(await db.studySession.count({ where: { userId } })).toBe(1);
     expect(groups[0].session.items).toHaveLength(2);
     expect(groups[0].plan.assignedUnique).toBe(2);
+  });
+  it('keeps a spelling-disabled group fixed after preferences are enabled and completes only real ratings', async () => {
+    const { userId } = await actor(4, 2);
+    const disabled = await request(userId, 'PUT', '/learning-preferences', {
+      expectedRevision: 0,
+      spellingEnabled: false,
+    });
+    expect(disabled.statusCode).toBe(200);
+    let current = (await issue(userId)).session;
+    const sessionId = current.id;
+    expect(current.spellingEnabled).toBe(false);
+    const original = await db.sessionItem.findMany({
+      where: { sessionId },
+      orderBy: { ordinal: 'asc' },
+    });
+    expect(original.every((item) => obj(item.questionJson).spellingEnabled === false)).toBe(true);
+    expect(
+      (
+        await request(userId, 'PUT', '/learning-preferences', {
+          expectedRevision: 1,
+          spellingEnabled: true,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (await request(userId, 'GET', `/study/sessions/${sessionId}`)).json().session.spellingEnabled,
+    ).toBe(false);
+    current = (await command(userId, current, 'reveal')).session;
+    const first = await command(userId, current, 'rate');
+    current = first.session;
+    expect(first.plan.completedUnique).toBe(1);
+    expect(first.plan.pendingSpellingCount).toBe(0);
+    expect(current.phase).toBe('recall');
+    current = (await command(userId, current, 'reveal')).session;
+    const lastRevealed = current,
+      lastCommand = randomUUID();
+    const completed = await command(userId, lastRevealed, 'rate', { commandId: lastCommand });
+    expect(completed.session).toMatchObject({
+      id: sessionId,
+      status: 'completed',
+      phase: 'completed',
+      step: 'completed',
+      currentItemId: null,
+      spellingEnabled: false,
+    });
+    expect(completed.session.items.every((item: any) => item.rated && !item.exerciseDone)).toBe(
+      true,
+    );
+    expect(completed.plan).toMatchObject({
+      completedUnique: 2,
+      assignedUnique: 0,
+      pendingSpellingCount: 0,
+    });
+    const repeat = await command(userId, lastRevealed, 'rate', { commandId: lastCommand });
+    expect(repeat.duplicate).toBe(true);
+    expect(repeat.session.status).toBe('completed');
+    expect(await db.reviewLog.count({ where: { userId } })).toBe(2);
+    const saved = await db.sessionItem.findMany({
+      where: { sessionId },
+      orderBy: { ordinal: 'asc' },
+    });
+    expect(
+      saved.every(
+        (item) => item.rated && !item.exerciseDone && !('result' in obj(item.questionJson)),
+      ),
+    ).toBe(true);
+    expect(saved.map((item) => item.questionJson)).toEqual(
+      original.map((item) => item.questionJson),
+    );
+    expect(await db.dailyPlanWord.count({ where: { activeSessionId: sessionId } })).toBe(0);
+    const future = (await issue(userId)).session;
+    expect(future.id).not.toBe(sessionId);
+    expect(future.spellingEnabled).toBe(true);
+  });
+  it('keeps both legacy and enabled issued groups in practice after preferences are disabled without duplicate ratings', async () => {
+    for (const legacy of [false, true]) {
+      const { userId } = await actor(4, 2);
+      if (!legacy)
+        expect(
+          (
+            await request(userId, 'PUT', '/learning-preferences', {
+              expectedRevision: 0,
+              spellingEnabled: true,
+            })
+          ).statusCode,
+        ).toBe(200);
+      let current = (await issue(userId)).session;
+      const sessionId = current.id;
+      if (legacy) {
+        const items = await db.sessionItem.findMany({ where: { sessionId } });
+        for (const item of items) {
+          const { spellingEnabled: _absent, ...question } = obj(item.questionJson);
+          await db.sessionItem.update({
+            where: { id: item.id },
+            data: { questionJson: json(question) },
+          });
+        }
+        current = (await request(userId, 'GET', `/study/sessions/${sessionId}`)).json().session;
+      }
+      expect(current.spellingEnabled).toBe(true);
+      const snapshots = (
+        await db.sessionItem.findMany({ where: { sessionId }, orderBy: { ordinal: 'asc' } })
+      ).map((item) => item.questionJson);
+      expect(
+        (
+          await request(userId, 'PUT', '/learning-preferences', {
+            expectedRevision: legacy ? 0 : 1,
+            spellingEnabled: false,
+          })
+        ).statusCode,
+      ).toBe(200);
+      expect(
+        (await request(userId, 'GET', `/study/sessions/${sessionId}`)).json().session
+          .spellingEnabled,
+      ).toBe(true);
+      let lastRevealed: any,
+        lastCommand = '';
+      while (current.phase === 'recall') {
+        current = (await command(userId, current, 'reveal')).session;
+        lastRevealed = current;
+        lastCommand = randomUUID();
+        current = (await command(userId, current, 'rate', { commandId: lastCommand })).session;
+      }
+      expect(current).toMatchObject({
+        status: 'in_progress',
+        phase: 'practice',
+        spellingEnabled: true,
+      });
+      expect(current.items.every((item: any) => item.rated && !item.exerciseDone)).toBe(true);
+      expect(
+        (await db.sessionItem.findMany({ where: { sessionId }, orderBy: { ordinal: 'asc' } })).map(
+          (item) => item.questionJson,
+        ),
+      ).toEqual(snapshots);
+      const repeat = await command(userId, lastRevealed, 'rate', { commandId: lastCommand });
+      expect(repeat.duplicate).toBe(true);
+      expect(repeat.session.phase).toBe('practice');
+      expect(await db.reviewLog.count({ where: { userId } })).toBe(2);
+      expect((await request(userId, 'GET', '/study/plan')).json().plan.pendingSpellingCount).toBe(
+        2,
+      );
+      while (current.phase === 'practice')
+        current = (
+          await command(userId, current, 'answer', {
+            answer: current.items[current.cursor].word.lemma,
+          })
+        ).session;
+      expect(current.status).toBe('completed');
+      expect(current.items.every((item: any) => item.exerciseDone)).toBe(true);
+      expect(await db.reviewLog.count({ where: { userId } })).toBe(2);
+      expect((await request(userId, 'GET', '/study/plan')).json().plan).toMatchObject({
+        completedUnique: 2,
+        pendingSpellingCount: 0,
+      });
+      expect((await issue(userId)).session.spellingEnabled).toBe(false);
+    }
   });
   it('reserves later-today reviews before new words and issues due review before the remaining new slot', async () => {
     const { userId } = await actor();

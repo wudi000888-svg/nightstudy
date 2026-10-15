@@ -1,150 +1,241 @@
 import {
+  ArrowLeft,
   BookOpen,
-  ChartNoAxesCombined,
-  House,
+  CloudUpload,
+  Layers,
   MoonStar,
   Search,
-  UserRound,
   ShieldCheck,
-  CloudUpload,
-  Menu,
+  Sun,
+  UserRound,
   X,
-  GraduationCap,
-  CheckCheck,
-  Languages,
 } from 'lucide-react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityTimer } from './ActivityTimer';
 import { useApp } from '../AppContext';
+import { useLearningPreferences } from '../LearningPreferences';
+import { isStudyPath, navigationGroup, navigationTitle } from '../lib/navigation';
 
-const links = [
-  { path: '/', label: '自习室', icon: House },
-  { path: '/books', label: '书架', icon: BookOpen },
-  { path: '/learn', label: '今日任务', icon: GraduationCap },
-  { path: '/lookup', label: '查词与生词本', icon: Search },
-  { path: '/translate', label: '网页翻译', icon: Languages },
-  { path: '/known', label: '熟词管理', icon: CheckCheck },
-  { path: '/memory', label: '个人记忆', icon: ChartNoAxesCombined },
-];
 export function Shell() {
-  const { site, user, pending, sync, syncNote } = useApp();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { site, user, scope, pending, conflicts, sync, syncNote } = useApp();
+  const appearance = useLearningPreferences();
   const location = useLocation();
+  const navigate = useNavigate();
+  const area = navigationGroup(location.pathname);
+  const [sessionFocus, setSessionFocus] = useState(false);
+  const [showSyncNote, setShowSyncNote] = useState(false);
+  const [themeNote, setThemeNote] = useState('');
+  const [reminder, setReminder] = useState(false);
+  const reminderStamp = useRef('');
+  const root = useRef<HTMLDivElement>(null);
+  const focusStatus = useRef<HTMLDivElement>(null);
+  const focus =
+    isStudyPath(location.pathname) &&
+    (sessionFocus || !!new URLSearchParams(location.search).get('session'));
+  const isAdmin = area === 'admin';
+  const isAuth = location.pathname.startsWith('/auth') || location.pathname === '/setup';
+  const landing = ['/', '/content', '/me'].includes(location.pathname);
   useEffect(() => {
     window.scrollTo(0, 0);
-    setMobileOpen(false);
+    if (!isStudyPath(location.pathname)) setSessionFocus(false);
   }, [location.pathname]);
   useEffect(() => {
-    if (!mobileOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMobileOpen(false);
+    const change = (event: Event) =>
+      setSessionFocus((event as CustomEvent<{ active: boolean }>).detail?.active === true);
+    window.addEventListener('nightstudy-study-focus', change);
+    return () => window.removeEventListener('nightstudy-study-focus', change);
+  }, []);
+  useEffect(() => {
+    setShowSyncNote(!!syncNote);
+    if (!syncNote || pending || conflicts.length) return;
+    const timer = window.setTimeout(() => setShowSyncNote(false), 6500);
+    return () => window.clearTimeout(timer);
+  }, [syncNote, pending, conflicts.length]);
+  useEffect(() => {
+    const update = () =>
+      root.current?.style.setProperty(
+        '--study-shell-offset',
+        `${focusStatus.current?.getBoundingClientRect().height ?? 0}px`,
+      );
+    update();
+    if (!focusStatus.current) return;
+    const observer = new ResizeObserver(update);
+    observer.observe(focusStatus.current);
+    return () => observer.disconnect();
+  }, [focus, pending, showSyncNote, syncNote]);
+  useEffect(() => {
+    if (!focus) return;
+    const viewport = window.visualViewport;
+    const update = () =>
+      root.current?.style.setProperty(
+        '--study-app-height',
+        `${viewport?.height ?? window.innerHeight}px`,
+      );
+    update();
+    viewport?.addEventListener('resize', update);
+    window.addEventListener('resize', update);
+    return () => {
+      viewport?.removeEventListener('resize', update);
+      window.removeEventListener('resize', update);
+      root.current?.style.removeProperty('--study-app-height');
     };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [mobileOpen]);
+  }, [focus]);
+  useEffect(() => {
+    setReminder(false);
+    reminderStamp.current = '';
+  }, [scope]);
+  useEffect(() => {
+    if (!user || !appearance.preferences.reminderEnabled) return;
+    const check = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = new Date();
+      const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const stamp = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}:${time}`;
+      if (time === appearance.preferences.reminderTime && reminderStamp.current !== stamp) {
+        reminderStamp.current = stamp;
+        setReminder(true);
+      }
+    };
+    check();
+    const timer = window.setInterval(check, 30000);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [scope, !!user, appearance.preferences.reminderEnabled, appearance.preferences.reminderTime]);
+  const links = [
+    { to: '/', group: 'learning', label: '学习', Icon: BookOpen },
+    { to: '/content', group: 'content', label: '内容', Icon: Layers },
+    { to: user ? '/me' : '/auth', group: 'account', label: '我的', Icon: UserRound },
+  ];
+  const navItems = () =>
+    links.map(({ to, group, label, Icon }) => (
+      <Link key={group} to={to} aria-current={area === group ? 'page' : undefined}>
+        <Icon size={19} aria-hidden="true" />
+        <span>{label}</span>
+      </Link>
+    ));
+  function back() {
+    if (Number(window.history.state?.idx ?? 0) > 0) navigate(-1);
+    else navigate(isAdmin || area === 'account' ? '/me' : '/content');
+  }
+  async function toggleTheme() {
+    const ok = await appearance.savePreferences({
+      theme: document.documentElement.dataset.theme === 'night' ? 'day' : 'night',
+    });
+    setThemeNote(ok ? '' : '外观未保存，请在学习偏好中重试。');
+  }
   return (
-    <div className="night-app">
+    <div
+      ref={root}
+      className={`night-app app-shell ${focus ? 'app-shell-focus' : ''} ${isAdmin ? 'app-shell-admin' : ''} ${isAuth ? 'app-shell-auth' : ''}`}
+      data-section={area}
+    >
+      <a className="skip-link" href="#main-content">
+        跳到正文
+      </a>
       <ActivityTimer />
-      <div className="ambient-orb" aria-hidden="true" />
-      <aside id="room-sidebar" className={`sidebar ${mobileOpen ? 'open' : ''}`}>
-        <Link className="brand" to="/" onClick={() => setMobileOpen(false)}>
-          <span className="brand-icon">
-            <MoonStar size={20} />
-          </span>
-          <span>
-            {site.title || '夜读英语'}
-            <small>一间安静的自习室</small>
-          </span>
-        </Link>
-        <div className="room-status">
-          <i /> 雨夜，自习中<span>{user ? '你的积累已连接本站' : '今晚，从一个词开始'}</span>
-        </div>
-        <nav className="side-nav" aria-label="主要导航">
-          {links.map(({ path, label, icon: Icon }) => (
-            <NavLink key={path} end={path === '/'} to={path} onClick={() => setMobileOpen(false)}>
-              <Icon size={18} />
-              <span>{label}</span>
-            </NavLink>
-          ))}
-        </nav>
-        <div className="sidebar-footer">
-          {user?.role === 'admin' && (
-            <NavLink to="/admin" onClick={() => setMobileOpen(false)}>
-              <ShieldCheck size={17} /> 管理自习室
-            </NavLink>
+      {!focus && (
+        <header className="desktop-header">
+          <Link className="compact-brand" to="/">
+            <MoonStar size={23} aria-hidden="true" />
+            <span>{site.title || '夜读英语'}</span>
+          </Link>
+          {isAdmin ? (
+            <Link className="desktop-return" to="/me">
+              <ArrowLeft size={17} />
+              返回学习
+            </Link>
+          ) : (
+            <nav aria-label="主要导航">{navItems()}</nav>
           )}
-          <NavLink to={user ? '/me' : '/auth'} onClick={() => setMobileOpen(false)}>
-            <span className="avatar">{user?.name?.slice(0, 1) || <UserRound size={17} />}</span>
-            <span>
-              {user?.name || '连接学习账户'}
-              <small>{user ? '账户与学习设置' : '登录后，让记录跟着你'}</small>
-            </span>
-          </NavLink>
-          <p>少一点赶路，多一点记住。</p>
-        </div>
-      </aside>
-      <header className="mobile-top">
-        <Link className="brand" to="/" onClick={() => setMobileOpen(false)}>
-          <span className="brand-icon">
-            <MoonStar size={18} />
-          </span>
-          {site.title}
-        </Link>
-        <button
-          className="icon-button"
-          aria-label={mobileOpen ? '关闭导航' : '打开导航'}
-          aria-expanded={mobileOpen}
-          aria-controls="room-sidebar"
-          onClick={() => setMobileOpen(!mobileOpen)}
-        >
-          {mobileOpen ? <X /> : <Menu />}
-        </button>
-      </header>
-      {mobileOpen && (
-        <button
-          className="nav-backdrop"
-          aria-label="关闭导航"
-          onClick={() => setMobileOpen(false)}
-        />
+          <div className="desktop-tools">
+            {!isAdmin && (
+              <Link className="icon-button" to="/lookup" aria-label="查词">
+                <Search size={19} />
+              </Link>
+            )}
+            <button
+              className="icon-button appearance-toggle"
+              onClick={() => void toggleTheme()}
+              disabled={appearance.saving || (!!user && !appearance.loaded)}
+              aria-label="切换浅色与夜读主题"
+            >
+              <Sun className="day-theme-icon" size={19} />
+              <MoonStar className="night-theme-icon" size={19} />
+            </button>
+            {user?.role === 'admin' && !isAdmin && (
+              <Link className="icon-button" to="/admin" aria-label="管理自习室">
+                <ShieldCheck size={19} />
+              </Link>
+            )}
+          </div>
+        </header>
       )}
-      <main className="main-content">
-        {!site.initialized && (
-          <div className="setup-strip">
-            自习室还没有管理员。<Link to="/setup">完成首次初始化 →</Link>
-          </div>
-        )}
-        {pending > 0 && (
-          <div className="sync-strip" role="status">
-            <CloudUpload size={16} /> {pending} 条操作等待同步
-            <button onClick={() => void sync()}>重试同步</button>
-          </div>
-        )}
-        {syncNote && (
-          <p className="sync-note" role="status">
-            {syncNote}
+      {!focus && !landing && (
+        <header className="mobile-page-header">
+          <button className="icon-button" onClick={back} aria-label="返回上一页">
+            <ArrowLeft size={21} />
+          </button>
+          <span>{navigationTitle(location.pathname)}</span>
+          {isAdmin ? (
+            <Link className="icon-button" to="/me" aria-label="返回我的">
+              <UserRound size={20} />
+            </Link>
+          ) : (
+            <Link className="icon-button" to="/lookup" aria-label="查词">
+              <Search size={20} />
+            </Link>
+          )}
+        </header>
+      )}
+      <main id="main-content" className="main-content">
+        <div ref={focusStatus} className="shell-status-region">
+          {!site.initialized && (
+            <div className="setup-strip">
+              自习室还没有管理员。<Link to="/setup">完成首次初始化</Link>
+            </div>
+          )}
+          {pending > 0 && (
+            <div className="sync-strip" role="status">
+              <CloudUpload size={16} />
+              {pending} 条操作待同步<button onClick={() => void sync()}>重试</button>
+            </div>
+          )}
+          {showSyncNote && syncNote && (
+            <p className="sync-note" role="status">
+              {syncNote}
+            </p>
+          )}
+        </div>
+        {themeNote && (
+          <p className="notice" role="status">
+            {themeNote}
+            <Link to="/me?section=preferences">学习偏好</Link>
           </p>
         )}
+        {reminder && !focus && (
+          <div className="learning-reminder" role="status">
+            <span>到学习时间了，读几个词再休息。</span>
+            <Link to="/learn">开始学习</Link>
+            <button
+              className="icon-button"
+              aria-label="关闭本次提醒"
+              onClick={() => setReminder(false)}
+            >
+              <X size={17} />
+            </button>
+          </div>
+        )}
         <Outlet />
-        <footer className="page-footer">
-          <span>{site.title}</span>
-          <Link to="/dictionary">词典说明</Link>
-        </footer>
       </main>
-      <nav className="mobile-tabs" aria-label="移动导航">
-        {[
-          { path: '/', label: '自习室', icon: House },
-          { path: '/learn', label: '任务', icon: GraduationCap },
-          { path: '/books', label: '词书', icon: BookOpen },
-          { path: '/lookup', label: '查词', icon: Search },
-          { path: user ? '/me' : '/auth', label: '我的', icon: UserRound },
-        ].map(({ path, label, icon: Icon }) => (
-          <NavLink key={path} end={path === '/'} to={path}>
-            <Icon size={18} />
-            <span>{label}</span>
-          </NavLink>
-        ))}
-      </nav>
+      {!focus && !isAdmin && !isAuth && (
+        <nav className="mobile-primary-nav" aria-label="移动导航">
+          {navItems()}
+        </nav>
+      )}
     </div>
   );
 }

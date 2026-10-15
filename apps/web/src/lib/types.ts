@@ -358,6 +358,7 @@ export interface SessionItem {
 }
 export interface StudySession {
   id: string;
+  spellingEnabled?: boolean;
   bookId: string | null;
   mode: 'learn' | 'review' | 'daily' | 'extra-review';
   phase: 'recall' | 'practice' | 'completed';

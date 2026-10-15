@@ -5,8 +5,10 @@ import { BrowserRouter } from 'react-router-dom';
 import { AppProvider } from './AppContext';
 import { App } from './App';
 import { WordCardProvider } from './components/WordCards';
+import { LearningPreferencesProvider } from './LearningPreferences';
 import { basePath } from './lib/api';
 import './styles.css';
+import './mobile.css';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 15000, refetchOnWindowFocus: true, retry: false } },
@@ -16,9 +18,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basePath || '/'}>
         <AppProvider>
-          <WordCardProvider>
-            <App />
-          </WordCardProvider>
+          <LearningPreferencesProvider>
+            <WordCardProvider>
+              <App />
+            </WordCardProvider>
+          </LearningPreferencesProvider>
         </AppProvider>
       </BrowserRouter>
     </QueryClientProvider>

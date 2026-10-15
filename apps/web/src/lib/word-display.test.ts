@@ -1,5 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { englishParts, InteractiveEnglish } from '../components/InteractiveEnglish';
 import { WordSaveButton, WordView } from '../components/UI';
@@ -40,7 +42,18 @@ const word: Word = {
   ],
 };
 function render(element: React.ReactElement) {
-  return renderToStaticMarkup(h(WordCardContext.Provider, { value: cardActions }, element));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  try {
+    return renderToStaticMarkup(
+      h(
+        QueryClientProvider,
+        { client },
+        h(MemoryRouter, null, h(WordCardContext.Provider, { value: cardActions }, element)),
+      ),
+    );
+  } finally {
+    client.clear();
+  }
 }
 beforeAll(() => {
   // The Node-only suite renders markup; it never mounts browser effects or fetches.

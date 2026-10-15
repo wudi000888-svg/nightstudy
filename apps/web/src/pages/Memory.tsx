@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Clock3, RotateCcw } from 'lucide-react';
 import { goalLabels, goalNames, type Book } from '../lib/types';
@@ -53,15 +53,29 @@ function clamp(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 export function MemoryChart({ data, horizon }: { data: Curve; horizon: number }) {
+  const canvas = useRef<SVGSVGElement>(null);
+  const [width, setWidth] = useState(640);
+  const bandId = useId();
+  useEffect(() => {
+    const target = canvas.current;
+    if (!target) return;
+    const measure = () => setWidth(Math.max(250, Math.floor(target.getBoundingClientRect().width)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [horizon, data.points.length]);
   const points = data.points.filter(
     (point) =>
-      point.day <= horizon && Number.isFinite(point.day) && Number.isFinite(point.retention),
+      point.day >= 0 &&
+      point.day <= horizon &&
+      Number.isFinite(point.day) &&
+      Number.isFinite(point.retention),
   );
-  const width = 720,
-    height = 280,
-    left = 48,
+  const height = 265,
+    left = 44,
     top = 22,
-    chartWidth = 645,
+    chartWidth = width - left - 15,
     chartHeight = 214;
   const x = (day: number) => left + (day / horizon) * chartWidth;
   const y = (value: number) => top + (1 - clamp(value)) * chartHeight;
@@ -79,15 +93,16 @@ export function MemoryChart({ data, horizon }: { data: Curve; horizon: number })
     );
   return (
     <svg
+      ref={canvas}
       className="memory-chart"
       viewBox={`0 0 ${width} ${height}`}
       role="img"
       aria-label={`未来 ${horizon} 天不再复习时的记忆预测，基于 ${data.coverage.eligible} 个已学习的词`}
     >
       <defs>
-        <linearGradient id="retention-band" x2="0" y2="1">
-          <stop stopColor="#e9b36d" stopOpacity=".19" />
-          <stop offset="1" stopColor="#e9b36d" stopOpacity=".03" />
+        <linearGradient id={bandId} x2="0" y2="1">
+          <stop stopColor="var(--app-accent)" stopOpacity=".19" />
+          <stop offset="1" stopColor="var(--app-accent)" stopOpacity=".03" />
         </linearGradient>
       </defs>
       {[0, 0.25, 0.5, 0.75, 1].map((value) => (
@@ -97,24 +112,26 @@ export function MemoryChart({ data, horizon }: { data: Curve; horizon: number })
             x2={left + chartWidth}
             y1={y(value)}
             y2={y(value)}
-            stroke="#f4eee5"
-            strokeOpacity=".08"
+            stroke="var(--app-line)"
           />
           <text x={left - 10} y={y(value) + 4} textAnchor="end">
             {Math.round(value * 100)}%
           </text>
         </g>
       ))}
-      {[0, horizon / 4, horizon / 2, horizon * 0.75, horizon].map((day) => (
+      {(width < 420
+        ? [0, horizon / 2, horizon]
+        : [0, horizon / 4, horizon / 2, horizon * 0.75, horizon]
+      ).map((day) => (
         <text key={day} x={x(day)} y={height - 16} textAnchor="middle">
           {Math.round(day)}天
         </text>
       ))}
-      {data.coverage.eligible > 1 && <polygon points={band} fill="url(#retention-band)" />}
+      {data.coverage.eligible > 1 && <polygon points={band} fill={`url(#${bandId})`} />}
       <polyline
         points={line}
         fill="none"
-        stroke="#e9b36d"
+        stroke="var(--app-accent)"
         strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -122,7 +139,13 @@ export function MemoryChart({ data, horizon }: { data: Curve; horizon: number })
       {points
         .filter((_, index) => index % Math.max(1, Math.floor(points.length / 7)) === 0)
         .map((point) => (
-          <circle key={point.day} cx={x(point.day)} cy={y(point.retention)} r="3.5" fill="#e9b36d">
+          <circle
+            key={point.day}
+            cx={x(point.day)}
+            cy={y(point.retention)}
+            r="3.5"
+            fill="var(--app-accent)"
+          >
             <title>
               {point.day}天 · 预计回忆率 {Math.round(point.retention * 100)}%
             </title>

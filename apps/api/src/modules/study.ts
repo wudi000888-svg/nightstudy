@@ -44,6 +44,11 @@ export const sessionInclude = {
 };
 type FullSession = Prisma.StudySessionGetPayload<{ include: typeof sessionInclude }>;
 
+// An issued group keeps its original exercise policy even when preferences change.
+export function sessionSpellingEnabled(session: Pick<FullSession, 'items'>) {
+  return session.items.some((item) => obj(item.questionJson).spellingEnabled !== false);
+}
+
 export function spellingQuestion(word: ReturnType<typeof wordDto>, focusSenseId?: string | null) {
   const sense =
     word.senses.find((x) => x.id === focusSenseId && x.definitionZh.trim()) ??
@@ -115,6 +120,7 @@ export function sessionDto(
     mode: session.mode,
     status: session.status,
     phase: session.phase,
+    spellingEnabled: sessionSpellingEnabled(session),
     cursor: session.cursor,
     step: session.step,
     revision: session.revision,
@@ -486,6 +492,10 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
       const progress = await tx.studyProgress.findMany({
         where: { userId: user.id, wordId: { in: chosen.map((item) => item.word.id) } },
       });
+      const learningPreference = await tx.userLearningPreference.findUnique({
+        where: { userId: user.id },
+        select: { spellingEnabled: true },
+      });
       const session = await tx.studySession.create({
         data: {
           userId: user.id,
@@ -506,6 +516,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
                 questionJson: json({
                   ...spellingQuestion(snapshot, item.focusSenseId),
                   taskBucket: item.bucket,
+                  spellingEnabled: learningPreference?.spellingEnabled ?? true,
                 }),
                 progressRevision: progress.find((p) => p.wordId === item.word.id)?.revision ?? 0,
               };
@@ -711,15 +722,18 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
           data: { rated: true, status: 'rated', progressRevision: nextProgress.revision },
         });
         const last = session.cursor + 1 === session.items.length;
+        const completedWithoutSpelling = last && !sessionSpellingEnabled(session);
         await tx.studySession.update({
           where: { id: session.id },
           data: {
-            cursor: last ? 0 : session.cursor + 1,
-            phase: last ? 'practice' : 'recall',
-            step: last ? 'exercise' : 'prompt',
+            cursor: completedWithoutSpelling ? session.items.length : last ? 0 : session.cursor + 1,
+            phase: completedWithoutSpelling ? 'completed' : last ? 'practice' : 'recall',
+            step: completedWithoutSpelling ? 'completed' : last ? 'exercise' : 'prompt',
+            ...(completedWithoutSpelling ? { status: 'completed' } : {}),
             revision: { increment: 1 },
           },
         });
+        if (completedWithoutSpelling) await clearSessionAssignment(tx, session.id);
       } else {
         if (
           session.phase !== 'practice' ||

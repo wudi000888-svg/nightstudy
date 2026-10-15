@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
   Check,
@@ -15,6 +15,10 @@ import { auth, post, setup } from '../lib/api';
 import { goalLabels, goalNames, type Settings } from '../lib/types';
 import { Empty, ErrorNotice, Heading, Loading, LoginPrompt, Notice, Panel } from '../components/UI';
 import type { TaskPlanResponse } from '../components/tasks/types';
+import type { LearningStats } from '../lib/mobile-content-types';
+import { PreferencesSettings } from './PreferencesSettings';
+import { useLearningPreferences } from '../LearningPreferences';
+import './mobile-content.css';
 
 export function AuthPage() {
   const { site, user, refresh } = useApp();
@@ -185,10 +189,14 @@ export function AuthPage() {
 }
 export function ProfilePage() {
   const { user, refresh, site, pending, sync, syncNote, scope } = useApp();
+  const { preferences } = useLearningPreferences();
   const client = useQueryClient();
   const plan = useRemote<TaskPlanResponse>('plan', 'study/plan', !!user);
-  const navigate = useNavigate();
+  const stats = useRemote<LearningStats>('stats', 'stats', !!user);
   const settings = useRemote<{ settings: Settings }>('settings', 'me/settings', !!user);
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const section = params.get('section');
   const [draft, setDraft] = useState<Settings | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -196,22 +204,47 @@ export function ProfilePage() {
   const [name, setName] = useState(user?.name ?? '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const lifetime = useRef(0),
+    saving = useRef(false);
   useEffect(() => {
+    lifetime.current++;
+    saving.current = false;
+    setBusy(false);
     setDraft(null);
     setName(user?.name ?? '');
     setCurrentPassword('');
     setNewPassword('');
     setError(null);
     setNotice('');
+    return () => {
+      lifetime.current++;
+    };
   }, [scope]);
   useEffect(() => {
     if (settings.data) setDraft(settings.data.settings);
   }, [settings.data]);
-  async function saveSettings() {
-    if (!draft) return;
+  async function perform(action: () => Promise<void>, message = '') {
+    if (saving.current) return;
+    const life = lifetime.current;
+    saving.current = true;
     setBusy(true);
     setError(null);
+    setNotice('');
     try {
+      await action();
+      if (life === lifetime.current) setNotice(message);
+    } catch (value) {
+      if (life === lifetime.current) setError(value);
+    } finally {
+      if (life === lifetime.current) {
+        saving.current = false;
+        setBusy(false);
+      }
+    }
+  }
+  async function saveSettings() {
+    if (!draft) return;
+    await perform(async () => {
       await post(
         'me/settings',
         {
@@ -224,51 +257,30 @@ export function ProfilePage() {
         'PATCH',
       );
       await client.invalidateQueries({ queryKey: [scope] });
-      setNotice('计划已保存。已安排的学习组可以继续，其余内容按新目标调整。');
-    } catch (value) {
-      setError(value);
-    } finally {
-      setBusy(false);
-    }
+    }, '计划已保存，已安排的学习组可以继续。');
   }
   async function changeName() {
-    setBusy(true);
-    setError(null);
-    try {
+    await perform(async () => {
       await post('me/profile', { name }, 'PATCH');
       await refresh();
-      setNotice('称呼已更新。');
-    } catch (value) {
-      setError(value);
-    } finally {
-      setBusy(false);
-    }
+    }, '称呼已更新。');
   }
   async function changePassword() {
-    setBusy(true);
-    setError(null);
-    try {
+    const life = lifetime.current;
+    await perform(async () => {
       await auth('change-password', { currentPassword, newPassword, revokeOtherSessions: true });
-      setCurrentPassword('');
-      setNewPassword('');
-      setNotice('密码已更新，其他设备的会话已撤销。');
-    } catch (value) {
-      setError(value);
-    } finally {
-      setBusy(false);
-    }
+      if (life === lifetime.current) {
+        setCurrentPassword('');
+        setNewPassword('');
+      }
+    }, '密码已更新，其他设备的会话已撤销。');
   }
   async function signOut() {
-    setBusy(true);
-    try {
+    await perform(async () => {
       await auth('sign-out', {});
       await refresh();
       navigate('/');
-    } catch (value) {
-      setError(value);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
   if (!user)
     return (
@@ -276,223 +288,297 @@ export function ProfilePage() {
         <LoginPrompt />
       </div>
     );
+  const titles: Record<string, string> = {
+    profile: '个人资料',
+    plan: '学习计划',
+    preferences: '学习偏好',
+    security: '账户安全',
+  };
+  const title = section ? titles[section] : null;
   return (
-    <div className="page">
-      <Heading
-        eyebrow="我的 · 一点自己的节奏"
-        title={
-          <>
-            今晚，<em>{user.name}。</em>
-          </>
-        }
-        description={`你的学习记录保存在 ${site.title}。换设备登录后，也可以继续。`}
-        action={
-          <button className="button quiet" onClick={() => void signOut()} disabled={busy}>
-            <LogOut size={16} />
-            退出账户
-          </button>
-        }
-      />
-      <ErrorNotice error={error || settings.error} />
-      {notice && <Notice>{notice}</Notice>}
-      <div className="settings-grid">
-        <Panel>
-          <div className="panel-title">
-            <UserRound size={19} />
-            <h2>个人资料</h2>
-          </div>
-          <label className="field">
-            本站邮箱
-            <input value={user.email} readOnly />
-          </label>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void changeName();
-            }}
-          >
-            <label className="field">
-              怎么称呼你
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                required
-                maxLength={80}
-              />
-            </label>
-            <button className="button ghost" disabled={busy}>
-              保存称呼
-            </button>
-          </form>
-          <p className="fine-print">显示名不会改变你的登录邮箱。</p>
-        </Panel>
-        <Panel>
-          <div className="panel-title">
-            <Settings2 size={19} />
-            <h2>学习计划</h2>
-          </div>
-          {settings.isPending ? (
-            <Loading />
-          ) : (
-            draft && (
+    <div className="page mobile-account">
+      {title ? (
+        <>
+          <Link className="mobile-back" to="/me">
+            ← 返回个人中心
+          </Link>
+          <Heading eyebrow="我的自习室" title={title} />
+          <ErrorNotice error={error || (section === 'plan' ? settings.error : null)} />
+          {notice && <Notice>{notice}</Notice>}
+          <Panel className="mobile-account-form">
+            {section === 'profile' && (
               <form
                 className="form-stack"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void saveSettings();
+                  void changeName();
                 }}
               >
                 <label className="field">
-                  学习方向
-                  <select
-                    value={draft.goal}
-                    onChange={(event) =>
-                      setDraft({ ...draft, goal: event.target.value as Settings['goal'] })
-                    }
-                  >
-                    {goalNames.map((goal) => (
-                      <option key={goal} value={goal}>
-                        {goalLabels[goal]}
-                      </option>
-                    ))}
-                  </select>
+                  本站邮箱
+                  <input value={user.email} readOnly />
                 </label>
-                <div className="form-columns">
-                  <label className="field">
-                    每天总词数（复习 + 新学）
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={draft.dailyTotalGoal}
-                      onChange={(event) =>
-                        setDraft({ ...draft, dailyTotalGoal: Number(event.target.value) })
-                      }
-                      required
-                    />
-                  </label>
-                  <label className="field">
-                    每组词数
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={draft.groupSize}
-                      onChange={(event) =>
-                        setDraft({ ...draft, groupSize: Number(event.target.value) })
-                      }
-                      required
-                    />
-                  </label>
-                </div>
-                <div className="task-plan-explanation">
-                  <div>
-                    <strong>新学来源：{plan.data?.plan.bookTitle ?? '尚未选择词书'}</strong>
-                    <p>
-                      先复习到期的词，再从选好的书里学新词。同词当天只计一次，巩固和拼写不重复占每日目标。
-                    </p>
-                    <p>
-                      当前未安排逾期 {plan.data?.plan.unplannedOverdueCount ?? '—'}{' '}
-                      词；换书或降低目标后，已安排的学习组仍可继续。
-                      <Link className="text-link" to="/books">
-                        选书并预览计划
-                      </Link>
-                    </p>
-                  </div>
-                </div>
-                {draft.pendingTimeZone && (
-                  <Notice>
-                    时区 {draft.pendingTimeZone} 已预约下个学习日生效；今日按 {draft.timeZone}{' '}
-                    统计。
-                  </Notice>
-                )}
                 <label className="field">
-                  统计时区（下个学习日生效）
+                  怎么称呼你
                   <input
-                    value={draft.pendingTimeZone ?? draft.timeZone}
-                    onChange={(event) =>
-                      setDraft({ ...draft, pendingTimeZone: null, timeZone: event.target.value })
-                    }
                     required
-                    placeholder="Asia/Shanghai"
+                    maxLength={80}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
                   />
                 </label>
+                <p className="mobile-caption">显示名不会改变登录邮箱。</p>
                 <button className="button primary" disabled={busy}>
-                  保存计划
+                  保存称呼
                 </button>
               </form>
-            )
-          )}
-        </Panel>
-        <Panel>
-          <div className="panel-title">
-            <LockKeyhole size={19} />
-            <h2>账户安全</h2>
-          </div>
-          <form
-            className="form-stack"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void changePassword();
-            }}
-          >
-            <label className="field">
-              当前密码
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(event) => setCurrentPassword(event.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </label>
-            <label className="field">
-              新密码
-              <input
-                type="password"
-                minLength={8}
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
-                autoComplete="new-password"
-                required
-              />
-            </label>
-            <button className="button ghost" disabled={busy}>
-              修改密码
-            </button>
-          </form>
-        </Panel>
-        <Panel>
-          <div className="panel-title">
-            <ShieldCheck size={19} />
-            <h2>我的记录</h2>
-          </div>
-          <p>{pending ? `${pending} 条操作暂存等待同步。` : '本站账户保存你的学习状态与计划。'}</p>
-          <button className="button ghost" onClick={() => void sync()}>
-            检查暂存同步
-          </button>
-          {syncNote && <p className="fine-print">{syncNote}</p>}
-          <div className="profile-links">
-            <Link to="/wordbook">
-              我的生词本 <ArrowRight size={15} />
+            )}
+            {section === 'plan' &&
+              (settings.isPending ? (
+                <Loading />
+              ) : (
+                draft && (
+                  <form
+                    className="form-stack"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void saveSettings();
+                    }}
+                  >
+                    <label className="field">
+                      学习方向
+                      <select
+                        value={draft.goal}
+                        onChange={(event) =>
+                          setDraft({ ...draft, goal: event.target.value as Settings['goal'] })
+                        }
+                      >
+                        {goalNames.map((goal) => (
+                          <option key={goal} value={goal}>
+                            {goalLabels[goal]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="field">
+                      每日总词数（复习 + 新学）
+                      <input
+                        type="number"
+                        required
+                        min={1}
+                        max={100}
+                        value={draft.dailyTotalGoal}
+                        onChange={(event) =>
+                          setDraft({ ...draft, dailyTotalGoal: Number(event.target.value) })
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      每组词数
+                      <input
+                        type="number"
+                        required
+                        min={1}
+                        max={20}
+                        value={draft.groupSize}
+                        onChange={(event) =>
+                          setDraft({ ...draft, groupSize: Number(event.target.value) })
+                        }
+                      />
+                    </label>
+                    <div className="mobile-plan-note">
+                      <strong>{plan.data?.plan.bookTitle ?? '尚未选择词书'}</strong>
+                      <p>
+                        先复习，再学新词。同词当天只计一次；换书或降低目标不撤回已安排的学习组。
+                      </p>
+                      <Link to="/books">选书并预览计划 →</Link>
+                    </div>
+                    {draft.pendingTimeZone && (
+                      <Notice>
+                        {draft.pendingTimeZone} 将在下个学习日生效；今日按 {draft.timeZone} 统计。
+                      </Notice>
+                    )}
+                    <label className="field">
+                      统计时区
+                      <input
+                        required
+                        value={draft.pendingTimeZone ?? draft.timeZone}
+                        placeholder="Asia/Shanghai"
+                        onChange={(event) =>
+                          setDraft({
+                            ...draft,
+                            pendingTimeZone: null,
+                            timeZone: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <p className="mobile-caption">
+                      学习日从当地凌晨4点开始。时区调整在下个学习日生效。
+                    </p>
+                    <button className="button primary" disabled={busy}>
+                      保存计划
+                    </button>
+                  </form>
+                )
+              ))}
+            {section === 'preferences' && <PreferencesSettings />}
+            {section === 'security' && (
+              <form
+                className="form-stack"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void changePassword();
+                }}
+              >
+                <label className="field">
+                  当前密码
+                  <input
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(event) => setCurrentPassword(event.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  新密码
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                  />
+                </label>
+                <p className="mobile-caption">修改后保留本设备登录，撤销其他设备的会话。</p>
+                <button className="button primary" disabled={busy}>
+                  修改密码
+                </button>
+              </form>
+            )}
+          </Panel>
+        </>
+      ) : (
+        <>
+          <header className="mobile-profile-head">
+            <span className="mobile-avatar" aria-hidden="true">
+              {user.name.slice(0, 1) || '☾'}
+            </span>
+            <div>
+              <span className="tiny-label">我的自习室</span>
+              <h1>{user.name}</h1>
+              <p>{site.title}</p>
+            </div>
+            <Link to="/me?section=profile" aria-label="编辑个人资料">
+              <ArrowRight size={20} />
             </Link>
-            <Link to="/known">
-              我的熟词与导入导出 <ArrowRight size={15} />
+          </header>
+          <ErrorNotice error={error} />
+          <div className="mobile-stat-strip">
+            <div>
+              <strong>{stats.data?.totalLearned ?? '—'}</strong>
+              <span>已学词</span>
+            </div>
+            <div>
+              <strong>{stats.data?.activeDays ?? '—'}</strong>
+              <span>满5分钟的学习日</span>
+            </div>
+            <div>
+              <strong>{stats.data?.knownClaimCount ?? '—'}</strong>
+              <span>熟词</span>
+            </div>
+          </div>
+          <ErrorNotice error={stats.error} onRetry={() => void stats.refetch()} />
+          <nav className="mobile-account-menu" aria-label="账户与学习设置">
+            <Link to="/me?section=plan">
+              <Settings2 size={21} />
+              <span>
+                <strong>学习计划</strong>
+                <small>
+                  {settings.data
+                    ? `每日 ${settings.data.settings.dailyTotalGoal} 词 · 每组 ${settings.data.settings.groupSize} 词`
+                    : '目标、词书与学习时区'}
+                </small>
+              </span>
+              <ArrowRight size={17} />
             </Link>
-            <Link to="/assessment">
-              词汇水平测验 <ArrowRight size={15} />
+            <Link to="/me?section=preferences">
+              <Check size={21} />
+              <span>
+                <strong>学习偏好</strong>
+                <small>
+                  {preferences.accent === 'uk' ? '英式' : '美式'}发音 ·{' '}
+                  {preferences.autoPlay ? '自动播放' : '点击播放'} · 字号与主题
+                </small>
+              </span>
+              <ArrowRight size={17} />
+            </Link>
+            <Link to="/content">
+              <UserRound size={21} />
+              <span>
+                <strong>我的学习内容</strong>
+                <small>在学、句库、笔记与学堂</small>
+              </span>
+              <ArrowRight size={17} />
             </Link>
             <Link to="/memory">
-              个人记忆与反馈 <ArrowRight size={15} />
+              <ShieldCheck size={21} />
+              <span>
+                <strong>学习统计与记忆曲线</strong>
+                <small>真实练习记录与记忆预测</small>
+              </span>
+              <ArrowRight size={17} />
+            </Link>
+            <Link to="/books/mine">
+              <Settings2 size={21} />
+              <span>
+                <strong>我的词书与导入</strong>
+                <small>管理自己选的内容</small>
+              </span>
+              <ArrowRight size={17} />
+            </Link>
+            <Link to="/me?section=profile">
+              <UserRound size={21} />
+              <span>
+                <strong>个人资料</strong>
+                <small>称呼与账户信息</small>
+              </span>
+              <ArrowRight size={17} />
+            </Link>
+            <Link to="/me?section=security">
+              <LockKeyhole size={21} />
+              <span>
+                <strong>账户安全</strong>
+                <small>修改密码与其他设备会话</small>
+              </span>
+              <ArrowRight size={17} />
             </Link>
             {user.role === 'admin' && (
               <Link to="/admin">
-                本站管理 <ArrowRight size={15} />
+                <ShieldCheck size={21} />
+                <span>
+                  <strong>本站管理</strong>
+                  <small>内容、用户和服务设置</small>
+                </span>
+                <ArrowRight size={17} />
               </Link>
             )}
-          </div>
-        </Panel>
-      </div>
+          </nav>
+          <section className="mobile-sync-status">
+            <p>{pending ? `${pending} 条操作等待同步` : '学习记录跟随本站账户保存'}</p>
+            <button className="text-link" onClick={() => void sync()}>
+              检查同步
+            </button>
+            {syncNote && <p role="status">{syncNote}</p>}
+          </section>
+          <button className="button quiet full" disabled={busy} onClick={() => void signOut()}>
+            <LogOut size={17} />
+            退出账户
+          </button>
+        </>
+      )}
     </div>
   );
 }

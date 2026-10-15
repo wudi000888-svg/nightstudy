@@ -7,37 +7,19 @@
 
 **在线使用：[english.minminlove.top](https://english.minminlove.top)**
 
-![NightStudy 雨夜自习室](docs/media/preview.png)
+<img src="docs/media/mobile-home-0.7.png" alt="移动学习首页" width="260"> <img src="docs/media/mobile-study-0.7.png" alt="专注词卡与双语语境" width="260">
+
+移动端界面，使用独立的本地验收账户和测试词书。
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前线上版本：[`0.6.0-alpha.5`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.5)。** 后台「AI 设置」支持 DeepSeek 官方及「CC Switch · 自定义服务」，填写同一供应商的接口地址、模型、认证方式与真实密钥。兼容 OpenAI Chat Completions、Responses、Anthropic Messages 和 Gemini API；原有加密配置保留，更换服务目的地须重新填写对应密钥。水平测试使用所选服务，学习者的选择绑定其看到的配置，服务变更时保留基础报告，不向未经确认的新服务发送答案。每份测试最多请求一次，不自动改变成绩、熟词、复习证据或学习计划。详细配置见 [AI配置](docs/AI_CONFIGURATION.md) 和 [CHANGELOG](CHANGELOG.md)。
+**当前版本：[`0.7.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.7.0-alpha.1)。** 移动端优先改造：学习、内容、我的三栏导航，沉浸式背词，语境浏览、真实句子收藏、学习笔记、英语学堂和跨设备学习偏好。默认浅色正文，可切夜读或跟随系统；桌面使用简洁居中布局。详细交互与边界见 [移动端改造](docs/MOBILE_REDESIGN.md)。
 
-本版代码 `f047a49` 已通过54文件516项测试、类型/格式/构建和真实双PostgreSQL 17、完整隔离Compose安装验证：[CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38662609334)、[镜像发行](https://github.com/wudi000888-svg/nightstudy/actions/runs/38662830726)。公开amd64镜像已匿名拉取、核对21项源码及Piper来源后按固定摘要部署，HTTPS健康返回alpha.5，线上静态资源与本机dist摘要一致。升级前后全部40张业务表的原有字段逐行摘要一致，仅新增四个配置字段及迁移13；本次升级前备份在独立测试库实际恢复并完成同样的40表核对，临时库已清理。现有管理员密码和会话保持，生产浏览器确认CC Switch入口及四种协议表单；未填写或调用真实供应商密钥。
+每日目标按复习与新学的不同词总数计算，先复习，再分配新词。释义和例句支持英文点词卡；美式、英式各一个发音入口，星星和固定按钮有明确提示。词书支持标准 TXT、DOCX、PDF 导入，提供 [TXT](docs/templates/nightstudy-wordbook-template.txt)、[Word](docs/templates/nightstudy-wordbook-template.docx)、[PDF](docs/templates/nightstudy-wordbook-template.pdf) 模板。学习正文保持简洁，词典名称可以查看，来源与许可集中在独立说明。
 
-本版隔离浏览器实际验证自定义服务保存、刷新保持、地址/协议变化须重新填写密钥、连接检测和水平测试的服务来源提示；两次检测使用受控模拟，外部模型调用为0，未开始水平测试或写入学习记录。临时测试账户、数据库及运行目录已精确清理。本机5198也升级至alpha.5，40表数据与旧迁移记录保留，全新物理备份已独立恢复核验。未提供真实API密钥，不将模拟结果描述为供应商在线质量或更高准确率的证明，未进行容量压测或专家语义认证。
+后台支持 DeepSeek 官方及 CC Switch 自定义供应商，兼容 Chat Completions、Responses、Anthropic Messages 和 Gemini API。真实密钥由部署者配置，日常背词不调用付费模型；水平测试分析保持独立于客观成绩和复习证据。见 [AI配置](docs/AI_CONFIGURATION.md)。
 
-此前alpha.4修复星星和钉子的即时提示、收藏后按钮位移及生词本入口，增加「已巩固」分类；其52文件396项测试及390×844词卡、AI模拟分析和手动采用建议等浏览器记录属于 [alpha.4发行](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.4)。
-
-五书8,798词的独立中英文解释、8,786词的真实配对或原创用法，以及437词组的学习与英美音源保持安装。学习正文保留词性、解释、例句和两个发音选项，来源许可单独查看；日常复习不会触发付费请求。详细范围见 [双语内容](docs/BILINGUAL_CONTENT.md) 和 [内容包](docs/CONTENT.md)。此前alpha.3的363项测试、45项HTTPS/只读数据库混合检查和旧任务快照验收记录属于 [alpha.3发行](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.6.0-alpha.3)。
-
-[线上双语词卡](docs/media/bilingual-card-preview.jpg) · [CC Switch 配置页面（供应商尚未填写）](docs/media/ccswitch-preview.png) · [历史DeepSeek页面](docs/media/deepseek-preview.jpg)。IPA包覆盖统计按实测词条刷新，原始账号、词书与学习数据保持；词库完整收录不代表每个冷门词已有双语例句，五书覆盖范围及12个待核对词见内容文档。
-
-**每日学习计划：** 桌面悬停英文立即打开清晰背景词卡，英美喇叭各在对应IPA前。每日计划按“复习 + 新学”的不同词总数安排：先预留到期复习，再补本书新词。选书先确认计划，支持暂停、延期、跨端继续、完成历史与七天复习负担。具体规则见 [每日任务](docs/DAILY_TASKS.md)、[个性化计划](docs/architecture/PERSONALIZATION.md) 和 [CHANGELOG](CHANGELOG.md)。0.5历史验收见 [0.5.0-alpha.2](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.5.0-alpha.2)。
-
-[线上悬停词卡](docs/media/hover-card-preview.png) · [手机任务实测（本机可丢弃账户）](docs/media/daily-tasks-mobile-preview.png)
-
-**已验收历史基线：[`0.4.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.4.0-alpha.1)。** 英文点词卡、精确查词、私有标准文档词书导入，以及区分真人录音、服务器合成与设备备用的英美发音已在该版本交付。五本源词书的8,798个词均有两种口音音源；下文已有验证记录仅属于标注的历史版本。
-
-[移动单词卡实测](docs/media/word-card-mobile-preview.png) · [TXT模板](docs/templates/nightstudy-wordbook-template.txt) · [Word模板](docs/templates/nightstudy-wordbook-template.docx) · [PDF模板](docs/templates/nightstudy-wordbook-template.pdf)
-
-默认首次安装创建用户名admin和独立随机密码，私密文件交付初始凭据；既有管理员不被重置。群站使用10分钟单次配对票据与独立长期授权，可读取状态、按批准的权限管理用户/注册/公告并检测更新。版本检测只访问固定GitHub Release，不执行shell安装。这些功能在0.3代码 `86afefa` 的86项测试及VPS42项真实HTTPS管理员/双站检查中验收，0.4回归保留对应测试。
-
-[系统与更新预览](docs/media/admin-system-preview.png) · [群站管理预览](docs/media/admin-fleet-preview.png)
-
-系统截图采集于0.3 Release发布前，显示no-release；0.4线上实际检测为up-to-date。
-
-0.5 [发行流水线](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517674566) 成功，公开amd64容器经匿名manifest及VPS空认证配置实际拉取验收。固定摘要部署见 [指南](docs/DEPLOYMENT.md#ci-与镜像发行)。
+首次安装自动创建 admin 与独立随机密码，凭据只写服务器私密文件。多站可独立部署或使用隔离数据库，群站通过一次性配对令牌授权；版本检测访问固定 GitHub Release。见 [部署指南](docs/DEPLOYMENT.md)、[每日任务](docs/DAILY_TASKS.md) 和 [版本记录](CHANGELOG.md)。
 
 ## 产品与边界
 
@@ -45,7 +27,7 @@
 - 普通用户拥有本站词书选择、学习进度、复习记录、熟词声明、生词本及设置。
 - 桌面悬停英文释义或例句中的词立即打开词卡，移入保持、离开短延时关闭、点击固定；键盘和手机点击也可打开。卡片正文不递归生成另一张卡，来源与音源说明单独查看。精确查词未命中显示空态；已保存的词显示状态，未揭晓的学习内容保持遮蔽。
 - 自定义词书只对本人可见。标准TXT、DOCX、纯文本PDF先预览合格/失败/重复行，再确认合格词；提供失败原因导出、词书选择、编辑及归档。
-- 固定会话先回忆、再评价、再拼写；动作去重与版本冲突保护避免重复评价。个人曲线使用真实 FSRS 状态，无数据时显示空态。
+- 固定会话先回忆、再评价，按偏好安排拼写；动作去重与版本冲突保护避免重复评价。个人曲线使用真实 FSRS 状态，无数据时显示空态。
 - 每日总目标为复习与新学的不同词数，先预留今日到期复习，再用余量学本书新词；复习覆盖本站全部已学词。未安排逾期、待巩固、待拼写与等待同步各自可见。
 - 学习日按计划时区当地04:00交接，时区更改从下个学习日生效。切书、降低总目标或跨日均保留已签发任务；暂停、页面24小时延期、恢复与完成历史按本人账户保存，API延期上限七天。
 - 同词巩固须等真实FSRS到期再评分，当天只计一个不同词，拼写不额外写FSRS。主动额外复习可超出主目标；七天负担明确假设后续尚未复习，不伪造完成预测。
@@ -64,7 +46,7 @@
 
 0.6另提供四级方向236、六级方向201个常用词组，共437个，配874条英美Piper合成音源。这是独立编选的练习书，不是官方完整考试词组大纲；词组继续使用原canonical身份，音源类型和许可如实保留。例句与原创补充均待校对。
 
-继续使用0.4的独立音频包：五书去重联合范围为8,798个词，包包含17,596条英美音源：其中3条已核验来源与许可的真人录音，17,593条采用Piper 1.8.0开源合成并明确标注。音频包已生成并逐文件校验，本机、PG17/Compose CI和VPS完整安装；可播放数量以各部署的就绪元数据与文件校验为准。网页优先就绪的本站音源；设备语音是单独选择的备用，不冒充真人或标准录音。登录用户可在服务可用且IPA齐全时显式补齐缺失合成音源，完成后再次点击播放。
+继续使用0.4的独立音频包：五书去重联合范围为8,798个词，包包含17,596条英美音源：其中3条已核验来源与许可的真人录音，17,593条采用Piper 1.8.0开源合成并明确标注。音频包已生成并逐文件校验，本机、PG17/Compose CI和VPS完整安装；可播放数量以各部署的就绪元数据与文件校验为准。网页优先就绪的本站音源；学习页只显示美式与英式两个入口，音源说明集中单独查看。登录用户可在服务可用且IPA齐全时显式补齐缺失合成音源，完成后再次点击播放。
 
 私有词书每批最多10,000项，TXT限UTF-8和256 KiB；DOCX/PDF限2 MiB，PDF最多250页。首行使用标准版本标记，之后每行一个词或短语；不做OCR，不支持旧版DOC、任意表格或释义拼接。缺中文释义、英美IPA或任一口音的就绪音源会列入失败清单。归档保留已学进度。详细格式、失败处理与来源许可见 [内容包](docs/CONTENT.md)、[音标与音源](docs/PHONETICS.md) 和 [API](docs/API.md)。
 

@@ -245,7 +245,7 @@ export async function planView(db: Db, userId: string, plan: DailyPlan, now = ne
         rated: true,
         exerciseDone: false,
       },
-      select: { wordId: true },
+      select: { wordId: true, questionJson: true },
     }),
     db.studySession.findFirst({
       where: { userId, taskKind: { not: 'extra-review' }, status: 'in_progress' },
@@ -291,7 +291,11 @@ export async function planView(db: Db, userId: string, plan: DailyPlan, now = ne
     overdueCount,
     unplannedOverdueCount,
     pendingConsolidationCount: consolidation.length,
-    pendingSpellingCount: new Set(spelling.map((item) => item.wordId)).size,
+    pendingSpellingCount: new Set(
+      spelling
+        .filter((item) => obj(item.questionJson).spellingEnabled !== false)
+        .map((item) => item.wordId),
+    ).size,
     newRemaining,
     reviewRemaining: new Set([
       ...review.filter((word) => !word.firstRatedAt).map((word) => word.wordId),

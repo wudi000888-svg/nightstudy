@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoaderCircle, Square, Volume2 } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
+import { useLearningPreferences } from '../LearningPreferences';
 import { ApiError, mountUrl, post } from '../lib/api';
 import type { Word, WordAudio } from '../lib/types';
 
@@ -45,8 +46,11 @@ function sourceLink(value: string | null | undefined) {
   }
 }
 
-export function AudioButton({ word }: { word: Word }) {
-  const { user } = useApp();
+export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?: boolean }) {
+  const { user, scope } = useApp();
+  const { preferences, loaded: preferencesLoaded } = useLearningPreferences();
+  const preferredAccent = preferences.accent === 'uk' ? 'UK' : 'US';
+  const accents: ('US' | 'UK')[] = preferredAccent === 'UK' ? ['UK', 'US'] : ['US', 'UK'];
   const supported =
     typeof window !== 'undefined' &&
     'speechSynthesis' in window &&
@@ -80,6 +84,7 @@ export function AudioButton({ word }: { word: Word }) {
   const mounted = useRef(true);
   const wordIdentity = useRef(word.id);
   const activeSelection = useRef<Selection | null>(null);
+  const automaticAttempt = useRef('');
   const device = selection.startsWith('device-');
   const deviceVoice = voices
     .filter(
@@ -226,6 +231,7 @@ export function AudioButton({ word }: { word: Word }) {
   }
   function play(next: Selection) {
     if (preparingServer) return;
+    automaticAttempt.current = `${scope}:${word.id}`;
     setPrepareNote('');
     if (playing && activeSelection.current === next) {
       stop();
@@ -327,6 +333,29 @@ export function AudioButton({ word }: { word: Word }) {
       update(requestId, { phase: 'error', text: '设备发音不可用，请检查系统语音设置。' });
     }
   }
+  useEffect(() => {
+    if (
+      !autoPlay ||
+      !preferencesLoaded ||
+      !preferences.autoPlay ||
+      document.visibilityState === 'hidden'
+    )
+      return;
+    const identity = `${scope}:${word.id}`;
+    const audio = preferredAccent === 'UK' ? audioUk : audioUs;
+    if (!audio || automaticAttempt.current === identity) return;
+    automaticAttempt.current = identity;
+    play(preferredAccent);
+  }, [
+    autoPlay,
+    preferencesLoaded,
+    preferences.autoPlay,
+    preferredAccent,
+    scope,
+    word.id,
+    audioUs?.id,
+    audioUk?.id,
+  ]);
   const canPrepare = !!user && !!info?.generationAvailable && hasUsIpa && hasUkIpa;
   const preparationError = prepareError
     ? prepareError instanceof ApiError && prepareError.code === 'audio_preparing'
@@ -342,7 +371,7 @@ export function AudioButton({ word }: { word: Word }) {
   return (
     <div className="audio-control pronunciation-control">
       <div className="pronunciation-lines">
-        {(['US', 'UK'] as const).map((accent) => {
+        {accents.map((accent) => {
           const audio = accent === 'US' ? audioUs : audioUk;
           const active = playing && selection === accent;
           const ipa =
@@ -352,30 +381,40 @@ export function AudioButton({ word }: { word: Word }) {
           const waiting = preparingServer || (active && playback.phase === 'preparing');
           return (
             <div className="pronunciation-row" key={accent}>
-              <button
-                type="button"
-                className="audio-button pronunciation-speaker"
-                disabled={preparingServer || (!audio && !canPrepare)}
-                aria-label={
-                  active
-                    ? `停止 ${word.lemma} ${name}发音`
+              <span className="icon-action-hint">
+                <button
+                  type="button"
+                  className="audio-button pronunciation-speaker"
+                  disabled={preparingServer || (!audio && !canPrepare)}
+                  aria-label={
+                    active
+                      ? `停止 ${word.lemma} ${name}发音`
+                      : !audio && !canPrepare
+                        ? `暂无 ${word.lemma} ${name}发音`
+                        : `播放 ${word.lemma} ${name}发音`
+                  }
+                  title={!audio && !canPrepare ? `暂无${name}发音` : `${name}发音`}
+                  aria-pressed={active}
+                  onClick={() => (audio ? play(accent) : void prepareSources())}
+                >
+                  <span className="pronunciation-accent">{accent}</span>
+                  {waiting ? (
+                    <LoaderCircle size={16} className="spin" />
+                  ) : active ? (
+                    <Square size={14} />
+                  ) : (
+                    <Volume2 size={16} />
+                  )}
+                </button>
+                <span className="icon-action-tooltip" role="tooltip">
+                  {active
+                    ? `停止${name}发音`
                     : !audio && !canPrepare
-                      ? `暂无 ${word.lemma} ${name}发音`
-                      : `播放 ${word.lemma} ${name}发音`
-                }
-                title={!audio && !canPrepare ? `暂无${name}发音` : `${name}发音`}
-                aria-pressed={active}
-                onClick={() => (audio ? play(accent) : void prepareSources())}
-              >
-                <span className="pronunciation-accent">{accent}</span>
-                {waiting ? (
-                  <LoaderCircle size={16} className="spin" />
-                ) : active ? (
-                  <Square size={14} />
-                ) : (
-                  <Volume2 size={16} />
-                )}
-              </button>
+                      ? `暂无${name}发音`
+                      : `播放${name}发音`}
+                </span>
+              </span>
+              <span className="pronunciation-region-label">{accent === 'US' ? '美' : '英'}</span>
               <span className="pronunciation-ipa">{ipa || '暂无音标'}</span>
             </div>
           );

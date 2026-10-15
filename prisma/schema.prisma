@@ -8,34 +8,38 @@ datasource db {
 }
 
 model User {
-  id              String             @id
-  name            String
-  email           String             @unique
-  username        String?            @unique
-  displayUsername String?
-  emailVerified   Boolean            @default(false)
-  image           String?
-  role            String             @default("user")
-  disabled        Boolean            @default(false)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  sessions        Session[]
-  accounts        Account[]
-  settings        UserSettings?
-  words           UserWord[]
-  progress        StudyProgress[]
-  studySessions   StudySession[]
-  receipts        CommandReceipt[]
-  reviews         ReviewLog[]
-  imports         KnownImport[]
-  claims          KnownClaim[]
-  assessments     Assessment[]
-  mastery         MasteryProfile[]
-  activity        ActivityInterval[]
-  customBooks     Book[]
-  bookImports     CustomBookImport[]
-  dailyPlans      DailyPlan[]
-  autoKnownWords  AutoKnownWord[]
+  id                 String                  @id
+  name               String
+  email              String                  @unique
+  username           String?                 @unique
+  displayUsername    String?
+  emailVerified      Boolean                 @default(false)
+  image              String?
+  role               String                  @default("user")
+  disabled           Boolean                 @default(false)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  sessions           Session[]
+  accounts           Account[]
+  settings           UserSettings?
+  words              UserWord[]
+  progress           StudyProgress[]
+  studySessions      StudySession[]
+  receipts           CommandReceipt[]
+  reviews            ReviewLog[]
+  imports            KnownImport[]
+  claims             KnownClaim[]
+  assessments        Assessment[]
+  mastery            MasteryProfile[]
+  activity           ActivityInterval[]
+  customBooks        Book[]
+  bookImports        CustomBookImport[]
+  dailyPlans         DailyPlan[]
+  autoKnownWords     AutoKnownWord[]
+  learningPreference UserLearningPreference?
+  librarySentences   LibrarySentence[]
+  libraryNotes       LibraryNote[]
+  academyAttempts    AcademyAttempt[]
 }
 
 model Session {
@@ -189,34 +193,36 @@ model UserSettings {
 }
 
 model Word {
-  id              String            @id
-  lemma           String
-  normalizedLemma String            @unique
-  phonetic        String            @default("")
-  phoneticUs      String            @default("")
-  phoneticUk      String            @default("")
-  phoneticSource  String            @default("")
-  goalTags        String[]
-  difficulty      Int               @default(1)
-  status          String            @default("published")
-  sourceRef       String            @default("NightStudy original demo")
-  contentVersion  String            @default("demo-2026-10-14")
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  senses          Sense[]
-  examples        WordExample[]
-  bookItems       BookItem[]
-  userWords       UserWord[]
-  progress        StudyProgress[]
-  sessionItems    SessionItem[]
-  reviews         ReviewLog[]
-  claims          KnownClaim[]
-  assessmentItems AssessmentItem[]
-  audio           WordAudio[]
-  dailyPlanWords  DailyPlanWord[]
-  autoKnownWords  AutoKnownWord[]
-  collocations    WordCollocation[] @relation("CollocationHeadword")
-  collocationOf   WordCollocation[] @relation("CollocationPhrase")
+  id               String            @id
+  lemma            String
+  normalizedLemma  String            @unique
+  phonetic         String            @default("")
+  phoneticUs       String            @default("")
+  phoneticUk       String            @default("")
+  phoneticSource   String            @default("")
+  goalTags         String[]
+  difficulty       Int               @default(1)
+  status           String            @default("published")
+  sourceRef        String            @default("NightStudy original demo")
+  contentVersion   String            @default("demo-2026-10-14")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  senses           Sense[]
+  examples         WordExample[]
+  bookItems        BookItem[]
+  userWords        UserWord[]
+  progress         StudyProgress[]
+  sessionItems     SessionItem[]
+  reviews          ReviewLog[]
+  claims           KnownClaim[]
+  assessmentItems  AssessmentItem[]
+  audio            WordAudio[]
+  dailyPlanWords   DailyPlanWord[]
+  autoKnownWords   AutoKnownWord[]
+  collocations     WordCollocation[] @relation("CollocationHeadword")
+  collocationOf    WordCollocation[] @relation("CollocationPhrase")
+  librarySentences LibrarySentence[]
+  libraryNotes     LibraryNote[]
 
   @@index([status, difficulty])
 }
@@ -668,4 +674,68 @@ model DeepSeekRequestLease {
   createdAt DateTime @default(now())
 
   @@index([expiresAt])
+}
+
+model UserLearningPreference {
+  userId          String   @id
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme           String   @default("day")
+  accent          String   @default("us")
+  autoPlay        Boolean  @default(false)
+  spellingEnabled Boolean  @default(true)
+  fontScale       Float    @default(1)
+  reminderEnabled Boolean  @default(false)
+  reminderTime    String   @default("20:00")
+  revision        Int      @default(0)
+  updatedAt       DateTime @updatedAt
+}
+
+model LibrarySentence {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId     String?
+  word       Word?    @relation(fields: [wordId], references: [id], onDelete: SetNull)
+  sourceType String
+  sourceId   String
+  sourceHash String
+  exampleEn  String
+  exampleZh  String
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, sourceType, sourceId, sourceHash])
+  @@index([userId, createdAt, id])
+}
+
+model LibraryNote {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wordId    String?
+  word      Word?    @relation(fields: [wordId], references: [id], onDelete: SetNull)
+  title     String
+  body      String
+  revision  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt, id])
+}
+
+model AcademyAttempt {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId      String
+  lessonVersion String
+  kind          String
+  status        String    @default("in_progress")
+  revision      Int       @default(0)
+  itemsJson     Json      @default("[]")
+  resultJson    Json?
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@index([userId, startedAt, id])
 }

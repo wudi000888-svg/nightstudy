@@ -1,6 +1,6 @@
 # Alpha API 契约
 
-对应当前0.6源码接口；最终版本的测试、发行与线上验收范围见 [README](../README.md) 和 [每日任务](DAILY_TASKS.md)，已记录的0.5及更早结果保留为历史证据。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
+对应当前0.7源码接口；最终版本的测试、发行与线上验收范围见 [README](../README.md) 和 [每日任务](DAILY_TASKS.md)，已记录的较早结果保留为历史证据。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
 
 请求由可信 Host 与规范 basePath 选择 operator 配置的 Realm，随后只访问该站独立认证/业务 PG DB。客户端不能通过 `siteId`、`userId`、数据库 URL 参数切换身份。真正互不信任的站点使用不同 origin；同 origin 子路径属于同一信任域。
 
@@ -123,6 +123,50 @@ prepare只补缺失音源，不覆盖优先的已就绪真人录音；返回后�
 
 翻译文本最多1,000个Unicode字符，sourceLanguage为auto/en/zh-CN（默认en），targetLanguage为en/zh-CN（默认zh-CN）。默认website-official仅提供官方网页入口，站内text返回503 `translation_not_configured`；生产站内结果使用带私密token的固定VPS网关，direct仅供本机开发。网页兼容provider返回 `google-web-compat` / `unofficial=true` / `bestEffort=true`，不是受支持的Google Cloud API。本机真实调用已遇到上游429；失败显示明确错误，不把离线词义冒充翻译。Google网页不能直接iframe，本站返回链接。原文会传送至配置网关/Google，不写翻译历史。配置、鉴权、超时的验证范围与尚待项见 [TRANSLATION.md](TRANSLATION.md)。
 
+## 学习偏好、学习库、句库与笔记
+
+以下接口均要求本站用户登录。用户与 Realm 由服务端会话决定；请求不能传入另一个 `userId` 或 `siteId`。列表使用 `items/page:{total,hasMore,nextCursor}`，游标绑定站点实例、用户和查询条件。
+
+| 方法与相对路径                     | 主要参数与响应                                                                                                 |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `GET /learning-preferences`        | `{preferences}`；没有已保存偏好时返回默认值，不创建数据库行                                                    |
+| `PUT /learning-preferences`        | `expectedRevision` 加需修改的偏好字段；返回 `{preferences}`，首次保存为 revision=1                             |
+| `GET /library/words`               | view=learning/recent/learned，q、limit、cursor 可选；返回本人真实学习词条和进度                                |
+| `GET /sentences`                   | q、wordId、limit、cursor 可选；本人收藏快照列表                                                                |
+| `GET /sentences/status?wordId=...` | 返回 `{wordId,items:[{sourceType,sourceId,saved,sentenceId}]}`，一次核对当前源的精确收藏状态，不依赖列表第一页 |
+| `POST /sentences`                  | `{sourceType:'word-example'或'sense',sourceId,wordId?}`；返回 `{sentence,duplicate}`                           |
+| `DELETE /sentences/:id`            | 无请求体或 `{}`；仅删除本人收藏，返回 `{deleted:true}`                                                         |
+| `GET /notes`                       | q、wordId、limit、cursor 可选；本人笔记列表                                                                    |
+| `GET /notes/:id`                   | 返回 `{note}`，其他用户或不存在的笔记返回404                                                                   |
+| `POST /notes`                      | `{title,body,wordId?}`；返回 `{note}`                                                                          |
+| `PATCH /notes/:id`                 | `{expectedRevision,title?,body?,wordId?}`；wordId 可设为 null，返回 `{note}`                                   |
+| `DELETE /notes/:id`                | `{expectedRevision}`；返回 `{deleted:true}`                                                                    |
+
+偏好默认值为 `theme:'day'`、`accent:'us'`、`autoPlay:false`、`spellingEnabled:true`、`fontScale:1`、`reminderEnabled:false`、`reminderTime:'20:00'`、`revision:0`。theme 可选 day/night/system，accent 可选 us/uk，fontScale 只接受 1/1.125/1.25，reminderTime 为24小时制 HH:mm。PUT 使用独立于每日计划设置的 revision；过期或并发首次保存返回409 `learning_preferences_conflict`，details.preferences 是当前值。提醒仅是打开页面时的本地偏好，不代表服务器推送能力。拼写开关只影响之后签发的新学习组，现有组保留签发时的值。
+
+学习库、句库、笔记列表默认50条、最多100条，q 最长120字符。学习库只列存在真实 firstLearnedAt 的已发布词；learning 排除本人暂停的词，recent 限最近30天有真实评价的词，learned 列全部已学词。每项含 word、progress、reviewedAt、dueAt、learnedAt、reviewCount、paused；reviewCount 不包含首学评价，学习库摘要只带有限释义与例句。
+
+句库只能收藏当前已发布词中可核实且英中例句均非空的 WordExample 或可学习 Sense；不接受客户端提交自写例句或伪造来源。收藏保存正文与归因快照，源编辑不会改写已有快照。同源同内容并发收藏去重；源正文或归因变化后，当前版本可能显示未收藏，旧快照仍在句库中。状态接口最多读取1000个源候选，超限返回413 `sentence_sources_limit`，不会静默截断。每人最多5000句，超限429 `sentence_limit`；源不可见、空句或被排除时404 `sentence_source_not_found`。收藏项包含 id、wordId、sourceType/sourceId、exampleEn/exampleZh、metadata、createdAt；源词被删除后 wordId 可为 null。
+
+笔记 title 去空白后1–120字符，body 为1–20000字符纯文本，不接受 NUL；每人最多1000篇，超限429 `note_limit`。可关联本站已发布 canonical word，不能借关联读取他人的私有词书关系。每项含 id、wordId、title、body、revision、createdAt、updatedAt；更新或删除时版本冲突返回409 `note_conflict`，details.note 为当前笔记。错误游标或多余请求字段返回400；本人不存在或非本人资源返回404。
+
+## 学堂与独立练习记录
+
+学堂为原创入门短课，提供 reading、shadowing、listening、topic 四类，不代表完整考试课程。所有下列接口要求本站登录。
+
+| 方法与相对路径                      | 主要参数与响应                                                                           |
+| ----------------------------------- | ---------------------------------------------------------------------------------------- |
+| `GET /academy`                      | 可选 category；返回课程摘要 items，含 completedAttempts、lastCompletedAt、audioAvailable |
+| `GET /academy/:id`                  | `{lesson}`，含原创双语 body、vocabulary、版本、类别和完成方式                            |
+| `POST /academy/:id/attempts`        | `{commandId,accent?:'us'或'uk'}`；返回 `{attempt,duplicate}`，固定本次课程与题目快照     |
+| `GET /academy/attempts`             | limit 默认20、最多100，cursor 可选；返回本人练习历史 items/page                          |
+| `GET /academy/attempts/:id`         | `{attempt}`；刷新或跨端恢复同一次练习                                                    |
+| `POST /academy/attempts/:id/submit` | `{commandId,expectedRevision,answers?:[{itemId,answer}]}`；返回 `{attempt,duplicate}`    |
+
+attempt 含 id、lessonId/lessonVersion、kind、status、revision、startedAt/completedAt、lesson 快照、items、result。status 为 in_progress/completed；开始时 result 为 null。听力题只返回 id、prompt、audioUrl、accent 和随机选项 `{id,text}`；answer 必须是该题的选项 ID，所有题都作答后才能提交。服务器使用固定快照评分，完成后才返回 objective-listening 的 score/total/correct/feedback。创建听力练习会实际核验所选口音音源，缺失或损坏返回503 `academy_audio_not_ready`，不创建假练习记录。
+
+阅读、跟读、专题只记录完成，result.assessmentKind 为 completion-only，score/total/correct 均为 null，不接受选择题答案；设备跟读功能不提供服务器口语评分。学堂完成不写 FSRS、ReviewLog、每日计划或熟词证据。开始和提交均使用稳定 commandId 去重；同编号不同内容409 `idempotency_conflict`，已提交练习再次使用其他动作编号409 `academy_already_submitted`，过期 revision 返回409 `academy_attempt_conflict`。听力未完整作答400 `academy_answers_incomplete`；非听力提交答案400 `academy_answers_not_applicable`。每人最多1000条练习记录，超限429 `academy_attempt_limit`；非本人练习返回404。
+
 ## 每日总量计划、固定任务与 FSRS
 
 以上业务入口均要求本站登录用户，不接受userId/siteId来替换任务所有者。每天总目标N包含复习与新学，按canonical wordId去重，先给今日到期复习预留预算，剩余才从选定词书补新词。复习覆盖本站全部已学词，不局限于当前书；未安排的逾期词独立显示。今日稍后到期的预留复习不会提前产生评分。
@@ -165,7 +209,7 @@ plan包含id/revision/localDate/timeZone/startsAt/endsAt、goal/bookId/bookTitle
 | dueNowCount / dueTodayCount / overdueCount       | 当前已到期、学习日结束前到期（含逾期）、学习日开始前已逾期的词；范围互有包含，不相加    |
 | unplannedOverdueCount                            | 仍未被当前计划安排的逾期词                                                              |
 | pendingConsolidationCount                        | 今日已评分但FSRS处于学习/重学状态，且本学习日还会到期的不同词；未到期时继续等待         |
-| pendingSpellingCount                             | 本人未完成固定组中已评分、尚未完成拼写的不同词；跨书重复项不重复计数                    |
+| pendingSpellingCount                             | 本人开启拼写的未完成固定组中已评分、尚未完成拼写的不同词；跨书重复项不重复计数          |
 | newRemaining / reviewRemaining                   | 可新增安排的新学量、未评分复习与巩固待办量；不能直接相加视为今日剩余unique预算          |
 | nextDueAt / activeTaskId                         | 本学习日下一次未来到期时间、当前进行中的主任务ID，均可为null                            |
 | recommendedTotal                                 | 当前总目标建议值；诊断推荐另见assessment.suggestedPlan                                  |
@@ -178,7 +222,7 @@ pause保留固定内容、历史与未评分预约；deferUntil须为未来且�
 
 没有可立即签发项时session=null，reason可能为planned_reviews_pending（预留的复习稍后到期）、daily_goal_complete、no_new_words或nothing_due。这不代表所有已签发任务或未安排逾期词已经完成，客户端继续展示真实待办。
 
-评分流程仍是当前item先reveal，再rate（again/hard/good/easy，必须含expectedProgressRevision）；整组评分后进入practice，当前题用answer。phase保持recall/practice/completed，step为prompt/revealed/exercise/completed。拼写只记录练习，不能写FSRS或伪造评分。巩固是到达真实FSRS dueAt后再回忆并评分，产生真实ReviewLog，不是重复增加当日词数，也不是将点击看答案当作复习成功。
+评分流程仍是当前item先reveal，再rate（again/hard/good/easy，必须含expectedProgressRevision）。session.spellingEnabled 为签发时偏好快照；开启时整组评分后进入practice，当前题用answer；关闭时最后一次真实评分后直接completed，exerciseDone 保持 false，不伪造已完成拼写。phase保持recall/practice/completed，step为prompt/revealed/exercise/completed。拼写只记录练习，不能写FSRS或伪造评分。巩固是到达真实FSRS dueAt后再回忆并评分，产生真实ReviewLog，不是重复增加当日词数，也不是将点击看答案当作复习成功。
 
 接受真实rate时同步返回collection：inWordbook、known及本次transition（graduated/auto-known/auto-known-withdrawn/restored/null）。自动分层只依真实FSRS Review状态、stability与最近Again之后的不同学习日Good/Easy复习，不把首学、拼写或重复回执当作新证据；14天/3日与90天/5日规则见 [内容说明](CONTENT.md#生词本与熟词本)。
 

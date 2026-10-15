@@ -35,6 +35,21 @@ const MyBooksPage = lazy(() =>
 const DictionaryPage = lazy(() =>
   import('./pages/Dictionary').then((page) => ({ default: page.DictionaryPage })),
 );
+const ContentPage = lazy(() =>
+  import('./pages/Content').then((page) => ({ default: page.ContentPage })),
+);
+const LearningLibraryPage = lazy(() =>
+  import('./pages/LearningLibrary').then((page) => ({ default: page.LearningLibraryPage })),
+);
+const SentencesPage = lazy(() =>
+  import('./pages/LearningLibrary').then((page) => ({ default: page.SentencesPage })),
+);
+const NotesPage = lazy(() =>
+  import('./pages/LearningLibrary').then((page) => ({ default: page.NotesPage })),
+);
+const AcademyPage = lazy(() =>
+  import('./pages/Academy').then((page) => ({ default: page.AcademyPage })),
+);
 
 class PageBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -85,6 +100,11 @@ export function App() {
           <Route path="books" element={<BooksPage />} />
           <Route path="books/import" element={<CustomBookImportPage />} />
           <Route path="books/mine" element={<MyBooksPage />} />
+          <Route path="content" element={<ContentPage />} />
+          <Route path="library" element={<LearningLibraryPage />} />
+          <Route path="sentences" element={<SentencesPage />} />
+          <Route path="notes" element={<NotesPage />} />
+          <Route path="academy" element={<AcademyPage />} />
           <Route path="learn" element={<StudyPage key="learn" mode="learn" />} />
           <Route path="review" element={<StudyPage key="review" mode="review" />} />
           <Route path="lookup" element={<LookupPage key="lookup" />} />

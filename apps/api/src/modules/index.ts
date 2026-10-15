@@ -12,6 +12,8 @@ import { registerFleet } from './fleet.js';
 import { registerCustomBooks } from './custom-books.js';
 import { registerDictionaryResolver } from './dictionary-resolver.js';
 import { registerBookTemplates } from './book-templates.js';
+import { registerLearningLibrary } from './learning-library.js';
+import { registerAcademy } from './academy.js';
 import type { FleetTransport } from './fleet-transport.js';
 import type { DeepSeekTransport } from '../providers/deepseek.js';
 
@@ -32,4 +34,6 @@ export async function registerModules(
   await registerCustomBooks(app, getContext);
   await registerDictionaryResolver(app, getContext);
   await registerBookTemplates(app, getContext);
+  await registerLearningLibrary(app, getContext);
+  await registerAcademy(app, getContext);
 }

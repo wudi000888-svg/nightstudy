@@ -6,6 +6,9 @@ import type { Sense, Word } from '../lib/types';
 import { AudioButton } from './Pronunciation';
 import { dictionaryText } from '../lib/dictionary';
 import { InteractiveEnglish } from './InteractiveEnglish';
+import { StudyWordDetails } from './study/StudyWordDetails';
+import { SentenceSaveButton, type SentenceSaveButtonProps } from './SentenceSaveButton';
+import './study/mobile-study.css';
 export { AudioButton } from './Pronunciation';
 
 export function Heading({
@@ -271,10 +274,12 @@ function BilingualExample({
   english,
   chinese,
   interactive,
+  source,
 }: {
   english: string;
   chinese: string;
   interactive: boolean;
+  source: Omit<SentenceSaveButtonProps, 'compact'>;
 }) {
   return (
     <blockquote
@@ -293,6 +298,7 @@ function BilingualExample({
           <p className="example-zh">{chinese}</p>
         </div>
       )}
+      {interactive && english && chinese && <SentenceSaveButton {...source} compact />}
     </blockquote>
   );
 }
@@ -311,11 +317,15 @@ export function WordView({
   focusSenseId,
   hideMeanings = false,
   interactive = true,
+  presentation = 'reading',
+  headerAction,
 }: {
   word: Word;
   focusSenseId?: string;
   hideMeanings?: boolean;
   interactive?: boolean;
+  presentation?: 'reading' | 'study';
+  headerAction?: ReactNode;
 }) {
   const availableSenses = (hideMeanings ? [] : (word.senses ?? [])).filter((sense) =>
     [sense.definitionZh, sense.definitionEn, sense.exampleEn, sense.exampleZh].some(
@@ -369,6 +379,7 @@ export function WordView({
                 english={dictionaryText(example.exampleEn)}
                 chinese={dictionaryText(example.exampleZh)}
                 interactive={interactive}
+                source={{ wordId: word.id, sourceType: 'word-example', sourceId: example.id }}
               />
             </div>
           ))}
@@ -390,6 +401,7 @@ export function WordView({
                 english={dictionaryText(sense.exampleEn)}
                 chinese={dictionaryText(sense.exampleZh)}
                 interactive={interactive}
+                source={{ wordId: word.id, sourceType: 'sense', sourceId: sense.id }}
               />
             )}
           </div>
@@ -424,7 +436,7 @@ export function WordView({
       </section>
     ) : null;
   return (
-    <div className="word-content">
+    <div className={`word-content${presentation === 'study' ? ' word-content-study' : ''}`}>
       <div className="word-title-row">
         <div>
           <h2 className="word-title">{word.lemma}</h2>
@@ -437,87 +449,103 @@ export function WordView({
             </div>
           )}
         </div>
-        <AudioButton word={word} />
+        <AudioButton word={word} autoPlay={presentation === 'study'} />
+        {headerAction && <div className="word-header-action">{headerAction}</div>}
       </div>
-      {senses.length > 0 && (
-        <div className="meanings">
-          {senses.map((sense, index) => {
-            const definitionZh = dictionaryText(sense.definitionZh);
-            const definitionEn = dictionaryText(sense.definitionEn);
-            const exampleEn = dictionaryText(sense.exampleEn);
-            const exampleZh = dictionaryText(sense.exampleZh);
-            const characters = Array.from((definitionZh || definitionEn).replace(/\s+/g, ' '));
-            const shortSummary =
-              characters.length > 100
-                ? `${characters.slice(0, 100).join('')}…`
-                : characters.join('');
-            const heading = <span className="sense-pos">{sense.pos || '词义'}</span>;
-            const content = (
-              <>
-                <div
-                  className="bilingual-definition"
-                  aria-label={
-                    definitionZh && definitionEn
-                      ? '中英释义对照'
-                      : definitionZh
-                        ? '中文释义'
-                        : '英文释义'
-                  }
-                >
-                  {definitionZh && (
-                    <div className="bilingual-cell" lang="zh-CN">
-                      <p className="meaning-zh">{definitionZh}</p>
-                    </div>
-                  )}
-                  {definitionEn && (
-                    <div className="bilingual-cell" lang="en">
-                      <p className="meaning-en">
-                        <InteractiveEnglish text={definitionEn} enabled={interactive} />
-                      </p>
-                    </div>
-                  )}
-                </div>
-                {(exampleEn || exampleZh) && (
-                  <BilingualExample
-                    english={exampleEn}
-                    chinese={exampleZh}
-                    interactive={interactive}
-                  />
-                )}
-              </>
-            );
-            return index === 0 ? (
-              <Fragment key={`${word.id}:${sense.id}`}>
-                <div className="sense">
-                  {heading}
-                  {content}
-                </div>
-                {englishSection}
-                {exampleSection}
-                {collocationSection}
-              </Fragment>
-            ) : (
-              <details className="sense sense-collapsed" key={`${word.id}:${sense.id}`}>
-                <summary>
-                  <span className="sense-summary-top">
-                    {heading}
-                    <span className="sense-expand-icon" aria-hidden="true">
-                      ⌄
-                    </span>
-                  </span>
-                  <span className="sense-summary-text">{shortSummary || '展开查看例句'}</span>
-                </summary>
-                <div className="sense-expanded">{content}</div>
-              </details>
-            );
-          })}
-        </div>
-      )}
-      {!hideMeanings && senses.length === 0 && <p className="fine-print">暂无释义。</p>}
-      {senses.length === 0 && (
+      {presentation === 'study' ? (
+        !hideMeanings && (
+          <StudyWordDetails
+            key={`${word.id}:${focusSenseId ?? ''}`}
+            word={word}
+            senses={senses}
+            englishSenses={englishSenses}
+            interactive={interactive}
+          />
+        )
+      ) : (
         <>
-          {exampleSection}
-          {collocationSection}
+          {senses.length > 0 && (
+            <div className="meanings">
+              {senses.map((sense, index) => {
+                const definitionZh = dictionaryText(sense.definitionZh);
+                const definitionEn = dictionaryText(sense.definitionEn);
+                const exampleEn = dictionaryText(sense.exampleEn);
+                const exampleZh = dictionaryText(sense.exampleZh);
+                const characters = Array.from((definitionZh || definitionEn).replace(/\s+/g, ' '));
+                const shortSummary =
+                  characters.length > 100
+                    ? `${characters.slice(0, 100).join('')}…`
+                    : characters.join('');
+                const heading = <span className="sense-pos">{sense.pos || '词义'}</span>;
+                const content = (
+                  <>
+                    <div
+                      className="bilingual-definition"
+                      aria-label={
+                        definitionZh && definitionEn
+                          ? '中英释义对照'
+                          : definitionZh
+                            ? '中文释义'
+                            : '英文释义'
+                      }
+                    >
+                      {definitionZh && (
+                        <div className="bilingual-cell" lang="zh-CN">
+                          <p className="meaning-zh">{definitionZh}</p>
+                        </div>
+                      )}
+                      {definitionEn && (
+                        <div className="bilingual-cell" lang="en">
+                          <p className="meaning-en">
+                            <InteractiveEnglish text={definitionEn} enabled={interactive} />
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    {(exampleEn || exampleZh) && (
+                      <BilingualExample
+                        english={exampleEn}
+                        chinese={exampleZh}
+                        interactive={interactive}
+                        source={{ wordId: word.id, sourceType: 'sense', sourceId: sense.id }}
+                      />
+                    )}
+                  </>
+                );
+                return index === 0 ? (
+                  <Fragment key={`${word.id}:${sense.id}`}>
+                    <div className="sense">
+                      {heading}
+                      {content}
+                    </div>
+                    {englishSection}
+                    {exampleSection}
+                    {collocationSection}
+                  </Fragment>
+                ) : (
+                  <details className="sense sense-collapsed" key={`${word.id}:${sense.id}`}>
+                    <summary>
+                      <span className="sense-summary-top">
+                        {heading}
+                        <span className="sense-expand-icon" aria-hidden="true">
+                          ⌄
+                        </span>
+                      </span>
+                      <span className="sense-summary-text">{shortSummary || '展开查看例句'}</span>
+                    </summary>
+                    <div className="sense-expanded">{content}</div>
+                  </details>
+                );
+              })}
+            </div>
+          )}
+          {!hideMeanings && senses.length === 0 && <p className="fine-print">暂无释义。</p>}
+          {senses.length === 0 && (
+            <>
+              {exampleSection}
+              {collocationSection}
+            </>
+          )}
         </>
       )}
     </div>

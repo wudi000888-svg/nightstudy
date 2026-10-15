@@ -79,6 +79,10 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 
 ## 验证记录
 
+当前 `0.7.0-alpha.1` 的运行源码为 [`1ff2986`](https://github.com/wudi000888-svg/nightstudy/commit/1ff298678355debf533433f5a61550b2bc98438a)，62 份测试文件、563 项测试及类型、格式、构建检查通过；[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729429192) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729521782) 均成功。本机 Native 与 VPS 已升级且健康，移动浏览器已核验首页、内容、学堂与偏好；隔离环境的学习、句子收藏和偏好检查见 [移动端学习体验](docs/MOBILE_REDESIGN.md#本机验证)。本轮 VPS 备份已在独立测试库恢复，40 张业务表的行与列、13 条迁移记录核对一致，测试库已清理；未向业务库执行恢复。
+
+以下保留0.5及更早版本的历史验证范围。
+
 0.5代码 `2918aa9` 的25文件162项测试、9项Python提取器回归及格式、类型、生产构建通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517645764) 与 [发行CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517674566) 均通过双PG17和完整Compose安装。新增覆盖04:00/DST、首次设置8路并发、跨端任务、真实FSRS巩固去重、跨日旧组直接评分、延期不改到期时间，以及5项IndexedDB冲突隔离与单条恢复回归。
 
 本机浏览器验证即时鼠标悬停、移入保持、离开关闭、清晰背景、词卡生词本和两种口音播放；390×844完成选书确认、三词目标、暂停恢复、回忆、拼写、两组完成及3/3去重进度。生产浏览器另验证rain英美真人录音、water悬停卡及两种服务器合成的实际播放完成事件。

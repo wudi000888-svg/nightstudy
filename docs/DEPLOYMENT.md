@@ -1,6 +1,10 @@
 # Alpha 运行与部署
 
-本文件描述当前0.6代码的运行约定；0.6最终构建、完整安装与生产升级结果待对应验收记录。最近已记录的线上基线为 `0.5.0-alpha.2`：代码2918aa9的25文件162项测试、9项Python回归、格式/类型/构建及 [双PG17/Compose CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517645764) 通过，VPS165项真实HTTPS任务检查通过。下面保留各历史版本的对应证据。Render、主机断电恢复、异机/密钥灾备、高并发容量及音源逐条专家听辨未验收。
+当前发布为 [`0.7.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.7.0-alpha.1)，运行源码为 [`1ff2986`](https://github.com/wudi000888-svg/nightstudy/commit/1ff298678355debf533433f5a61550b2bc98438a)。本机 Native 与目标 VPS 已升级并通过健康检查；移动浏览器已核验首页、内容入口与学堂页面。62 份测试文件、563 项测试及类型、格式、构建检查通过，[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729429192) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729521782) 均成功。当前移动端交互及隔离环境的学习流程验收见 [MOBILE_REDESIGN.md](MOBILE_REDESIGN.md)。
+
+2026-10-15 本轮 VPS 升级前备份已在独立测试库恢复：40 张业务表的行与列及 13 条迁移记录与备份基线一致，随后按数据库身份与零连接条件清理测试库；未向业务库执行恢复或终止未知客户端。此次证明不包含所有权、ACL、注释、安全标签及表空间位置。升级新增四张表，迁移后为 44 张业务表、14 条迁移记录；已有 40 张表在升级窗口摘要一致。数据库与翻译网关保持运行，只重新创建应用容器。
+
+Render、主机断电恢复、异机/密钥灾备、高并发容量及音源逐条专家听辨未验收。下文保留各历史版本的对应证据，标明版本的旧镜像与检查结果不代表当前运行版本。
 
 ## Docker Compose minimal
 
@@ -121,7 +125,7 @@ Blueprint 显式设置 `CLIENT_IP_PROFILE=render-public`。该模式启动要求
 
 ## 翻译网关与目标VPS
 
-当前运行镜像 `nightstudy-english:0.5.0-alpha.2-2918aa9`，代码与成功CI一致，init退出0、app/PG/网关健康。切换前另保存私密数据库归档、可读catalog和原.env；本次只核验catalog，未重复执行实际恢复演练。自动准备保留原管理员、词库770,611、4个ready包、五书去重8798词及17596条音源；8条媒体样本检查通过。初始凭据仍在VPS私密文件中，不通过Web交付。
+历史0.5验收时运行镜像 `nightstudy-english:0.5.0-alpha.2-2918aa9`，代码与成功CI一致，init退出0、app/PG/网关健康。切换前另保存私密数据库归档、可读catalog和原.env；本次只核验catalog，未重复执行实际恢复演练。自动准备保留原管理员、词库770,611、4个ready包、五书去重8798词及17596条音源；8条媒体样本检查通过。初始凭据仍在VPS私密文件中，不通过Web交付。
 
 165项真实HTTPS断言通过，验证两普通账户隔离、私有词书和原子计划确认、命令幂等、主任务共享额度、暂停恢复、降目标/切书保留原组、实际到期巩固、历史分页及七日负担。三词产生四次真实评分、一次复习，每日仍计三词；未手工修改dueAt或生产时钟。2用户、1私有书、1导入、2计划、3任务、4评分、3进度和24个已接受回执已按精确ID、归属及创建窗口清理，公共内容和其他用户受事务保护。自然04:00跨日未遇到，跨日及DST只归入隔离回归证据。生产浏览器另验证即时悬停、英美真人及合成播放完成；真实更新检测返回up-to-date及0.5.0-alpha.2发布链接。
 
@@ -195,11 +199,21 @@ docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exi
 
 ## CI 与镜像发行
 
+当前 `0.7.0-alpha.1` 对应源码 [`1ff298678355debf533433f5a61550b2bc98438a`](https://github.com/wudi000888-svg/nightstudy/commit/1ff298678355debf533433f5a61550b2bc98438a)；[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729429192) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729521782) 均成功，62 份文件、563 项测试及类型、格式、构建检查通过。本机 Native 与 VPS 均已运行该版本并健康；浏览器核验范围见开头说明。
+
+当前固定发行镜像：
+
+```text
+ghcr.io/wudi000888-svg/nightstudy@sha256:e3739407152aeee0dccb1eaac33b4392226b1486e6c94200991195ba723af28f
+```
+
+以下保留旧版发行记录，分别对应当时的源码与验收范围。
+
 0.5.0-alpha.2代码2918aa9的 [main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517645764) 与 [发行CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38517674566) 全部成功，覆盖162项测试、9项Python回归、双PG17、默认完整内容与音频安装、随机admin登录及闭合翻译网关。
 
 公开linux/amd64镜像经匿名OCI索引访问及VPS空Docker认证配置实际拉取通过；实际响应体SHA与digest头一致。无网络、只读容器核对版本0.5.0-alpha.2、revision2918aa9、私密运行文件不存在、Piper引擎源码和许可摘要及运行版本匹配，音频/模型另在持久卷。索引包含amd64和attestation条目，不宣称arm64发行。
 
-0.5.0-alpha.2已验收的固定发行摘要（不是0.6镜像）：
+历史0.5.0-alpha.2已验收的固定发行摘要：
 
 ```text
 ghcr.io/wudi000888-svg/nightstudy@sha256:1017b3171738e1cf08f9537127cf6f8a79bf242f6e2ef442ff5a6cc8c8b52dc5
@@ -211,7 +225,7 @@ ghcr.io/wudi000888-svg/nightstudy@sha256:1017b3171738e1cf08f9537127cf6f8a79bf242
 
 CI对PR/main运行锁文件安装、格式、双PG17 migration/seed、sites/typecheck/build与一次 `pnpm test`。测试库显式CONTENT_PACK=demo，CONTENT_TEST_DATABASE_URL启用源码内合成内容PG fixture；不重复执行独立CLI夹具。另执行有界tar提取的Python回归；随后验证基础/scale/翻译Compose描述，构建镜像，并在隔离Compose默认ecdict安装完整字典、英美音标与预生成音频，等待最多600秒，核对ready、catalog声明770,611、5书去重8798词的17596音源与两口音IPA完整性，并校验真人/合成样本文件；另启动闭合网关容器，验证无鉴权请求返回401，不依赖真实Google可用性。清理只针对CI隔离project的卷。
 
-0.6新增验收约束以实际数据库为准：先记录原canonical词/义项/词书焦点和非空原文摘要，再安装补充包；检查8,798词的独立中英文解释、manifest对应的8,786词例句与12个源异常、437词组及874条实际音源文件。报告真实的成对义项/焦点数量，不把所有源Sense假装成对，不把补充包条目叠加到770,611词典数量。旧会话、练习题、用户进度与既有音源行保留；这些是验收要求，最终通过记录随具体commit/CI/部署另行更新。
+0.6新增验收约束以实际数据库为准：先记录原canonical词/义项/词书焦点和非空原文摘要，再安装补充包；检查8,798词的独立中英文解释、manifest对应的8,786词例句与12个源异常、437词组及874条实际音源文件。报告真实的成对义项/焦点数量，不把所有源Sense假装成对，不把补充包条目叠加到770,611词典数量。旧会话、练习题、用户进度与既有音源行保留；这些是持续使用的验收要求，具体通过范围以对应commit、CI与部署记录为准。
 
 0.3代码86afefa的 [CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38491439614) 通过13文件86项测试、双PG17回归和Compose默认全量安装；明确断言installedDictionary/declaredEntryCount=770611，私密导出后实际登录随机admin，网关健康及无鉴权401通过。US/UK数值和3包数量由本机/VPS验证，未写成CI的独立数值断言。VPS管理员与公网双站42项断言另列，不混用测试环境与生产容量证据。
 
@@ -223,4 +237,4 @@ CI对PR/main运行锁文件安装、格式、双PG17 migration/seed、sites/type
 ghcr.io/wudi000888-svg/nightstudy@sha256:061e117fb448e973813849679a154844118f74c3c38a2e562252b3460e3e805b
 ```
 
-已按前文准备.env、随机密钥与HTTPS入口后，可将NIGHTSTUDY_IMAGE配置为上方0.5.0-alpha.2的当前摘要，使用 `docker compose up --detach --no-build --wait app` 从发行镜像启动。init仍负责默认首次admin、迁移与完整内容；凭据按前文私密导出。`scripts/install.sh` 是源码构建入口，使用发行摘要时不加--build。源码Compose也可自行构建；不要依赖浮动latest。[GitHub官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
+已按前文准备.env、随机密钥与HTTPS入口后，可将NIGHTSTUDY_IMAGE配置为上方0.7.0-alpha.1的当前摘要，使用 `docker compose up --detach --no-build --wait app` 从发行镜像启动。init仍负责默认首次admin、迁移与完整内容；凭据按前文私密导出。`scripts/install.sh` 是源码构建入口，使用发行摘要时不加--build。源码Compose也可自行构建；不要依赖浮动latest。[GitHub官方镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)

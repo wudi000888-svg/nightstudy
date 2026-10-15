@@ -1,20 +1,23 @@
-import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
   BookOpen,
   GraduationCap,
-  Search,
-  Sparkles,
-  RotateCcw,
-  Settings2,
+  MoonStar,
+  CalendarDays,
+  Check,
+  PanelsTopLeft,
+  ChartNoAxesCombined,
 } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
 import { goalLabels, goalNames, type Book, type Goal } from '../lib/types';
 import { Empty, ErrorNotice, Heading, Loading, Panel } from '../components/UI';
-import { NightScene } from '../components/NightScene';
+import { useAppNavigation } from '../components/AppNavigation';
+import type { H5HomeSummary, H5HomeEntry } from '../lib/h5-home-types';
+import { useScreenActive } from '../lib/screen-lifecycle';
 import { useBookPlan } from '../components/tasks/useBookPlan';
-import { HomeLearning } from './HomeLearning';
+import './h5-home.css';
 import './mobile-content.css';
 
 export function bookKindLabel(book: Pick<Book, 'kind'>) {
@@ -82,169 +85,187 @@ export function BookGrid({
     </div>
   );
 }
+const homeEntryText = {
+  setup: '选择词书',
+  resume: '继续这一组',
+  ready: '开始',
+  waiting: '稍后继续',
+  review_first: '先复习，再学新词',
+  other_task: '继续当前任务',
+  complete: '今日完成',
+  empty: '暂时没有待学词',
+} as const;
+
+export function homeEntryDestination(entry: H5HomeEntry, mode: 'learn' | 'review') {
+  if (entry.sessionId && ['resume', 'other_task'].includes(entry.state))
+    return `/${mode}?session=${encodeURIComponent(entry.sessionId)}`;
+  if (entry.state === 'setup') return '/books';
+  if (entry.state === 'review_first') return '/review?start=1';
+  if (entry.state === 'ready') return `/${mode}?start=1`;
+  return entry.state === 'complete' ? '/learning?section=results' : '/learning?section=tasks';
+}
+
 export function HomePage() {
-  const { user, pending } = useApp();
-  const planning = useBookPlan();
-  const books = useRemote<{ items: Book[] }>('books', 'books');
-  const plan = planning.query;
-  const active = plan.data?.plan;
-  const currentBook = books.data?.items.find((book) => book.id === active?.bookId);
-  const availableBooks = books.data?.items.filter((book) => !book.isDemo) ?? [];
-  const date = active?.localDate
-    ? new Intl.DateTimeFormat('zh-CN', {
-        month: 'long',
-        day: 'numeric',
-        weekday: 'long',
-        timeZone: 'UTC',
-      }).format(new Date(`${active.localDate}T12:00:00Z`))
-    : new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(
-        new Date(),
-      );
+  const { user, pending, conflicts } = useApp();
+  const active = useScreenActive();
+  const { openModule } = useAppNavigation();
+  const navigate = useNavigate();
+  const home = useRemote<H5HomeSummary>('app-home', 'app/home', !!user);
+  const summary = home.data;
+  useEffect(() => {
+    if (!active || !summary) return;
+    // A fresh query cache can still cross the server's learning-day/due boundary
+    // while another retained screen is open. Reconcile that snapshot immediately.
+    const snapshotTime = new Date(summary.asOf).getTime();
+    const times = [summary.endsAt, summary.learn.availableAt, summary.review.availableAt]
+      .filter((value): value is string => !!value)
+      .map((value) => new Date(value).getTime())
+      .filter((value) => value > snapshotTime);
+    if (!times.length) return;
+    if (Math.min(...times) <= Date.now()) {
+      void home.refetch();
+      return;
+    }
+    const timeout = window.setTimeout(
+      () => void home.refetch(),
+      Math.min(2147483647, Math.max(1000, Math.min(...times) - Date.now() + 100)),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [summary?.asOf, active]);
+  const date = summary?.localDate ? new Date(`${summary.localDate}T12:00:00Z`) : new Date();
+  const dateLabel = new Intl.DateTimeFormat('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+    ...(summary ? { timeZone: 'UTC' } : {}),
+  }).format(date);
+  const blocked = pending > 0 || !!conflicts?.length;
+  const openStudy = (mode: 'learn' | 'review') => {
+    if (!user) {
+      navigate(`/auth?next=${encodeURIComponent(`/${mode}?start=1`)}`);
+      return;
+    }
+    if (blocked) {
+      navigate('/learning?section=tasks');
+      return;
+    }
+    const entry = summary?.[mode];
+    if (entry) navigate(homeEntryDestination(entry, mode));
+  };
   return (
-    <div className="page mobile-home">
-      <section className="mobile-home-stage" aria-label="今日学习">
-        <div className="mobile-home-scene" aria-hidden="true">
-          <NightScene />
+    <section className="h5-home" aria-label="学习首页">
+      <div className="h5-home-wallpaper" aria-hidden="true">
+        <div className="h5-home-cloud" />
+        <div className="h5-home-architecture">
+          {Array.from({ length: 5 }, (_, index) => (
+            <span key={index} />
+          ))}
         </div>
-        <header className="mobile-home-top">
-          <span>
-            夜读英语 <small>NIGHT STUDY</small>
-          </span>
-          <span>{date}</span>
-          <Link to={user ? '/me?section=preferences' : '/auth'} aria-label="我的学习偏好">
-            <Settings2 size={19} />
-          </Link>
-        </header>
-        <div className="mobile-home-intro">
-          <span className="mobile-kicker">留一点安静，给自己。</span>
-          <h1>
-            在雨声里，
-            <br />
-            慢慢记住。
-          </h1>
-          <p>不赶进度，让今天的词留下来。</p>
-        </div>
-        <div className="mobile-home-session">
-          <Link className="mobile-current-book" to="/books">
-            <BookOpen size={18} />
-            <span>
-              <small>正在学习</small>
-              <strong>{currentBook?.title ?? active?.bookTitle ?? '选择一本词书'}</strong>
-            </span>
-            <ArrowRight size={18} />
-          </Link>
-          {user && active ? (
-            <>
-              <div className="mobile-today-line">
-                <span>今日已评价的不同词</span>
-                <strong>
-                  {active.completedUnique}
-                  <small> / {active.dailyTotalGoal}</small>
-                </strong>
-              </div>
-              <div
-                className="mobile-home-progress"
-                role="progressbar"
-                aria-label="今日总词数进度"
-                aria-valuemin={0}
-                aria-valuemax={Math.max(active.dailyTotalGoal, active.completedUnique)}
-                aria-valuenow={active.completedUnique}
-              >
-                <i
-                  style={{
-                    width: `${Math.min(100, (active.completedUnique / active.dailyTotalGoal) * 100)}%`,
-                  }}
-                />
-              </div>
-              <p className="mobile-home-counts">
-                新学 {active.completedNew} · 复习 {active.completedReview} · 本组上限{' '}
-                {active.groupSize} 词
-              </p>
-            </>
-          ) : (
-            <p className="mobile-home-counts">每天的总词数，包含新学与复习。登录后跨设备继续。</p>
-          )}
-          <div className="mobile-home-actions">
-            <Link to={user ? '/learn?start=1' : '/auth'} className="mobile-study-action">
-              <Sparkles size={23} />
-              <span>
-                <strong>{active?.activeTaskId ? '继续学习' : '新学'}</strong>
-                <small>
-                  {active ? `计划待新学 ${active.newRemaining} 词` : '从今天的一小组开始'}
-                </small>
-              </span>
-              <ArrowRight size={17} />
-            </Link>
-            <Link to={user ? '/review?start=1' : '/auth'} className="mobile-study-action review">
-              <RotateCcw size={23} />
-              <span>
-                <strong>复习</strong>
-                <small>
-                  {active ? `现在到期 ${active.dueNowCount} 词` : '在下一次回忆中留下来'}
-                </small>
-              </span>
-              <ArrowRight size={17} />
-            </Link>
-          </div>
-          <p className="mobile-home-rule">
-            今日计划先复习，再学新词；同词只计一次。
-            {pending > 0 ? ` ${pending} 条操作等待同步。` : ''}
-          </p>
-          {user && plan.isPending && <Loading text="正在读取今日计划…" />}
-          <ErrorNotice error={plan.error} onRetry={() => void plan.refetch()} />
-        </div>
-      </section>
-      <HomeLearning plan={active ?? null} />
-      <div className="mobile-section-title">
-        <div>
-          <span className="tiny-label">选择你的方向</span>
-          <h2>我的书架</h2>
-        </div>
-        <Link to="/books">
-          全部词书 <ArrowRight size={15} />
-        </Link>
       </div>
-      <ErrorNotice error={books.error} onRetry={() => void books.refetch()} />
-      {books.isPending ? (
-        <Loading text="正在打开词书…" />
-      ) : availableBooks.length ? (
-        <BookGrid
-          books={availableBooks.slice(0, 4)}
-          onSelect={(id) => {
-            const book = availableBooks.find((value) => value.id === id);
-            if (book) planning.choose(book);
-          }}
-        />
-      ) : (
-        <Empty title="还没有可选词书" description="管理员发布学习内容后，词书会出现在这里。" />
-      )}
-      <div className="mobile-quick-links">
-        <Link to="/books/mine">
-          <BookOpen size={18} />
-          我的词书
-        </Link>
-        <Link to="/books/import">
-          <ArrowRight size={18} />
-          导入词书
-        </Link>
-        <Link to="/content">
-          <Search size={18} />
-          内容中心
-        </Link>
-        <Link to={user ? '/assessment' : '/auth'}>
-          <GraduationCap size={18} />
-          了解我的水平
-        </Link>
+      <button
+        type="button"
+        className="h5-home-avatar"
+        aria-label="个人中心"
+        title="个人中心"
+        onClick={() => (user ? openModule('account') : navigate('/auth'))}
+      >
+        {user?.name ? <span>{Array.from(user.name)[0]}</span> : <MoonStar size={25} />}
+      </button>
+      <button
+        type="button"
+        className={`h5-home-checkin${summary?.checkedIn ? ' is-checked' : ''}`}
+        aria-label={summary?.checkedIn ? '今日已签到，查看学习日历' : '查看签到与学习日历'}
+        onClick={() =>
+          navigate(
+            user ? '/learning?section=calendar' : '/auth?next=%2Flearning%3Fsection%3Dcalendar',
+          )
+        }
+      >
+        {summary?.checkedIn ? <Check size={28} /> : <CalendarDays size={28} />}
+        <strong>{summary?.checkedIn ? '已签到' : '签到'}</strong>
+        <span>{dateLabel}</span>
+      </button>
+      <div className="h5-home-study-actions">
+        {(['learn', 'review'] as const).map((mode) => {
+          const entry = summary?.[mode];
+          const label = mode === 'learn' ? 'Learn' : 'Review';
+          const detail = !user
+            ? '开始学习'
+            : blocked
+              ? '记录待同步'
+              : entry
+                ? homeEntryText[entry.state]
+                : home.error
+                  ? '重新连接'
+                  : '正在读取…';
+          return (
+            <button
+              type="button"
+              key={mode}
+              className={`h5-home-study h5-home-${mode}`}
+              disabled={!!user && !summary && !home.error}
+              aria-label={`${label}，${detail}${entry ? `，${entry.count}词` : ''}`}
+              onClick={() => (home.error && !summary ? void home.refetch() : openStudy(mode))}
+            >
+              <strong>{label}</strong>
+              <span className="h5-home-count">{user ? (entry?.count ?? '—') : '—'}</span>
+              <small>{detail}</small>
+            </button>
+          );
+        })}
       </div>
-      {planning.dialog}
-    </div>
+      <div className="h5-home-status" aria-live="polite">
+        {blocked
+          ? conflicts?.length
+            ? '进度有更新，请先核对'
+            : `${pending} 条记录等待同步`
+          : home.error
+            ? '暂时无法连接，点击学习按钮重试'
+            : summary?.dailyGoalComplete
+              ? '今天的目标已完成'
+              : null}
+      </div>
+      <nav className="h5-home-modules" aria-label="首页功能">
+        <button
+          type="button"
+          aria-label="英语学堂"
+          title="英语学堂"
+          onClick={() => openModule('academy')}
+        >
+          <GraduationCap size={28} />
+        </button>
+        <button
+          type="button"
+          aria-label="我的内容"
+          title="我的内容"
+          onClick={() => openModule('content')}
+        >
+          <PanelsTopLeft size={27} />
+        </button>
+        <button
+          type="button"
+          aria-label="我的学习"
+          title="我的学习"
+          onClick={() => openModule('learning')}
+        >
+          <ChartNoAxesCombined size={27} />
+        </button>
+      </nav>
+    </section>
   );
 }
 export function BooksPage() {
   const planning = useBookPlan();
   const books = useRemote<{ items: Book[] }>('books', 'books');
-  const [goal, setGoal] = useState<Goal | 'all'>('all');
   const [params, setParams] = useSearchParams();
+  const goalParam = params.get('goal');
+  const goal = goalNames.includes(goalParam as Goal) ? (goalParam as Goal) : 'all';
+  const setGoal = (value: Goal | 'all') => {
+    const next = new URLSearchParams(params);
+    if (value === 'all') next.delete('goal');
+    else next.set('goal', value);
+    setParams(next);
+  };
   const kind =
     params.get('kind') === 'phrases'
       ? 'phrases'

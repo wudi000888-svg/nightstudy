@@ -78,7 +78,7 @@ function guestPreferences(key: string): LearningPreferences {
 function PreferencesScope({ children }: { children: ReactNode }) {
   const { scope, site, user } = useApp();
   const queryClient = useQueryClient();
-  const guestKey = `nightstudy:guest-appearance:${site.siteId}`;
+  const guestKey = `nightstudy:guest-appearance:${scope}`;
   const [guest, setGuest] = useState(() => guestPreferences(guestKey));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<unknown>(null);

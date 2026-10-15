@@ -50,6 +50,14 @@
 
 ## 用户内容与设置
 
+### H5 首页聚合
+
+`GET /app/home` 要求当前站点登录，返回 `Cache-Control: no-store`。同一 serializable 事务及学习设置行锁内读取服务器时间、每日唯一词计划、可继续任务和学习日历；允许初始化/刷新当天计划，但不会签发学习组、写评价或制造签到。`userId` 等请求参数不能改变认证身份。
+
+响应包含 `asOf/localDate/timeZone/startsAt/endsAt`、`checkedIn`、`dailyGoalComplete`、`plan`、`learn/review` 和 `calendar`。`plan` 提供计划 id/revision、词书、每日总词数、已完成唯一词数、待新学/复习、待拼写与短期巩固数；新学与复习共用每日总额，复习优先占位。`learn/review` 为 `{state,count,sessionId,sessionRevision,phase,availableAt}`；state 为 `setup/resume/ready/waiting/review_first/other_task/complete/empty`。`resume` 恢复原组与阶段；`waiting` 表示真实到期或延期时间，不能提前造题；`other_task` 明确另一现行组，客户端不另外创建冲突任务。
+
+`calendar.days` 为含今天的最近 30 个学习日，提供 `localDate/checkedIn/completedGroups`，`calendar.streak` 按实际历史连续天数计算，不截断为 30 天。仅服务器已保存为 `completed` 的完整组，且每项已评价并完成该组签发时要求的拼写，才点亮完成时所在学习日；空组、只揭晓、待拼写与客户端待同步事件不算签到。关闭拼写的组不要求虚构练习记录。学习日使用计划记录的时区与 04:00 边界；跨日完成按完成时所在学习日计。签到与每日总目标达成分别判断，仍需短期巩固或拼写时不能显示整日完成。
+
 | 方法与相对路径                      | 访问      | 主要参数与响应                                                                                                          |
 | ----------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `GET /books`                        | 访客/本人 | 公开已发布词书及登录用户本人的私有书；wordCount/learnedCount/coveredCount/claimedKnownCount/isDemo/visibility/ownedByMe |

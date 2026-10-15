@@ -15,6 +15,7 @@ import { maintenanceTick } from './maintenance.js';
 import type { FleetTransport } from './modules/fleet-transport.js';
 import { registerDeepSeek } from './modules/deepseek.js';
 import type { DeepSeekTransport } from './providers/deepseek.js';
+import { registerPwa } from './pwa.js';
 
 const setupInput = z.object({
   token: z.string().min(32).max(256),
@@ -116,6 +117,7 @@ export async function buildApp(
             throw new HttpError(503, 'database_not_prepared', '站点数据库尚未准备完成');
           return {
             siteId: runtime.config.id,
+            instanceId: state.instanceId,
             title: runtime.config.title,
             basePath: runtime.config.basePath,
             publicUrl: runtime.config.publicUrl,
@@ -219,6 +221,8 @@ export async function buildApp(
       });
   }
 
+  await registerPwa(app, config, registry);
+
   app.setNotFoundHandler(async (request, reply) => {
     const site = registry.resolve(request);
     const pathname = new URL(request.url, 'http://internal.invalid').pathname;
@@ -237,7 +241,7 @@ export async function buildApp(
       .readFileSync(file, 'utf8')
       .replace(
         '<head>',
-        `<head><base href="${site.basePath || ''}/"><script nonce="${nonce}">window.__NIGHTSTUDY_CONFIG__=${boot}</script>`,
+        `<head><base href="${site.basePath || ''}/"><link rel="manifest" href="${site.basePath}/manifest.webmanifest"><link rel="apple-touch-icon" href="${site.basePath}/app-icons/icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><script nonce="${nonce}">window.__NIGHTSTUDY_CONFIG__=${boot}</script>`,
       );
     reply
       .header(

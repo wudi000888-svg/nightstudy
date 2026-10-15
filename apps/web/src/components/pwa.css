@@ -1,0 +1,48 @@
+.pwa-update-notice {
+  position: fixed;
+  z-index: 70;
+  left: 50%;
+  bottom: max(100px, calc(env(safe-area-inset-bottom) + 90px));
+  transform: translateX(-50%);
+  width: min(370px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  color: var(--ink);
+  background: var(--app-panel);
+  box-shadow: 0 5px 28px #143b3924;
+  font-size: 14px;
+}
+.pwa-update-notice > span {
+  flex: 1;
+}
+.pwa-update-notice > button {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--teal, var(--gold));
+  padding: 6px;
+  font: inherit;
+}
+.pwa-settings {
+  margin-top: 22px;
+  padding: 18px;
+  background: var(--app-panel);
+  border-radius: 18px;
+}
+.pwa-settings h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 12px;
+}
+.pwa-settings p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.7;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}

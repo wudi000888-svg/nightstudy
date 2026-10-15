@@ -16,6 +16,8 @@ const state = vi.hoisted(() => {
   vi.stubGlobal('window', { __NIGHTSTUDY_CONFIG__: {} });
   return {
     scope: 'lookup-test:user-a',
+    active: true,
+    infiniteEnabled: undefined as boolean | undefined,
     slots: [] as unknown[],
     cursor: 0,
     refs: [] as { current: unknown }[],
@@ -65,6 +67,10 @@ vi.mock('react-router-dom', async (original) => ({
       void state.router!.navigate(`/lookup?${next}`, options),
   ],
 }));
+vi.mock('./screen-lifecycle', async (original) => ({
+  ...(await original<typeof import('./screen-lifecycle')>()),
+  useScreenActive: () => state.active,
+}));
 vi.mock('../AppContext', () => ({
   useApp: () => ({ user: { id: state.scope }, scope: state.scope }),
   useRemote: () => ({ data: { item: null }, error: null, isFetching: false, refetch: vi.fn() }),
@@ -72,18 +78,21 @@ vi.mock('../AppContext', () => ({
 vi.mock('@tanstack/react-query', async (original) => ({
   ...(await original<typeof import('@tanstack/react-query')>()),
   useQueryClient: () => state.client,
-  useInfiniteQuery: () => ({
-    data: {
-      pages: [
-        {
-          items: state.words,
-          page: { total: state.words.length, nextCursor: null, hasMore: false },
-        },
-      ],
-    },
-    isPending: false,
-    error: null,
-  }),
+  useInfiniteQuery: (options: { enabled?: boolean }) => {
+    state.infiniteEnabled = options.enabled;
+    return {
+      data: {
+        pages: [
+          {
+            items: state.words,
+            page: { total: state.words.length, nextCursor: null, hasMore: false },
+          },
+        ],
+      },
+      isPending: false,
+      error: null,
+    };
+  },
 }));
 vi.mock('./api', () => ({
   api: vi.fn(),
@@ -148,6 +157,8 @@ beforeEach(() => {
   state.router?.dispose();
   state.client?.clear();
   state.scope = 'lookup-test:user-a';
+  state.active = true;
+  state.infiniteEnabled = undefined;
   state.slots = [];
   state.refs = [];
   state.effects = [];
@@ -360,4 +371,41 @@ it('remounts private notes on account changes and never publishes an old save re
     state.client!.getQueryData(wordbookEntryKey('lookup-test:user-a', water.id)),
   ).toBeUndefined();
   expect(state.client!.getQueryData(wordbookEntryKey(state.scope, water.id))).toBeUndefined();
+});
+
+it('retains a late exact lookup result while hidden without replacing the foreground route', async () => {
+  await state.router!.navigate('/lookup?q=water');
+  let resolveList!: (value: unknown) => void, resolveExact!: (value: unknown) => void;
+  vi.mocked(api).mockImplementation(
+    (path) =>
+      new Promise((done) => {
+        if (String(path).startsWith('dictionary/resolve')) resolveExact = done;
+        else resolveList = done;
+      }),
+  );
+  render();
+  state.active = false;
+  render();
+  expect(state.infiniteEnabled).toBe(false);
+  resolveList({ items: [water], page: { total: 1, nextCursor: null, hasMore: false } });
+  resolveExact({ word: water, matchType: 'exact' });
+  const tree = await settle();
+  expect(state.router!.state.location.search).toBe('?q=water');
+  expect(find(tree, (element) => element.type === WordView).props.word).toEqual(water);
+  expect(api).toHaveBeenCalledTimes(2);
+});
+it('does not hydrate a hidden lookup until its own screen becomes active', async () => {
+  state.active = false;
+  await state.router!.navigate('/lookup?q=water');
+  await settle();
+  expect(api).not.toHaveBeenCalled();
+  state.active = true;
+  vi.mocked(api).mockImplementation(async (path) =>
+    String(path).startsWith('dictionary/resolve')
+      ? { word: water, matchType: 'exact' }
+      : { items: [water], page: { total: 1, nextCursor: null, hasMore: false } },
+  );
+  await settle();
+  expect(api).toHaveBeenCalledTimes(2);
+  expect(state.router!.state.location.search).toContain('entry=lookup-water');
 });

@@ -3,6 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BookOpen, Search } from 'lucide-react';
 import { useApp } from '../AppContext';
+import { useScreenActive } from '../lib/screen-lifecycle';
 import { api } from '../lib/api';
 import { useWordCards } from '../lib/word-cards';
 import type { LibraryResponse } from '../lib/mobile-content-types';
@@ -14,6 +15,7 @@ export { NotesPage } from './NotesLibrary';
 
 export function LearningLibraryPage() {
   const { user, scope } = useApp();
+  const active = useScreenActive();
   const cards = useWordCards();
   const [params, setParams] = useSearchParams();
   const view = ['learning', 'recent', 'learned'].includes(params.get('view') ?? '')
@@ -23,12 +25,13 @@ export function LearningLibraryPage() {
   const [input, setInput] = useState(query);
   const list = useInfiniteQuery({
     queryKey: [scope, 'library', 'pages', view, query],
-    enabled: !!user,
+    enabled: !!user && active,
     retry: false,
     initialPageParam: '',
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam, signal }) =>
       api<LibraryResponse>(
         `library/words?view=${view}&q=${encodeURIComponent(query)}&limit=30${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
+        { signal },
       ),
     getNextPageParam: (last) =>
       last.page.hasMore ? (last.page.nextCursor ?? undefined) : undefined,
@@ -160,7 +163,9 @@ export function LearningLibraryPage() {
         <button
           className="button ghost full"
           disabled={list.isFetchingNextPage}
-          onClick={() => void list.fetchNextPage()}
+          onClick={() => {
+            if (active) void list.fetchNextPage();
+          }}
         >
           {list.isFetchingNextPage ? '正在读取…' : '加载更多'}
         </button>

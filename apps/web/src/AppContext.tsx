@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, errorText } from './lib/api';
 import type { Me, Site, User } from './lib/types';
+import { applicationScope } from './lib/app-scope';
+import { useScreenActive } from './lib/screen-lifecycle';
 import {
   flushCommands,
   pendingCommands,
@@ -29,10 +31,11 @@ export function useApp() {
 }
 export function useRemote<T>(key: string, path: string, enabled = true) {
   const { scope } = useApp();
+  const active = useScreenActive();
   return useQuery<T, Error>({
     queryKey: [scope, key, path],
-    queryFn: () => api<T>(path),
-    enabled,
+    queryFn: ({ signal }) => api<T>(path, { signal }),
+    enabled: enabled && active,
     retry: false,
   });
 }
@@ -52,7 +55,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState(0);
   const [syncNote, setSyncNote] = useState('');
   const [conflicts, setConflicts] = useState<CommandConflict[]>([]);
-  const scope = `${siteQuery.data?.siteId ?? ''}:${meQuery.data?.user?.id ?? 'guest'}`;
+  const scope = siteQuery.data
+    ? applicationScope(window.location.origin, siteQuery.data, meQuery.data?.user?.id ?? null)
+    : 'boot';
+  const previousScope = useRef(scope);
+  useEffect(() => {
+    const previous = previousScope.current;
+    previousScope.current = scope;
+    if (previous !== scope) {
+      void queryClient.cancelQueries({ queryKey: [previous] });
+      queryClient.removeQueries({ queryKey: [previous] });
+    }
+  }, [scope, queryClient]);
   const [syncScope, setSyncScope] = useState(scope);
   const currentScope = useRef(scope);
   currentScope.current = scope;

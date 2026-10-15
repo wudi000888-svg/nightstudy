@@ -297,7 +297,7 @@ export function PlanConfirm({
                 type="submit"
                 disabled={busy || previewLoading || !preview}
               >
-                {busy ? '正在确认计划…' : '确认计划，进入今日任务'}
+                {busy ? '正在确认计划…' : '确认学习计划'}
                 <ArrowRight size={16} />
               </button>
               <button className="button quiet" type="button" disabled={busy} onClick={onClose}>

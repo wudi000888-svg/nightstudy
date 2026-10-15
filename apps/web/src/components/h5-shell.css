@@ -1,0 +1,292 @@
+/* An application viewport with independent screen scroll, shared by Safari,
+   installed mode and desktop. Viewport geometry has one owner: AppViewport. */
+html,
+body,
+#root {
+  height: 100%;
+  overscroll-behavior: none;
+}
+body:has(.h5-app) {
+  overflow: hidden;
+}
+.h5-app.app-shell {
+  position: fixed;
+  inset: auto;
+  top: var(--app-top, 0px);
+  left: var(--app-left, 0px);
+  width: var(--app-width, 100%);
+  height: var(--app-height, 100dvh);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--app-bg, #edf5f4);
+}
+.h5-app.app-shell::before {
+  display: none;
+}
+.h5-app.app-shell .h5-main-content {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.h5-screen-stack {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.h5-screen {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--app-bg, #edf5f4);
+  z-index: 20;
+}
+.h5-screen-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-top: 20px;
+  scrollbar-gutter: stable;
+}
+.h5-screen[hidden] {
+  display: none !important;
+}
+.h5-screen[data-screen-active='false'] *,
+.h5-screen[data-screen-active='false'] *::before,
+.h5-screen[data-screen-active='false'] *::after {
+  animation-play-state: paused !important;
+}
+.h5-home-screen {
+  z-index: 0;
+}
+.h5-home-screen > .h5-screen-content,
+.h5-study-screen > .h5-screen-content {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+.h5-study-screen {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+.h5-screen[data-motion='forward-outgoing'] {
+  z-index: 10;
+}
+.h5-screen[data-motion='close-outgoing'],
+.h5-screen[data-motion='back-outgoing'] {
+  z-index: 30;
+}
+.h5-transition-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: transparent;
+  touch-action: none;
+  pointer-events: auto;
+}
+.h5-cover-header {
+  position: relative;
+  z-index: 32;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 60px;
+  padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px
+    max(12px, env(safe-area-inset-left));
+  color: var(--ink);
+  background: var(--app-bg, #edf5f4);
+  border-bottom: 1px solid var(--app-line, var(--line));
+}
+.h5-cover-header > .icon-button,
+.h5-cover-heading .icon-button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+}
+.h5-cover-header > .icon-button:hover,
+.h5-cover-heading .icon-button:hover {
+  background: var(--app-accent-soft);
+}
+.h5-cover-heading {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.h5-cover-heading h1 {
+  overflow: hidden;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.h5-inner-back {
+  position: absolute;
+  left: 0;
+}
+.h5-header-spacer {
+  width: 44px;
+  height: 44px;
+}
+.h5-app .h5-status-region {
+  position: relative;
+  z-index: 34;
+  flex: 0 0 auto;
+  max-height: min(30%, 180px);
+  overflow-y: auto;
+  background: var(--app-panel, #fff);
+}
+.h5-status-region:empty {
+  display: none;
+}
+.h5-app .h5-status-region .sync-strip,
+.h5-app .h5-status-region .sync-note,
+.h5-app .h5-status-region .setup-strip,
+.h5-app .h5-status-region .learning-reminder {
+  margin: 0;
+  border-radius: 0;
+  padding: 9px max(16px, env(safe-area-inset-left));
+  font-size: 13px;
+}
+.h5-app .h5-module-screen > .h5-screen-content > .page {
+  width: 100%;
+  min-height: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px max(20px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+}
+.h5-app .h5-module-screen .page-heading {
+  margin-bottom: 22px;
+}
+.h5-app .h5-module-screen .page-heading h1 {
+  font-size: clamp(24px, 4.5vw, 32px);
+}
+.h5-app .h5-study-screen > .h5-screen-content > .page {
+  max-width: none;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+.h5-app .h5-study-screen > .h5-screen-content > .study-focus-active {
+  height: 100%;
+}
+.h5-app .h5-module-screen .admin-page {
+  max-width: 1160px;
+}
+@keyframes h5-open-incoming {
+  from {
+    opacity: 0.94;
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@keyframes h5-close-outgoing {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0.92;
+    transform: translate3d(0, 100%, 0);
+  }
+}
+@keyframes h5-forward-incoming {
+  from {
+    opacity: 0.96;
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@keyframes h5-forward-outgoing {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0.65;
+    transform: translate3d(-18%, 0, 0);
+  }
+}
+@keyframes h5-back-incoming {
+  from {
+    opacity: 0.65;
+    transform: translate3d(-18%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@keyframes h5-back-outgoing {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0.96;
+    transform: translate3d(100%, 0, 0);
+  }
+}
+@keyframes h5-content-incoming {
+  from {
+    opacity: 0.6;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@media (max-width: 370px) {
+  .h5-app .h5-module-screen > .h5-screen-content > .page {
+    padding-inline: 15px;
+  }
+  .h5-cover-heading h1 {
+    max-width: calc(100% - 68px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .h5-screen {
+    animation: none !important;
+  }
+}

@@ -1,15 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp, useRemote } from '../../AppContext';
 import { post } from '../../lib/api';
 import type { Book } from '../../lib/types';
 import { PlanConfirm } from './PlanConfirm';
 import type { TaskPlanResponse } from './types';
+import { useScreenActive } from '../../lib/screen-lifecycle';
 
 export function useBookPlan() {
   const { user, scope } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
+  const active = useScreenActive();
+  const navigation = useRef({ key: location.key, active, generation: 0 });
+  if (navigation.current.key !== location.key || navigation.current.active !== active) {
+    navigation.current = {
+      key: location.key,
+      active,
+      generation: navigation.current.generation + 1,
+    };
+  }
   const client = useQueryClient();
   const query = useRemote<TaskPlanResponse>('plan', 'study/plan', !!user);
   const [selected, setSelected] = useState<Book | null>(null);
@@ -56,6 +67,7 @@ export function useBookPlan() {
         onConfirm={async (values, revision, commandId) => {
           if (!selected) return;
           const request = generation.current;
+          const navigationGeneration = navigation.current.generation;
           await post<TaskPlanResponse>('study/plan/confirm', {
             bookId: selected.id,
             ...values,
@@ -65,7 +77,12 @@ export function useBookPlan() {
           if (request !== generation.current) return;
           setSelected(null);
           await client.invalidateQueries({ queryKey: [scope] });
-          if (request === generation.current) navigate('/learn');
+          if (
+            request === generation.current &&
+            navigation.current.active &&
+            navigationGeneration === navigation.current.generation
+          )
+            navigate('/');
         }}
       />
     ),

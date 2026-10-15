@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { isStudyPath, navigationGroup, navigationTitle } from './navigation';
 describe('mobile navigation ownership', () => {
-  it('assigns task, content tools and memory to their primary sections', () => {
-    for (const path of ['/', '/learn', '/review']) expect(navigationGroup(path)).toBe('learning');
+  it('assigns independent H5 modules without turning the home into a permanent tab', () => {
+    for (const path of [
+      '/',
+      '/learn',
+      '/review',
+      '/learning',
+      '/assessment',
+      '/memory',
+      '/stats',
+      '/books',
+      '/library',
+    ])
+      expect(navigationGroup(path)).toBe('learning');
     for (const path of [
       '/content',
       '/books/mine',
@@ -10,13 +21,11 @@ describe('mobile navigation ownership', () => {
       '/known',
       '/notes',
       '/sentences',
-      '/academy',
-      '/assessment',
       '/translate',
     ])
       expect(navigationGroup(path)).toBe('content');
-    for (const path of ['/me', '/memory', '/stats', '/auth/login'])
-      expect(navigationGroup(path)).toBe('account');
+    expect(navigationGroup('/academy')).toBe('academy');
+    for (const path of ['/me', '/auth/login']) expect(navigationGroup(path)).toBe('account');
     expect(navigationGroup('/admin/ai')).toBe('admin');
     expect(navigationGroup('/administrator')).toBe('content');
   });

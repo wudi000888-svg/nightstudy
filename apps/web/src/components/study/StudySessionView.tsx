@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import type { CommandResult, Rating, StudySession } from '../../lib/types';
 import { Empty, IconActionHint, WordView } from '../UI';
 import { StudyBookmark } from './StudyBookmark';
+import { beforeAppBackEvent } from '../../lib/screen-lifecycle';
 
 type Feedback = NonNullable<CommandResult['result']> & { position: number };
 export interface StudySessionViewProps {
@@ -75,14 +76,25 @@ export function StudySessionView({
   const progress = spellingPhase ? spelled : rated;
   const locked = busy || waitingSync;
   const formId = useId();
+  const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (event: Event) => {
+      if (event.defaultPrevented || !menu.current?.open) return;
+      event.preventDefault();
+      menu.current.open = false;
+      menu.current.querySelector('summary')?.focus();
+    };
+    window.addEventListener(beforeAppBackEvent, close);
+    return () => window.removeEventListener(beforeAppBackEvent, close);
+  }, []);
   return (
     <section className="study-session-view" aria-label="专注学习">
       <header className="study-focus-header">
-        <IconActionHint label="返回今日任务">
+        <IconActionHint label="退出学习，返回原页">
           <button
             type="button"
             className="study-focus-icon"
-            aria-label="返回今日任务"
+            aria-label="退出学习，返回原页"
             disabled={busy}
             onClick={onBack}
           >
@@ -99,7 +111,7 @@ export function StudySessionView({
             </span>
           </strong>
         </div>
-        <details className="study-focus-menu">
+        <details className="study-focus-menu" ref={menu}>
           <summary aria-label="学习操作">
             <Ellipsis size={23} />
           </summary>
@@ -112,6 +124,26 @@ export function StudySessionView({
                 <Pause size={17} /> 暂停这一组
               </button>
             )}
+            {item?.revealed &&
+              !practice &&
+              !completed &&
+              !paused &&
+              ratings
+                .filter((rating) => ['hard', 'easy'].includes(rating.value))
+                .map((rating) => (
+                  <button
+                    type="button"
+                    className={`study-rating-${rating.value}`}
+                    key={rating.value}
+                    disabled={locked}
+                    onClick={() => {
+                      if (menu.current) menu.current.open = false;
+                      onAct('rate', rating.value);
+                    }}
+                  >
+                    {rating.title}，{rating.help}
+                  </button>
+                ))}
             <p>
               本组已评价 {rated} 词 · {spellingEnabled ? `已拼写 ${spelled} 词` : '未安排拼写'}
             </p>
@@ -284,7 +316,7 @@ export function StudySessionView({
               继续今日任务 <ArrowRight size={18} />
             </button>
             <button className="study-secondary-action" disabled={busy} onClick={onBack}>
-              查看今日进度
+              返回原页
             </button>
           </>
         ) : practice && item?.question ? (
@@ -310,26 +342,27 @@ export function StudySessionView({
         ) : item && !practice ? (
           !item.revealed ? (
             <button className="study-main-action" disabled={locked} onClick={() => onAct('reveal')}>
-              {busy ? '正在揭晓…' : '显示释义'}
+              {busy ? '正在揭晓…' : '看答案'}
               <ArrowRight size={18} />
             </button>
           ) : (
             <>
-              <p className="study-rating-prompt">这次记得怎么样？</p>
-              <div className="study-rating-actions">
-                {ratings.map((rating) => (
-                  <button
-                    type="button"
-                    key={rating.value}
-                    className={`study-rating-${rating.value}`}
-                    disabled={locked}
-                    aria-label={`${rating.title}，${rating.help}`}
-                    onClick={() => onAct('rate', rating.value)}
-                  >
-                    <strong>{rating.title}</strong>
-                    <span>{rating.help}</span>
-                  </button>
-                ))}
+              <div className="study-rating-actions study-rating-primary">
+                {ratings
+                  .filter((rating) => ['again', 'good'].includes(rating.value))
+                  .map((rating) => (
+                    <button
+                      type="button"
+                      key={rating.value}
+                      className={`study-rating-${rating.value}`}
+                      disabled={locked}
+                      aria-label={rating.value === 'again' ? '记错了，安排巩固' : '记住了，下一词'}
+                      onClick={() => onAct('rate', rating.value)}
+                    >
+                      <strong>{rating.value === 'again' ? '记错了' : '下一词'}</strong>
+                      <span>{rating.value === 'again' ? '安排巩固' : '确认记得并继续'}</span>
+                    </button>
+                  ))}
               </div>
             </>
           )

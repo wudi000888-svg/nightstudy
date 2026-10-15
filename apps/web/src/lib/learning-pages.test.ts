@@ -6,12 +6,14 @@ import { BookGrid, bookKindLabel } from '../pages/Home';
 import { KnownPage, type KnownWord } from '../pages/Known';
 import { api } from './api';
 import type { Book, PageInfo } from './types';
+import { ScreenActiveProvider } from './screen-lifecycle';
 
 interface KnownBatch {
   items: KnownWord[];
   page: PageInfo;
 }
 interface KnownQueryOptions {
+  enabled?: boolean;
   queryKey: unknown[];
   queryFn: (context: { pageParam: string | null; signal: AbortSignal }) => Promise<KnownBatch>;
   getNextPageParam: (last: KnownBatch) => string | undefined;
@@ -161,4 +163,9 @@ it('resets the private known-word page subtree immediately when the account scop
   expect(KnownPage().key).toBe(initial);
   state.scope = 'component-test:user-b';
   expect(KnownPage().key).not.toBe(initial);
+});
+
+it('keeps a retained hidden known-word observer disabled', () => {
+  render(h(ScreenActiveProvider, { value: false }, h(KnownPage)));
+  expect(state.options!.enabled).toBe(false);
 });

@@ -10,6 +10,7 @@ export const goalNames = Object.keys(goalLabels) as Goal[];
 export type Rating = 'again' | 'hard' | 'good' | 'easy';
 export interface Site {
   siteId: string;
+  instanceId: string;
   title: string;
   basePath: string;
   publicUrl: string;

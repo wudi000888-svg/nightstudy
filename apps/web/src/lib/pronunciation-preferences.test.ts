@@ -2,6 +2,7 @@ import React, { type ReactElement, type ReactNode } from 'react';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { AudioButton } from '../components/Pronunciation';
 import type { Word, WordAudio } from './types';
+import { stopApplicationAudio } from './audio-manager';
 
 const state = vi.hoisted(() => {
   vi.stubGlobal('window', { __NIGHTSTUDY_CONFIG__: {} });
@@ -9,6 +10,7 @@ const state = vi.hoisted(() => {
     accent: 'uk' as 'us' | 'uk',
     autoPlay: false,
     loaded: true,
+    active: true,
     slots: [] as unknown[],
     cursor: 0,
     refs: [] as { current: unknown }[],
@@ -44,6 +46,10 @@ vi.mock('../LearningPreferences', () => ({
     preferences: { accent: state.accent, autoPlay: state.autoPlay },
     loaded: state.loaded,
   }),
+}));
+vi.mock('./screen-lifecycle', async (original) => ({
+  ...(await original<typeof import('./screen-lifecycle')>()),
+  useScreenActive: () => state.active,
 }));
 const word: Word = {
   id: 'audio-preference-water',
@@ -101,9 +107,11 @@ beforeAll(() =>
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('unexpected audio network'))),
 );
 beforeEach(() => {
+  stopApplicationAudio();
   state.accent = 'uk';
   state.autoPlay = false;
   state.loaded = true;
+  state.active = true;
   state.slots = [];
   state.refs = [];
   state.effects = [];
@@ -119,6 +127,7 @@ beforeEach(() => {
   });
 });
 afterAll(() => {
+  stopApplicationAudio();
   expect(globalThis.fetch).not.toHaveBeenCalled();
   vi.unstubAllGlobals();
 });
@@ -147,6 +156,11 @@ it('requires loaded opt-in and the study surface before attempting any automatic
   runAutomaticEffect();
   expect(instances).toHaveLength(0);
   state.loaded = true;
+  state.active = false;
+  render();
+  runAutomaticEffect();
+  expect(instances).toHaveLength(0);
+  state.active = true;
   render();
   runAutomaticEffect();
   expect(instances).toHaveLength(1);

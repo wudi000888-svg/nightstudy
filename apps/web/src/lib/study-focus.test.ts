@@ -149,7 +149,7 @@ afterAll(() => {
 it('shows a focused recall surface without leaking any enriched meanings, examples or collocations before reveal', () => {
   const markup = view();
   expect(markup).toContain('aria-label="专注学习"');
-  expect(markup).toContain('显示释义');
+  expect(markup).toContain('看答案');
   expect(markup).toContain('water');
   for (const secret of [
     '保密名词水义',
@@ -165,7 +165,7 @@ it('shows a focused recall surface without leaking any enriched meanings, exampl
   expect(markup).not.toContain('给今天');
 });
 
-it('keeps the server focus sense first and exposes exactly the four real rating choices after reveal', () => {
+it('keeps the server focus sense first, two thumb actions and the two precise ratings in the tools menu', () => {
   const revealed = { ...session, items: [{ ...session.items[0]!, revealed: true }] };
   const markup = view({ session: revealed });
   expect(markup).toContain('保密动词浇水义');
@@ -176,6 +176,9 @@ it('keeps the server focus sense first and exposes exactly the four real rating 
   expect(markup).toContain('下一条例句');
   for (const rating of ['again', 'hard', 'good', 'easy'])
     expect(markup).toContain(`class="study-rating-${rating}"`);
+  expect(markup).toContain('记错了，安排巩固');
+  expect(markup).toContain('记住了，下一词');
+  expect(markup).toContain('study-rating-primary');
   const queued = view({ session: revealed, waitingSync: true });
   for (const rating of ['again', 'hard', 'good', 'easy'])
     expect(queued).toMatch(new RegExp(`class="study-rating-${rating}"[^>]*disabled`));

@@ -8,7 +8,16 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../app.js';
 import { createDatabase } from '../db.js';
 import type { AppConfig } from '../config.js';
-import { json, obj, freshCard, wordDto, wordInclude, learningDayWindow } from './shared.js';
+import {
+  json,
+  obj,
+  freshCard,
+  wordDto,
+  wordInclude,
+  learningDayWindow,
+  transact,
+} from './shared.js';
+import { appHomeSnapshot } from './app-home.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const suite = url ? describe : describe.skip;
@@ -763,5 +772,200 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     expect(response.session).toBeNull();
     expect(response.reason).toBe('nothing_due');
     expect(await db.studyProgress.count({ where: { userId } })).toBe(0);
+  });
+  it('serves one authenticated home snapshot without issuing groups, even across concurrent reads', async () => {
+    const { userId } = await actor();
+    expect((await request(null, 'GET', '/app/home')).statusCode).toBe(401);
+    const responses = await Promise.all(
+      Array.from({ length: 4 }, () => request(userId, 'GET', '/app/home')),
+    );
+    responses.forEach((response) => {
+      expect(response.statusCode, response.body).toBe(200);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.json()).toMatchObject({
+        checkedIn: false,
+        dailyGoalComplete: false,
+        plan: { completedUnique: 0, dailyTotalGoal: 3, newRemaining: 3 },
+        learn: { state: 'ready', count: 3, sessionId: null },
+        review: { state: 'empty', count: 0 },
+      });
+      expect(response.json().calendar.days).toHaveLength(30);
+      expect(response.json().calendar.streak).toBe(0);
+    });
+    expect(new Set(responses.map((response) => response.json().plan.id)).size).toBe(1);
+    expect(await db.dailyPlan.count({ where: { userId } })).toBe(1);
+    expect(await db.studySession.count({ where: { userId } })).toBe(0);
+    expect(await db.reviewLog.count({ where: { userId } })).toBe(0);
+  });
+  it('reserves the unique total-word budget for reviews and directs Learn to actual due reviews', async () => {
+    const { userId } = await actor(5, 5);
+    await progress(userId, 0, new Date(Date.now() - 60000));
+    await progress(userId, 1, new Date(Date.now() - 30000));
+    const home = (await request(userId, 'GET', '/app/home')).json();
+    expect(home.plan).toMatchObject({ dailyTotalGoal: 5, newRemaining: 3, reviewRemaining: 2 });
+    expect(home.review).toMatchObject({ state: 'ready', count: 2 });
+    expect(home.learn).toMatchObject({ state: 'review_first', count: 2 });
+    expect(await db.studySession.count({ where: { userId } })).toBe(0);
+    const group = (await issue(userId, { mode: 'review' })).session;
+    expect(group).toMatchObject({ taskKind: 'daily', mode: 'review' });
+    expect(group.items.map((item: any) => item.wordId)).toEqual([ids[0], ids[1]]);
+    expect(group.items.every((item: any) => item.bucket === 'review')).toBe(true);
+    const after = (await request(userId, 'GET', '/app/home')).json();
+    expect(after.plan).toMatchObject({ dailyTotalGoal: 5, newRemaining: 3 });
+    expect(after.review).toMatchObject({ state: 'resume', sessionId: group.id, count: 2 });
+    expect(after.learn).toMatchObject({ state: 'review_first', sessionId: group.id });
+    expect(after.checkedIn).toBe(false);
+  });
+  it('keeps future reviews waiting and does not manufacture a group or reuse their reserved new-word slot', async () => {
+    const { userId } = await actor(1, 1);
+    const now = new Date(),
+      window = learningDayWindow(now, 'Asia/Shanghai');
+    const due = new Date((now.getTime() + window.endsAt.getTime()) / 2);
+    await progress(userId, 0, due);
+    const home = (await request(userId, 'GET', '/app/home')).json();
+    expect(home.plan).toMatchObject({ newRemaining: 0, reviewRemaining: 1 });
+    expect(home.review).toMatchObject({
+      state: 'waiting',
+      count: 1,
+      availableAt: due.toISOString(),
+    });
+    expect(home.learn).toMatchObject({
+      state: 'waiting',
+      count: 1,
+      availableAt: due.toISOString(),
+    });
+    expect(await db.studySession.count({ where: { userId } })).toBe(0);
+    expect((await issue(userId, { mode: 'review' })).session).toBeNull();
+  });
+  it('only checks in after the real group finishes its required spelling and keeps another user isolated', async () => {
+    const { userId } = await actor(1, 1),
+      other = await actor(1, 1);
+    let group = (await issue(userId)).session;
+    expect((await request(userId, 'GET', '/app/home')).json().learn).toMatchObject({
+      state: 'resume',
+      sessionId: group.id,
+      phase: 'recall',
+    });
+    group = (await command(userId, group, 'reveal')).session;
+    group = (await command(userId, group, 'rate')).session;
+    const rated = (await request(userId, 'GET', '/app/home')).json();
+    expect(rated).toMatchObject({ checkedIn: false, dailyGoalComplete: false });
+    expect(rated.plan).toMatchObject({ completedUnique: 1, pendingSpellingCount: 1 });
+    expect(rated.learn).toMatchObject({
+      state: 'resume',
+      phase: 'practice',
+      sessionId: group.id,
+      count: 1,
+    });
+    group = (await command(userId, group, 'answer', { answer: group.items[0].word.lemma })).session;
+    expect(group.status).toBe('completed');
+    const done = (await request(userId, 'GET', '/app/home')).json();
+    expect(done).toMatchObject({ checkedIn: true, dailyGoalComplete: true });
+    expect(done.calendar.days.at(-1)).toMatchObject({ checkedIn: true, completedGroups: 1 });
+    expect(done.calendar.streak).toBe(1);
+    expect(done.learn.state).toBe('complete');
+    const privateHome = (await request(other.userId, 'GET', `/app/home?userId=${userId}`)).json();
+    expect(privateHome).toMatchObject({ checkedIn: false, plan: { completedUnique: 0 } });
+    expect(privateHome.plan.id).not.toBe(done.plan.id);
+  });
+  it('accepts the issued no-spelling policy as a complete group without inventing exercise records', async () => {
+    const { userId } = await actor(1, 1);
+    await db.userLearningPreference.create({ data: { userId, spellingEnabled: false } });
+    const result = await finish(userId, (await issue(userId)).session);
+    expect(result.session.items[0].exerciseDone).toBe(false);
+    const home = (await request(userId, 'GET', '/app/home')).json();
+    expect(home).toMatchObject({ checkedIn: true, dailyGoalComplete: true });
+    expect(home.plan.pendingSpellingCount).toBe(0);
+  });
+  it('resumes paused fixed groups and reports future-deferred groups without reissuing words', async () => {
+    const { userId } = await actor(2, 2);
+    const group = (await issue(userId)).session;
+    const paused = await request(userId, 'POST', `/study/tasks/${group.id}/state`, {
+      action: 'pause',
+      commandId: randomUUID(),
+      expectedSessionRevision: group.revision,
+    });
+    expect(paused.statusCode, paused.body).toBe(200);
+    expect((await request(userId, 'GET', '/app/home')).json().learn).toMatchObject({
+      state: 'resume',
+      sessionId: group.id,
+      count: 2,
+    });
+    const until = new Date(Date.now() + 3600000).toISOString();
+    const deferred = await request(userId, 'POST', `/study/tasks/${group.id}/state`, {
+      action: 'defer',
+      deferUntil: until,
+      commandId: randomUUID(),
+      expectedSessionRevision: paused.json().session.revision,
+    });
+    expect(deferred.statusCode, deferred.body).toBe(200);
+    expect((await request(userId, 'GET', '/app/home')).json().learn).toMatchObject({
+      state: 'waiting',
+      sessionId: group.id,
+      count: 2,
+      availableAt: until,
+    });
+    expect(await db.studySession.count({ where: { userId } })).toBe(1);
+  });
+  it('keeps short-term consolidation pending even after unique words reached the daily target', async () => {
+    const { userId } = await actor(1, 1);
+    await db.userLearningPreference.create({ data: { userId, spellingEnabled: false } });
+    await finish(userId, (await issue(userId)).session, 'again');
+    const home = (await request(userId, 'GET', '/app/home')).json();
+    expect(home).toMatchObject({ checkedIn: true, dailyGoalComplete: false });
+    expect(home.plan).toMatchObject({ completedUnique: 1, pendingConsolidationCount: 1 });
+    expect(home.review.state).toBe('waiting');
+    expect(home.review.availableAt).not.toBeNull();
+    expect(home.learn.state).toBe('waiting');
+  });
+  it('uses the server learning-day 04:00 boundary and rejects empty or incomplete fake completion rows', async () => {
+    const { userId } = await actor(1, 1);
+    const at = new Date('2026-10-15T20:01:00.000Z');
+    const make = async (updatedAt: string, rated: boolean, phase = 'completed', withItem = true) =>
+      db.studySession.create({
+        data: {
+          userId,
+          taskKind: 'daily',
+          mode: 'daily',
+          status: 'completed',
+          phase,
+          updatedAt: new Date(updatedAt),
+          ...(withItem
+            ? {
+                items: {
+                  create: {
+                    wordId: ids[0]!,
+                    ordinal: 0,
+                    rated,
+                    exerciseDone: false,
+                    questionJson: { spellingEnabled: false },
+                    contentSnapshot: {},
+                  },
+                },
+              }
+            : {}),
+        },
+      });
+    await make('2026-10-15T19:59:00.000Z', true);
+    await make('2026-10-15T20:00:10.000Z', false);
+    await make('2026-10-15T20:00:20.000Z', true, 'practice');
+    await make('2026-10-15T20:00:30.000Z', true, 'completed', false);
+    const before = await transact(db, (tx) => appHomeSnapshot(tx, userId, at));
+    expect(before.localDate).toBe('2026-10-16');
+    expect(before.checkedIn).toBe(false);
+    expect(before.calendar.days.at(-2)).toMatchObject({
+      localDate: '2026-10-15',
+      checkedIn: true,
+      completedGroups: 1,
+    });
+    expect(before.calendar.streak).toBe(1);
+    await make('2026-10-15T20:00:40.000Z', true);
+    const after = await transact(db, (tx) => appHomeSnapshot(tx, userId, at));
+    expect(after.checkedIn).toBe(true);
+    expect(after.calendar.days.at(-1)).toMatchObject({
+      localDate: '2026-10-16',
+      completedGroups: 1,
+    });
+    expect(after.calendar.streak).toBe(2);
   });
 });

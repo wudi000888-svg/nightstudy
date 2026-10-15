@@ -11,6 +11,7 @@ import { Empty, ErrorNotice, Heading, Loading, LoginPrompt, Notice, Panel } from
 import { StudySessionView } from '../components/study/StudySessionView';
 import { useStudyViewport } from '../components/study/useStudyViewport';
 import { useQuickStudyStart } from '../components/study/useQuickStudyStart';
+import { useAppNavigation } from '../components/AppNavigation';
 import { TaskForecast, TaskOverview, taskDate, taskLabel } from '../components/tasks/TaskOverview';
 import { TaskConflicts } from '../components/tasks/TaskConflicts';
 import type {
@@ -34,6 +35,7 @@ const reasons: Record<string, string> = {
 };
 
 export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
+  const navigation = useAppNavigation();
   const { user, scope, pending, sync, syncNote, conflicts, discardConflict } = useApp();
   const client = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -68,10 +70,20 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     (NonNullable<CommandResult['result']> & { position: number }) | undefined
   >();
   const unfinished = saved.data?.items ?? [];
+  const resumable =
+    mode === 'review'
+      ? unfinished.filter(
+          (value) =>
+            !value.items.some((item) => item.bucket === 'new') &&
+            (value.mode === 'review' ||
+              value.taskKind === 'extra-review' ||
+              value.items.some((item) => item.bucket === 'review')),
+        )
+      : unfinished;
   const preferred =
-    unfinished.find((value) => value.id === plan.data?.plan.activeTaskId) ??
-    unfinished.find((value) => value.status === 'in_progress') ??
-    unfinished[0];
+    resumable.find((value) => value.id === plan.data?.plan.activeTaskId) ??
+    resumable.find((value) => value.status === 'in_progress') ??
+    resumable[0];
   const waitingSync = pending > 0 || (error instanceof ApiError && error.queued);
   const focusActive = !!session && !!user;
   const viewportHeight = useStudyViewport(focusActive);
@@ -168,7 +180,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         const body = extra
           ? { mode: 'review', taskKind: 'extra-review' }
           : {
-              mode: 'daily',
+              mode: mode === 'review' ? 'review' : 'daily',
               ...(plan.data ? { expectedPlanRevision: plan.data.plan.revision } : {}),
             };
         const key = JSON.stringify(body);
@@ -189,7 +201,9 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
       if (result.session) {
         linkLoaded.current = `${scope}:${result.session.id}`;
       }
-      linkStudySession(params, result.session?.id ?? null, setParams);
+      linkStudySession(params, result.session?.id ?? null, (next) =>
+        setParams(next, { replace: true }),
+      );
       void client.invalidateQueries({ queryKey: [scope] });
     } catch (value) {
       if (isCurrent(requestScope, requestLife)) {
@@ -372,16 +386,13 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         !saved.error &&
         !waitingSync));
   function dashboard() {
-    setSession(null);
-    setFeedback(undefined);
-    setParams({});
-    setReason('');
+    navigation.goBack();
   }
 
   if (!user)
     return (
       <div className="page">
-        <Heading eyebrow="今日任务" title="让每一天，都有一点自己的积累。" />
+        <Heading eyebrow="学习账户" title="登录后继续学习" />
         <LoginPrompt />
       </div>
     );
@@ -397,13 +408,9 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     >
       {!session && !openingShortcut && (
         <Heading
-          eyebrow="今日任务 · 先复习，再学新词"
-          title={
-            <>
-              给今天，<em>一点记住的时间。</em>
-            </>
-          }
-          description="每天总词数包含复习与新学。同词当天只计一次；到期巩固继续真实评价，拼写单独记录。"
+          eyebrow="先复习，再学新词"
+          title="今日学习"
+          description="先复习，再学新词。"
           action={
             <Link to="/" className="button quiet">
               回自习室
@@ -456,7 +463,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
           <>
             {mode === 'review' && (
               <p className="content-caption">
-                学习与到期复习已合并到今日任务。额外复习仍可主动安排，不改变每日总目标。
+                这里仅安排到期复习，仍计入今日总目标。额外复习可以主动安排。
               </p>
             )}
             <ErrorNotice

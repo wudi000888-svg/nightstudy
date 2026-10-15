@@ -56,12 +56,13 @@ export function SentencesPage() {
   );
   const list = useInfiniteQuery({
     queryKey: [owner.scope, 'sentences', 'pages', query, filterWord],
-    enabled: !!user,
+    enabled: !!user && owner.active,
     retry: false,
     initialPageParam: '',
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam, signal }) =>
       api<SentencePage>(
         `sentences?q=${encodeURIComponent(query)}&limit=25${filterWord ? `&wordId=${encodeURIComponent(filterWord)}` : ''}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
+        { signal },
       ),
     getNextPageParam: (last) =>
       last.page.hasMore ? (last.page.nextCursor ?? undefined) : undefined,
@@ -272,7 +273,9 @@ export function SentencesPage() {
         <button
           className="button ghost full"
           disabled={list.isFetchingNextPage}
-          onClick={() => void list.fetchNextPage()}
+          onClick={() => {
+            if (owner.active) void list.fetchNextPage();
+          }}
         >
           加载更多
         </button>

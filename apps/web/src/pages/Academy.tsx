@@ -59,12 +59,13 @@ export function AcademyPage() {
   );
   const history = useInfiniteQuery({
     queryKey: [owner.scope, 'academy-attempts', 'pages'],
-    enabled: !!user,
+    enabled: !!user && owner.active,
     retry: false,
     initialPageParam: '',
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam, signal }) =>
       api<{ items: AcademyAttempt[]; page: PageInfo }>(
         `academy/attempts?limit=15${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
+        { signal },
       ),
     getNextPageParam: (last) =>
       last.page.hasMore ? (last.page.nextCursor ?? undefined) : undefined,
@@ -118,7 +119,8 @@ export function AcademyPage() {
       );
       setAttempt(result.attempt);
       setAnswers({});
-      setParams({ lesson: lesson.id, attempt: result.attempt.id }, { replace: true });
+      if (owner.isForeground(request))
+        setParams({ lesson: lesson.id, attempt: result.attempt.id }, { replace: true });
       await client.invalidateQueries({ queryKey: [owner.scope, 'academy-attempts'] });
     } catch (value) {
       if (owner.isCurrent(request)) setError(value);
@@ -479,7 +481,9 @@ export function AcademyPage() {
               <button
                 className="button ghost full"
                 disabled={history.isFetchingNextPage}
-                onClick={() => void history.fetchNextPage()}
+                onClick={() => {
+                  if (owner.active) void history.fetchNextPage();
+                }}
               >
                 更多记录
               </button>

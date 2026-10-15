@@ -12,10 +12,10 @@ import './mobile-content.css';
 
 export function NotesPage() {
   const { user } = useApp();
-  const owner = usePageLifetime(),
-    client = useQueryClient();
   const [params] = useSearchParams();
   const sourceWord = params.get('wordId');
+  const owner = usePageLifetime(sourceWord ?? ''),
+    client = useQueryClient();
   const [query, setQuery] = useState(''),
     [input, setInput] = useState('');
   const [editing, setEditing] = useState<LearningNote | null>(null),
@@ -47,12 +47,13 @@ export function NotesPage() {
   );
   const list = useInfiniteQuery({
     queryKey: [owner.scope, 'notes', 'pages', query],
-    enabled: !!user,
+    enabled: !!user && owner.active,
     retry: false,
     initialPageParam: '',
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam, signal }) =>
       api<NotePage>(
         `notes?q=${encodeURIComponent(query)}&limit=25${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`,
+        { signal },
       ),
     getNextPageParam: (last) =>
       last.page.hasMore ? (last.page.nextCursor ?? undefined) : undefined,
@@ -303,7 +304,9 @@ export function NotesPage() {
         <button
           className="button ghost full"
           disabled={list.isFetchingNextPage}
-          onClick={() => void list.fetchNextPage()}
+          onClick={() => {
+            if (owner.active) void list.fetchNextPage();
+          }}
         >
           加载更多
         </button>

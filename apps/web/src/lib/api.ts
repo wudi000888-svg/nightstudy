@@ -1,3 +1,5 @@
+import { beginWriteRequest } from './request-activity';
+
 declare global {
   interface Window {
     __NIGHTSTUDY_CONFIG__?: { basePath?: string };
@@ -24,6 +26,15 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const finish = beginWriteRequest(init?.method);
+  try {
+    return await performRequest<T>(path, init);
+  } finally {
+    finish();
+  }
+}
+
+async function performRequest<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
     response = await fetch(mountUrl(path), {

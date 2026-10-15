@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { dictionaryText } from '../lib/dictionary';
 import type { Word } from '../lib/types';
 import { WordCardContext } from '../lib/word-cards';
+import { beforeAppBackEvent, screenDeactivateEvent } from '../lib/screen-lifecycle';
 import {
   isWordbookSaved,
   mutateWordbook,
@@ -264,6 +265,20 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     dismiss();
   }, [location.key, scope, dismiss]);
+  useEffect(() => {
+    const back = (event: Event) => {
+      if (event.defaultPrevented || !open.current) return;
+      event.preventDefault();
+      dismiss(true);
+    };
+    const leave = () => dismiss();
+    window.addEventListener(beforeAppBackEvent, back, true);
+    window.addEventListener(screenDeactivateEvent, leave);
+    return () => {
+      window.removeEventListener(beforeAppBackEvent, back, true);
+      window.removeEventListener(screenDeactivateEvent, leave);
+    };
+  }, [dismiss]);
   useEffect(
     () => () => {
       generation.current++;

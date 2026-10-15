@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp, useRemote } from '../AppContext';
+import { useScreenActive } from '../lib/screen-lifecycle';
 import { api, post } from '../lib/api';
 import type { PageInfo, Word, WordbookItem } from '../lib/types';
 import { TranslationPanel } from '../components/Translation';
@@ -45,7 +46,10 @@ export function LookupPage({ initialTab = 'lookup' }: { initialTab?: 'lookup' | 
 
 function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
   const { user, scope } = useApp();
+  const active = useScreenActive();
   const client = useQueryClient();
+  const foreground = useRef(active);
+  foreground.current = active;
   const currentScope = useRef(scope);
   currentScope.current = scope;
   const [params, setParams] = useSearchParams();
@@ -93,7 +97,7 @@ function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
     initialPageParam: null as string | null,
     getNextPageParam: (last) =>
       last.page?.hasMore ? (last.page.nextCursor ?? undefined) : undefined,
-    enabled: !!user,
+    enabled: !!user && active,
     retry: false,
   });
   const wordbookItems = useMemo(
@@ -139,7 +143,8 @@ function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
     return next;
   }
   async function choose(word: Word, navigate = true) {
-    if (navigate) {
+    if (!foreground.current) return;
+    if (navigate && foreground.current) {
       rememberList();
       detailOrigin.current = tab === 'wordbook' ? 'wordbook' : 'lookup';
       if (params.get('entry') !== word.id) setParams(entryUrl(searchQuery || word.lemma, word.id));
@@ -168,7 +173,8 @@ function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
   }
   async function search(more = false, requestedTerm?: string, requestedEntry?: string | null) {
     const term = requestedTerm ?? (more ? searchQuery : query.trim());
-    if (!term || (more && (searchFlight.current || !page?.nextCursor))) return;
+    if (!foreground.current || !term || (more && (searchFlight.current || !page?.nextCursor)))
+      return;
     const request = ++searchGeneration.current;
     searchController.current?.abort();
     const controller = new AbortController();
@@ -213,6 +219,17 @@ function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
       setSearched(true);
       if (!more) {
         const exact = resolved.status === 'fulfilled' ? resolved.value?.word : null;
+        if (!foreground.current) {
+          setSelected(
+            requestedEntry
+              ? exact?.id === requestedEntry
+                ? exact
+                : (data.items.find((word) => word.id === requestedEntry) ?? null)
+              : (exact ?? data.items[0] ?? null),
+          );
+          setDetailBusy(false);
+          return;
+        }
         if (requestedEntry) {
           if (exact?.id === requestedEntry) {
             activeEntry.current = exact.id;
@@ -229,7 +246,7 @@ function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
           activeEntry.current = exact.id;
           setSelected(exact);
           detailOrigin.current = 'lookup';
-          setParams(entryUrl(term, exact.id), { replace: true });
+          if (foreground.current) setParams(entryUrl(term, exact.id), { replace: true });
         } else if (data.items[0]) void choose(data.items[0], false);
         else {
           setSelected(null);
@@ -251,6 +268,7 @@ function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
     }
   }
   useEffect(() => {
+    if (!active) return;
     const term = params.get('q')?.trim() ?? '';
     const entry = params.get('entry');
     const previous = previousLocation.current;
@@ -271,9 +289,9 @@ function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
       const brief = results.find((row) => row.id === entry);
       void choose(brief ?? { id: entry, lemma: '' }, false);
     }
-  }, [params.get('q'), params.get('entry')]);
+  }, [params.get('q'), params.get('entry'), active]);
   useEffect(() => {
-    if (mobileDetail || !searched || !returnedToList.current) return;
+    if (!active || mobileDetail || !searched || !returnedToList.current) return;
     if (searchFlight.current) {
       searchController.current?.abort();
       searchGeneration.current++;
@@ -282,12 +300,12 @@ function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
     }
     if (detailOrigin.current === 'wordbook') setTab('wordbook');
     const frame = window.requestAnimationFrame(() => {
-      if (!isCurrent()) return;
+      if (!isCurrent() || !foreground.current) return;
       if (listElement.current) listElement.current.scrollTop = listPosition.current.list;
       window.scrollTo({ top: listPosition.current.page, behavior: 'instant' });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [mobileDetail]);
+  }, [mobileDetail, active]);
   function returnToResults() {
     setParams(entryUrl(searchQuery || query.trim()), { replace: true });
     if (detailOrigin.current === 'wordbook') setTab('wordbook');
@@ -667,7 +685,9 @@ function LookupContent({ initialTab }: { initialTab: 'lookup' | 'wordbook' }) {
               <button
                 className="button ghost"
                 disabled={wordbook.isFetching || busy}
-                onClick={() => void wordbook.fetchNextPage()}
+                onClick={() => {
+                  if (active) void wordbook.fetchNextPage();
+                }}
               >
                 {wordbook.isFetchingNextPage ? '正在读取更多…' : '更多生词'}{' '}
                 <ArrowRight size={16} />

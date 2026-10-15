@@ -3,17 +3,17 @@
 [![CI](https://github.com/wudi000888-svg/nightstudy/actions/workflows/ci.yml/badge.svg)](https://github.com/wudi000888-svg/nightstudy/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-雨夜里的语境背词与间隔复习。NightStudy 是可自行部署的多用户英语学习应用，围绕语境词书、FSRS 复习、熟词测试、记忆曲线、用户中心与基本管理后台建设。
+以移动 H5 应用体验学习英语。NightStudy 是可自行部署的多用户英语学习应用，支持语境词书、FSRS 复习、熟词测试、记忆曲线、用户中心与管理后台。
 
 **在线使用：[english.minminlove.top](https://english.minminlove.top)**
 
-<img src="docs/media/mobile-home-0.7.png" alt="移动学习首页" width="260"> <img src="docs/media/mobile-study-0.7.png" alt="专注词卡与双语语境" width="260">
+<img src="docs/media/mobile-home-0.8.png" alt="移动学习首页" width="260"> <img src="docs/media/mobile-study-0.8.png" alt="专注词卡与双语语境" width="260">
 
 移动端界面，使用独立的本地验收账户和测试词书。
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前版本：[`0.7.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.7.0-alpha.1)。** 移动端优先改造：学习、内容、我的三栏导航，沉浸式背词，语境浏览、真实句子收藏、学习笔记、英语学堂和跨设备学习偏好。默认浅色正文，可切夜读或跟随系统；桌面使用简洁居中布局。详细交互与边界见 [移动端改造](docs/MOBILE_REDESIGN.md)。
+**当前版本：[`0.8.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.8.0-alpha.1)。** 单屏壁纸首页、独立模块覆盖页与沉浸学习：头像、签到、Learn / Review、三个纯图标组成固定应用首页；模块记住列表位置和编辑状态，关闭回首页。支持主屏幕安装与用户确认的安全更新。设计契约及验证边界见 [H5 应用改造](docs/H5_APP_REDESIGN.md)。
 
 每日目标按复习与新学的不同词总数计算，先复习，再分配新词。释义和例句支持英文点词卡；美式、英式各一个发音入口，星星和固定按钮有明确提示。词书支持标准 TXT、DOCX、PDF 导入，提供 [TXT](docs/templates/nightstudy-wordbook-template.txt)、[Word](docs/templates/nightstudy-wordbook-template.docx)、[PDF](docs/templates/nightstudy-wordbook-template.pdf) 模板。学习正文保持简洁，词典名称可以查看，来源与许可集中在独立说明。
 
@@ -23,7 +23,7 @@
 
 ## 产品与边界
 
-- 保留雨夜背景、专注卡片和简洁学习节奏，支持桌面与手机。
+- 手机优先的完整应用壳：独立滚动、模块返回栈、安全区、短转场与统一音频生命周期；桌面保持同一应用构图。
 - 普通用户拥有本站词书选择、学习进度、复习记录、熟词声明、生词本及设置。
 - 桌面悬停英文释义或例句中的词立即打开词卡，移入保持、离开短延时关闭、点击固定；键盘和手机点击也可打开。卡片正文不递归生成另一张卡，来源与音源说明单独查看。精确查词未命中显示空态；已保存的词显示状态，未揭晓的学习内容保持遮蔽。
 - 自定义词书只对本人可见。标准TXT、DOCX、纯文本PDF先预览合格/失败/重复行，再确认合格词；提供失败原因导出、词书选择、编辑及归档。
@@ -79,7 +79,9 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 
 ## 验证记录
 
-当前 `0.7.0-alpha.1` 的运行源码为 [`1ff2986`](https://github.com/wudi000888-svg/nightstudy/commit/1ff298678355debf533433f5a61550b2bc98438a)，62 份测试文件、563 项测试及类型、格式、构建检查通过；[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729429192) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729521782) 均成功。本机 Native 与 VPS 已升级且健康，移动浏览器已核验首页、内容、学堂与偏好；隔离环境的学习、句子收藏和偏好检查见 [移动端学习体验](docs/MOBILE_REDESIGN.md#本机验证)。本轮 VPS 备份已在独立测试库恢复，40 张业务表的行与列、13 条迁移记录核对一致，测试库已清理；未向业务库执行恢复。
+0.8 本机通过 75 份测试文件、642 项真实双 PostgreSQL 与前端回归，以及格式、类型检查和生产构建。独立测试站点完成手机视口的三词回忆、拼写、保存、签到和收藏；模块重开恢复分类，PWA 只在用户确认后更新。完整范围见 [H5 应用改造](docs/H5_APP_REDESIGN.md#本轮实现与验收)。线上与镜像结果按实际发行补充。
+
+历史 `0.7.0-alpha.1` 的运行源码为 [`1ff2986`](https://github.com/wudi000888-svg/nightstudy/commit/1ff298678355debf533433f5a61550b2bc98438a)，62 份测试文件、563 项测试及类型、格式、构建检查通过；[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729429192) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38729521782) 均成功。本机 Native 与 VPS 已升级且健康，移动浏览器已核验首页、内容、学堂与偏好；隔离环境的学习、句子收藏和偏好检查见 [移动端学习体验](docs/MOBILE_REDESIGN.md#本机验证)。本轮 VPS 备份已在独立测试库恢复，40 张业务表的行与列、13 条迁移记录核对一致，测试库已清理；未向业务库执行恢复。
 
 以下保留0.5及更早版本的历史验证范围。
 

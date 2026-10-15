@@ -1,9 +1,15 @@
 import React, { type ReactElement, type ReactNode } from 'react';
 import { QueryClient } from '@tanstack/react-query';
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from 'vitest';
-import { HomePage } from './Home';
+import { HomePage, homeEntryDestination } from './Home';
+import { H5LearningPage } from './H5Learning';
+import { LearningCalendar } from './HomeLearning';
+import type { H5HomeSummary, H5HomeEntry } from '../lib/h5-home-types';
 import { ContentPage } from './Content';
+import { authReturnPath } from './Account';
 import { NotesPage } from './NotesLibrary';
+import { SentencesPage } from './SentenceLibrary';
+import { LearningLibraryPage } from './LearningLibrary';
 import { AcademyPage } from './Academy';
 import { PreferencesSettings } from './PreferencesSettings';
 import { SentenceSaveButton } from '../components/SentenceSaveButton';
@@ -15,6 +21,16 @@ const state = vi.hoisted(() => {
   return {
     scope: 'mobile:learner-a',
     user: true,
+    active: true,
+    infiniteOptions: [] as { queryKey: unknown[]; enabled?: boolean }[],
+    fetchNextPage: vi.fn(),
+    pending: 0,
+    conflicts: [] as unknown[],
+    navigate: vi.fn(),
+    openModule: vi.fn(),
+    remotePaths: [] as string[],
+    effects: [] as (() => unknown)[],
+    refetch: vi.fn(),
     slots: [] as unknown[],
     cursor: 0,
     refs: [] as { current: unknown }[],
@@ -51,7 +67,9 @@ vi.mock('react', async (importOriginal) => ({
     ];
   },
   useRef: (initial: unknown) => (state.refs[state.refCursor++] ??= { current: initial }),
-  useEffect: () => {},
+  useEffect: (setup: () => unknown) => {
+    state.effects.push(setup);
+  },
   useId: () => 'mobile-test-dialog',
 }));
 vi.mock('../AppContext', () => ({
@@ -60,16 +78,27 @@ vi.mock('../AppContext', () => ({
       ? { id: 'learner-a', name: '学习者', email: 'fixture@example.test', role: 'user' }
       : null,
     scope: state.scope,
-    pending: 0,
+    pending: state.pending,
+    conflicts: state.conflicts,
     site: { title: '测试自习室' },
   }),
-  useRemote: (_key: string, path: string) => ({
-    data: state.client?.getQueryData([state.scope, _key, path]) ?? state.remote[path],
-    isPending: false,
-    isFetching: false,
-    error: null,
-    refetch: vi.fn().mockResolvedValue({}),
-  }),
+  useRemote: (_key: string, path: string) => {
+    state.remotePaths.push(path);
+    return {
+      data: state.client?.getQueryData([state.scope, _key, path]) ?? state.remote[path],
+      isPending: false,
+      isFetching: false,
+      error: null,
+      refetch: state.refetch,
+    };
+  },
+}));
+vi.mock('../lib/screen-lifecycle', async (original) => ({
+  ...(await original<typeof import('../lib/screen-lifecycle')>()),
+  useScreenActive: () => state.active,
+}));
+vi.mock('../components/AppNavigation', () => ({
+  useAppNavigation: () => ({ openModule: state.openModule }),
 }));
 vi.mock('../LearningPreferences', () => ({
   useLearningPreferences: () => ({
@@ -100,26 +129,30 @@ vi.mock('react-router-dom', async (importOriginal) => ({
       state.params = new URLSearchParams(next);
     },
   ],
-  useNavigate: () => vi.fn(),
+  useNavigate: () => state.navigate,
 }));
 vi.mock('@tanstack/react-query', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-query')>()),
   useQueryClient: () => state.client,
-  useInfiniteQuery: (options: { queryKey: unknown[] }) => ({
-    data: {
-      pages: [
-        {
-          items: state.batches[String(options.queryKey[1])] ?? [],
-          page: { total: 0, hasMore: false, nextCursor: null },
-        },
-      ],
-    },
-    isPending: false,
-    error: null,
-    hasNextPage: false,
-    isFetchingNextPage: false,
-    refetch: vi.fn(),
-  }),
+  useInfiniteQuery: (options: { queryKey: unknown[]; enabled?: boolean }) => {
+    state.infiniteOptions.push(options);
+    return {
+      data: {
+        pages: [
+          {
+            items: state.batches[String(options.queryKey[1])] ?? [],
+            page: { total: 0, hasMore: false, nextCursor: null },
+          },
+        ],
+      },
+      isPending: false,
+      error: null,
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      fetchNextPage: state.fetchNextPage,
+      refetch: vi.fn(),
+    };
+  },
 }));
 vi.mock('../lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/api')>()),
@@ -158,6 +191,16 @@ beforeAll(() => {
 beforeEach(() => {
   state.scope = 'mobile:learner-a';
   state.user = true;
+  state.active = true;
+  state.infiniteOptions = [];
+  state.fetchNextPage.mockReset();
+  state.pending = 0;
+  state.conflicts = [];
+  state.navigate.mockReset();
+  state.openModule.mockReset();
+  state.remotePaths = [];
+  state.effects = [];
+  state.refetch.mockReset().mockResolvedValue({});
   state.slots = [];
   state.refs = [];
   state.cursor = state.refCursor = 0;
@@ -177,29 +220,172 @@ afterAll(() => {
   vi.unstubAllGlobals();
 });
 
-it('keeps the daily unique goal distinct from the group limit and routes both shortcuts into the real daily flow', () => {
-  state.plan = {
+function homeEntry(
+  state: H5HomeEntry['state'],
+  count = 0,
+  sessionId: string | null = null,
+): H5HomeEntry {
+  return { state, count, sessionId, sessionRevision: null, phase: null, availableAt: null };
+}
+function homeSummary(): H5HomeSummary {
+  return {
+    asOf: '2026-10-15T04:00:00.000Z',
+    localDate: '2026-10-15',
+    timeZone: 'Asia/Shanghai',
+    startsAt: '2026-10-14T20:00:00.000Z',
+    endsAt: '2026-10-15T20:00:00.000Z',
+    checkedIn: false,
+    dailyGoalComplete: false,
     plan: {
-      localDate: '2026-10-15',
-      bookId: null,
-      bookTitle: '日常词书',
+      id: 'daily-plan',
+      revision: 2,
+      bookId: 'book-rain',
+      bookTitle: '词书',
       dailyTotalGoal: 60,
       completedUnique: 32,
       completedNew: 12,
       completedReview: 20,
-      groupSize: 5,
       newRemaining: 8,
-      dueNowCount: 4,
+      reviewRemaining: 4,
+      pendingSpellingCount: 0,
+      pendingConsolidationCount: 0,
+      nextDueAt: null,
     },
-    settings: {},
+    learn: homeEntry('ready', 8),
+    review: homeEntry('ready', 4),
+    calendar: {
+      days: [{ localDate: '2026-10-15', checkedIn: false, completedGroups: 0 }],
+      streak: 0,
+    },
   };
+}
+it.each(['day', 'due'] as const)(
+  'reconciles a still-fresh home snapshot when returning after its %s boundary',
+  (kind) => {
+    const summary = homeSummary();
+    if (kind === 'due') {
+      summary.review.availableAt = '2026-10-15T04:00:05.000Z';
+    }
+    state.remote['app/home'] = summary;
+    const boundary = kind === 'day' ? summary.endsAt : summary.review.availableAt!;
+    const now = vi.spyOn(Date, 'now').mockReturnValue(new Date(boundary).getTime() + 1000);
+    try {
+      state.active = false;
+      render(HomePage);
+      for (const setup of state.effects) setup();
+      expect(state.refetch).not.toHaveBeenCalled();
+      state.effects = [];
+      state.active = true;
+      render(HomePage);
+      for (const setup of state.effects) setup();
+      expect(state.refetch).toHaveBeenCalledOnce();
+    } finally {
+      now.mockRestore();
+    }
+  },
+);
+it('keeps the single-screen home to four areas and reads both action counts from one server snapshot', () => {
+  state.remote['app/home'] = homeSummary();
+  state.plan = { plan: { newRemaining: 99, dueNowCount: 88 }, settings: {} };
   const tree = render(HomePage);
-  expect(text(tree)).toContain('32 / 60');
-  expect(text(tree)).toContain('本组上限 5 词');
-  expect(text(tree)).not.toContain('32 / 5');
-  expect(all(tree).filter((node) => node.props.to === '/learn?start=1')).toHaveLength(1);
-  expect(all(tree).filter((node) => node.props.to === '/review?start=1')).toHaveLength(1);
-  expect(text(tree)).toContain('先复习，再学新词');
+  expect(state.remotePaths).toEqual(['app/home']);
+  expect(all(tree).filter((node) => node.type === 'button')).toHaveLength(7);
+  expect(all(tree).some((node) => node.type === 'h1' || node.type === 'header')).toBe(false);
+  expect(text(tree)).not.toContain('书架');
+  expect(text(tree)).not.toContain('99');
+  const learn = find(tree, (node) => node.props['aria-label'] === 'Learn，开始，8词');
+  const review = find(tree, (node) => node.props['aria-label'] === 'Review，开始，4词');
+  click(learn);
+  click(review);
+  expect(state.navigate.mock.calls).toEqual([['/learn?start=1'], ['/review?start=1']]);
+  expect(post).not.toHaveBeenCalled();
+});
+it('opens the three retained modules and avatar as overlays rather than ordinary page links', () => {
+  const tree = render(HomePage);
+  for (const label of ['个人中心', '英语学堂', '我的内容', '我的学习'])
+    click(find(tree, (node) => node.props['aria-label'] === label));
+  expect(state.openModule.mock.calls).toEqual([
+    ['account'],
+    ['academy'],
+    ['content'],
+    ['learning'],
+  ]);
+  expect(state.navigate).not.toHaveBeenCalled();
+});
+it('preserves a visitor’s exact learning intention through login', () => {
+  state.user = false;
+  const tree = render(HomePage);
+  click(find(tree, (node) => node.props['aria-label'] === 'Review，开始学习'));
+  expect(state.navigate).toHaveBeenCalledWith('/auth?next=%2Freview%3Fstart%3D1');
+  expect(
+    all(tree)
+      .filter((node) => node.props.className === 'h5-home-count')
+      .map((node) => text(node)),
+  ).toEqual(['—', '—']);
+});
+it('restores only known internal app destinations after authentication', () => {
+  expect(authReturnPath('/review?start=1')).toBe('/review?start=1');
+  expect(authReturnPath('/learning?section=calendar')).toBe('/learning?section=calendar');
+  expect(authReturnPath('/books/import')).toBe('/books/import');
+  for (const target of [
+    'https://example.test/books',
+    '//example.test/books',
+    '/books/../../admin',
+    '/auth?next=/review',
+    'javascript:alert(1)',
+    null,
+  ])
+    expect(authReturnPath(target)).toBe('/');
+});
+it('keeps unsynchronized or conflicting actions from issuing another task', () => {
+  state.pending = 2;
+  state.remote['app/home'] = homeSummary();
+  const tree = render(HomePage);
+  click(find(tree, (node) => node.props['aria-label'] === 'Learn，记录待同步，8词'));
+  expect(state.navigate).toHaveBeenCalledWith('/learning?section=tasks');
+  expect(text(tree)).toContain('2 条记录等待同步');
+  expect(post).not.toHaveBeenCalled();
+});
+it('routes resume, review-first, wait and complete states without manufacturing empty groups', () => {
+  expect(homeEntryDestination(homeEntry('resume', 1, 'saved/task'), 'review')).toBe(
+    '/review?session=saved%2Ftask',
+  );
+  expect(homeEntryDestination(homeEntry('other_task', 1, 'active'), 'learn')).toBe(
+    '/learn?session=active',
+  );
+  expect(homeEntryDestination(homeEntry('review_first', 0), 'learn')).toBe('/review?start=1');
+  for (const phase of ['waiting', 'empty'] as const)
+    expect(homeEntryDestination(homeEntry(phase), 'learn')).toBe('/learning?section=tasks');
+  expect(homeEntryDestination(homeEntry('complete'), 'learn')).toBe('/learning?section=results');
+  expect(homeEntryDestination(homeEntry('setup'), 'learn')).toBe('/books');
+});
+it('displays check-in only from the completed-group calendar, independent of legacy duration statistics', () => {
+  const summary = homeSummary();
+  summary.checkedIn = true;
+  state.remote['app/home'] = summary;
+  state.remote.stats = { today: { checkedIn: false } };
+  const tree = render(HomePage);
+  click(find(tree, (node) => node.props['aria-label'] === '今日已签到，查看学习日历'));
+  expect(text(tree)).toContain('已签到');
+  expect(state.navigate).toHaveBeenCalledWith('/learning?section=calendar');
+  const calendar = render(() =>
+    LearningCalendar({
+      calendar: summary.calendar,
+      localDate: summary.localDate,
+      timeZone: summary.timeZone,
+    }),
+  );
+  expect(text(calendar)).toContain('还没有完成的学习组');
+  expect(text(calendar)).toContain('完成当天一组学习，自动签到');
+  expect(text(calendar)).not.toContain('5分钟');
+});
+it('keeps learning and preferences in one URL-backed segmented module', () => {
+  const tree = render(H5LearningPage);
+  click(find(tree, (node) => node.type === 'button' && text(node) === '学习偏好'));
+  expect(state.params.get('section')).toBe('preferences');
+  const preferences = render(H5LearningPage);
+  expect(all(preferences).some((node) => node.type === PreferencesSettings)).toBe(true);
+  expect(text(preferences)).not.toContain('签到日历');
 });
 it('gives guests a real login destination for their private content and keeps public lookup available', () => {
   state.user = false;
@@ -319,6 +505,55 @@ it('creates a real note with the selected word and no client-supplied ownership'
   );
   expect(text(render(NotesPage))).toContain('笔记已保存');
 });
+it('settles an in-flight note save while retained offscreen and releases its busy state', async () => {
+  state.params = new URLSearchParams('wordId=word-rain');
+  let tree = render(NotesPage);
+  (
+    find(tree, (node) => node.type === 'input' && node.props.maxLength === 120).props.onChange as (
+      event: unknown,
+    ) => void
+  )({ target: { value: 'Hidden save' } });
+  (find(tree, (node) => node.type === 'textarea').props.onChange as (event: unknown) => void)({
+    target: { value: 'A saved thought.' },
+  });
+  let resolve!: (value: unknown) => void;
+  vi.mocked(post).mockImplementation(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
+  tree = render(NotesPage);
+  (
+    find(tree, (node) => node.type === 'form' && node.props.className === 'form-stack').props
+      .onSubmit as (event: unknown) => void
+  )({ preventDefault() {} });
+  state.active = false;
+  render(NotesPage);
+  resolve({});
+  await settle();
+  state.active = true;
+  tree = render(NotesPage);
+  expect(text(tree)).toContain('笔记已保存');
+  expect(
+    find(tree, (node) => node.type === 'button' && text(node).includes('写笔记')).props.disabled,
+  ).toBe(false);
+  expect(post).toHaveBeenCalledTimes(1);
+});
+it('disables hidden infinite observers and stops manual pagination from retained library controls', () => {
+  state.active = false;
+  for (const page of [LearningLibraryPage, NotesPage, SentencesPage, AcademyPage]) {
+    state.slots = [];
+    state.refs = [];
+    state.infiniteOptions = [];
+    const tree = render(page);
+    expect(state.infiniteOptions.length).toBeGreaterThan(0);
+    expect(state.infiniteOptions.every((option) => option.enabled === false)).toBe(true);
+    const more = all(tree).find((node) => node.type === 'button' && text(node) === '加载更多');
+    if (more) click(more);
+  }
+  expect(state.fetchNextPage).not.toHaveBeenCalled();
+});
 it('preserves the expected note revision on conflict and requires explicit fresh reading before replacing the draft', async () => {
   const note = {
     id: 'note-1',
@@ -396,6 +631,31 @@ const attempt: AcademyAttempt = {
   ],
   result: null,
 };
+it('keeps a late academy start in its retained screen without navigating over another module', async () => {
+  state.params = new URLSearchParams('lesson=lesson-one');
+  state.remote['academy/lesson-one'] = { lesson: attempt.lesson };
+  let resolve!: (value: unknown) => void;
+  vi.mocked(post).mockImplementation(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
+  let tree = render(AcademyPage);
+  click(find(tree, (node) => node.type === 'button' && text(node).includes('开始听力练习')));
+  state.active = false;
+  render(AcademyPage);
+  resolve({ attempt });
+  await settle();
+  expect(state.params.get('attempt')).toBeNull();
+  expect(
+    state.client!.getQueryData([state.scope, 'academy-attempt', `academy/attempts/${attempt.id}`]),
+  ).toEqual({ attempt });
+  state.active = true;
+  tree = render(AcademyPage);
+  expect(text(tree)).toContain('提交本组答案');
+  expect(post).toHaveBeenCalledTimes(1);
+});
 it('submits only canonical listening item ids once and displays the server result', async () => {
   state.params = new URLSearchParams('lesson=lesson-one&attempt=attempt-one');
   state.slots[0] = attempt;

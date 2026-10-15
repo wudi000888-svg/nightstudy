@@ -9,6 +9,7 @@ import { InteractiveEnglish } from './InteractiveEnglish';
 import { StudyWordDetails } from './study/StudyWordDetails';
 import { SentenceSaveButton, type SentenceSaveButtonProps } from './SentenceSaveButton';
 import './study/mobile-study.css';
+import { beforeAppBackEvent, useScreenActive } from '../lib/screen-lifecycle';
 export { AudioButton } from './Pronunciation';
 
 export function Heading({
@@ -562,6 +563,7 @@ function sourceLink(value: string | null | undefined) {
     return undefined;
   }
 }
+const dialogLayers: HTMLDialogElement[] = [];
 export function Dialog({
   open,
   title,
@@ -575,18 +577,44 @@ export function Dialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const active = useScreenActive();
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
-    if (open && !element.open) element.showModal();
-    if (!open && element.open) element.close();
-  }, [open]);
+    const removeLayer = () => {
+      const index = dialogLayers.indexOf(element);
+      if (index >= 0) dialogLayers.splice(index, 1);
+    };
+    if (open && active) {
+      if (!element.open) element.showModal();
+      removeLayer();
+      dialogLayers.push(element);
+    } else if (element.open) element.close();
+    const back = (event: Event) => {
+      if (event.defaultPrevented || !element.open || dialogLayers.at(-1) !== element) return;
+      event.preventDefault();
+      close.current();
+    };
+    window.addEventListener(beforeAppBackEvent, back);
+    return () => {
+      window.removeEventListener(beforeAppBackEvent, back);
+      removeLayer();
+      if (element.open) element.close();
+    };
+  }, [open, active]);
   return (
     <dialog
       ref={ref}
       className="night-dialog"
       aria-labelledby={titleId}
-      onCancel={onClose}
+      onCancel={(event) => {
+        // The controlled owner may be saving and reject dismissal. Native cancel
+        // must not silently close a dialog whose open state is still true.
+        event.preventDefault();
+        onClose();
+      }}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

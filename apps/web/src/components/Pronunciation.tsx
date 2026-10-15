@@ -4,6 +4,8 @@ import { useApp, useRemote } from '../AppContext';
 import { useLearningPreferences } from '../LearningPreferences';
 import { ApiError, mountUrl, post } from '../lib/api';
 import type { Word, WordAudio } from '../lib/types';
+import { claimAudio, releaseAudio } from '../lib/audio-manager';
+import { useScreenActive } from '../lib/screen-lifecycle';
 
 type Selection = 'US' | 'UK' | 'device-US' | 'device-UK';
 type Playback = { phase: 'idle' | 'preparing' | 'playing' | 'ended' | 'error'; text: string };
@@ -47,6 +49,7 @@ function sourceLink(value: string | null | undefined) {
 }
 
 export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?: boolean }) {
+  const screenActive = useScreenActive();
   const { user, scope } = useApp();
   const { preferences, loaded: preferencesLoaded } = useLearningPreferences();
   const preferredAccent = preferences.accent === 'uk' ? 'UK' : 'US';
@@ -112,9 +115,13 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
     }
     if (supported && stopActivePlayback === stop) window.speechSynthesis.cancel();
     if (stopActivePlayback === stop) stopActivePlayback = null;
+    releaseAudio(stop);
     activeSelection.current = null;
     if (mounted.current) setPlayback({ phase: 'idle', text: '播放已停止。' });
   }, [supported]);
+  useEffect(() => {
+    if (!screenActive) stop();
+  }, [screenActive, stop]);
   useEffect(() => {
     mounted.current = true;
     wordIdentity.current = word.id;
@@ -230,7 +237,7 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
     update(requestId, { phase: 'error', text: message });
   }
   function play(next: Selection) {
-    if (preparingServer) return;
+    if (preparingServer || !screenActive || document.visibilityState === 'hidden') return;
     automaticAttempt.current = `${scope}:${word.id}`;
     setPrepareNote('');
     if (playing && activeSelection.current === next) {
@@ -240,6 +247,7 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
     if (stopActivePlayback && stopActivePlayback !== stop) stopActivePlayback();
     stop();
     stopActivePlayback = stop;
+    claimAudio(stop, stop);
     activeSelection.current = next;
     setSelection(next);
     const region = next.endsWith('UK') ? 'UK' : 'US';
@@ -336,6 +344,7 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
   useEffect(() => {
     if (
       !autoPlay ||
+      !screenActive ||
       !preferencesLoaded ||
       !preferences.autoPlay ||
       document.visibilityState === 'hidden'
@@ -348,6 +357,7 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
     play(preferredAccent);
   }, [
     autoPlay,
+    screenActive,
     preferencesLoaded,
     preferences.autoPlay,
     preferredAccent,

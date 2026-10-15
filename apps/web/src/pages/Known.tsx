@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, Upload, ArrowRight, RotateCcw, FileCheck2, CheckCheck } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
+import { useScreenActive } from '../lib/screen-lifecycle';
 import { api, download, post } from '../lib/api';
 import { dictionaryText } from '../lib/dictionary';
 import type { PageInfo, Progress, Word } from '../lib/types';
@@ -62,6 +63,9 @@ export function KnownPage() {
 }
 function KnownContent() {
   const { user, scope } = useApp();
+  const active = useScreenActive();
+  const foreground = useRef(active);
+  foreground.current = active;
   const client = useQueryClient();
   const currentScope = useRef(scope);
   currentScope.current = scope;
@@ -81,7 +85,7 @@ function KnownContent() {
     initialPageParam: null as string | null,
     getNextPageParam: (last) =>
       last.page.hasMore ? (last.page.nextCursor ?? undefined) : undefined,
-    enabled: !!user && tab === 'list',
+    enabled: !!user && active && tab === 'list',
     retry: false,
   });
   const knownItems = useMemo(
@@ -120,7 +124,7 @@ function KnownContent() {
       const result = await post<{ import: ImportBatch }>('known-words/imports', { format, text });
       if (currentScope.current !== owner) return;
       setPreview(result.import);
-      await imports.refetch();
+      if (foreground.current) await imports.refetch();
     } catch (value) {
       if (currentScope.current === owner) setError(value);
     } finally {
@@ -139,10 +143,11 @@ function KnownContent() {
       if (currentScope.current !== owner) return;
       if (preview?.id === batch.id) setPreview(result.import);
       await Promise.all([
-        imports.refetch(),
+        ...(foreground.current ? [imports.refetch()] : []),
         client.invalidateQueries({ queryKey: [owner, 'known-words'] }),
         client.invalidateQueries({ queryKey: [owner, 'books'] }),
         client.invalidateQueries({ queryKey: [owner, 'plan'] }),
+        client.invalidateQueries({ queryKey: [owner, 'app-home'] }),
       ]);
       if (currentScope.current !== owner) return;
       setNotice(
@@ -256,7 +261,9 @@ function KnownContent() {
                 <button
                   className="button ghost"
                   disabled={known.isFetchingNextPage}
-                  onClick={() => void known.fetchNextPage()}
+                  onClick={() => {
+                    if (active) void known.fetchNextPage();
+                  }}
                 >
                   {known.isFetchingNextPage ? '正在读取…' : '更多熟词'} <ArrowRight size={16} />
                 </button>

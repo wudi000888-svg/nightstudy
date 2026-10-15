@@ -54,6 +54,10 @@ vi.mock('react-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-dom')>()),
   createPortal: (node: ReactNode) => node,
 }));
+vi.mock('./screen-lifecycle', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./screen-lifecycle')>()),
+  useScreenActive: () => true,
+}));
 vi.mock('../AppContext', () => ({
   useApp: () => ({ user: { id: 'user-a' }, scope: state.scope }),
   useRemote: (_key: string, path: string) => ({

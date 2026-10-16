@@ -7,13 +7,13 @@
 
 **在线使用：[english.minminlove.top](https://english.minminlove.top)**
 
-<img src="docs/media/mobile-home-0.9.jpg" alt="移动学习首页" width="260"> <img src="docs/media/mobile-study-0.8.png" alt="专注词卡与双语语境" width="260">
+<img src="docs/media/mobile-home-0.10.png" alt="移动学习首页" width="260"> <img src="docs/media/mobile-word-0.10.png" alt="专注词卡与双语语境" width="260">
 
-移动端界面，使用独立的本地验收账户和测试词书。
+0.10 线上匿名公开页面：雨夜首页与双语词卡。
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前源码：`0.10.0-alpha.3`。** 补齐18本内置词书的成对释义、词性和双语例句，扩充静态英美句音，精修小屏阅读、词卡和音频反馈，并优化书架查询。本机完整内容安装及回归检查已通过，发行镜像与线上升级结果见 [0.10交付记录](https://github.com/wudi000888-svg/nightstudy/blob/main/docs/CONTENT_BILINGUAL_POLISH_010.md)。
+**当前发布：[0.10.0-alpha.3](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.10.0-alpha.3)。** 补齐18本内置词书的成对释义、词性和双语例句，扩充静态英美句音，精修小屏阅读、词卡和音频反馈，并优化书架查询。已通过完整 CI 和 Compose 冷安装，并完成本机及 VPS 升级、公开 HTTP 与移动页面验收。发行镜像与实际覆盖见 [0.10交付记录](https://github.com/wudi000888-svg/nightstudy/blob/main/docs/CONTENT_BILINGUAL_POLISH_010.md)。
 
 保留单屏H5首页、独立页面栈、Learn / Review、雨夜动态和管理员自定义壁纸，支持主屏幕安装与用户确认的安全更新。早期交付及来源说明见 [0.9记录](docs/CONTENT_AUDIO_PERFORMANCE_09.md)、[开放内容与代码复用](docs/OPEN_CONTENT_REUSE.md) 和 [雨夜外观](docs/RAIN_NIGHT_UI.md)。
 
@@ -83,7 +83,9 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 
 ## 验证记录
 
-0.10 的文本制作复现、隔离浏览器检查及本机只读性能对照见 [本轮记录](docs/CONTENT_BILINGUAL_POLISH_010.md#验收与发布状态)。书架接口在 25 并发的单次本机对照中，p95 从 3,175.37 ms 降至 180.20 ms；两次使用同一数据库内容和六个并行离线语音工作进程。测试没有 TCP/TLS，也未完全控制系统缓存；未改动的查词接口也变快，因此不将全部差值归因于 SQL，更不作为 VPS 容量承诺。全量源码回归与成品音包验收已通过；发行CI及实际站点升级结果见该记录。
+0.10.0-alpha.3 的 85 份测试文件 / 734 项、Python 138 项、检查器 169 项，以及完整类型和格式检查均通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38840374791) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38841110467) 均通过真实 Compose 冷安装、原始内容保护及三包音频检查。Native 与 VPS 已升级，各 43 次公开 HTTP 检查及匿名手机页面复核通过；47 表增量/重放保护、制作复现及实际范围见 [0.10 记录](docs/CONTENT_BILINGUAL_POLISH_010.md#最终发行与两端部署2026-10-16)。
+
+书架接口在 25 并发的单次本机对照中，p95 从 3,175.37 ms 降至 180.20 ms；两次使用同一数据库内容和六个并行离线语音工作进程。测试没有 TCP/TLS，也未完全控制系统缓存；未改动的查词接口也变快，因此不将全部差值归因于 SQL，更不作为 VPS 容量承诺。测量方法及限制见 [性能对照](docs/CONTENT_BILINGUAL_POLISH_010.md#书架查询与本机性能对照)。
 
 0.8 本机通过 75 份测试文件、642 项真实双 PostgreSQL 与前端回归，以及格式、类型检查和生产构建。独立测试站点完成手机视口的三词回忆、拼写、保存、签到和收藏；模块重开恢复分类，PWA 只在用户确认后更新。完整范围见 [H5 应用改造](docs/H5_APP_REDESIGN.md#本轮实现与验收)。运行源码为 [`1fc25da`](https://github.com/wudi000888-svg/nightstudy/commit/1fc25daf4a15322c2a3b445d4ed4fa4119f22dbf)，[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38769072734) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38769173777) 均通过 PostgreSQL 17 与完整 Compose 首装。本机 Native、VPS 已升级；两端各34项接口与静态资源检查通过，线上首页已在浏览器核对。VPS 新备份在独立测试库实际恢复，44表及14条迁移记录一致，测试库已清理。
 

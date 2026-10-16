@@ -46,7 +46,7 @@ const requireCheck = (condition, code, details) => {
   if (!condition) throw new VerificationError(code, details);
 };
 
-function identity(data) {
+function wordBookIdentity(data) {
   return {
     words: sha(
       JSON.stringify(
@@ -65,6 +65,11 @@ function identity(data) {
     books: sha(
       JSON.stringify(sorted(data.books).map(({ id, goal, version }) => ({ id, goal, version }))),
     ),
+  };
+}
+function identity(data) {
+  return {
+    ...wordBookIdentity(data),
     bookItems: sha(JSON.stringify(sorted(data.bookItems))),
     senses: sha(
       JSON.stringify(
@@ -177,7 +182,10 @@ function verifyPolishedBaseline(data, baseline, bundle) {
     words: data.words.filter((word) => wordIds.has(word.id)),
     books: data.books.filter((book) => book.version.startsWith('ecdict-')),
   };
-  const now = identity(originalScope);
+  // The polished reader keeps memberships inside books.items. This baseline
+  // compares only immutable word/book identities; bindings are checked below,
+  // and the complete current memberships are checked by verifyPolishedContent.
+  const now = wordBookIdentity(originalScope);
   requireCheck(
     now.words === baseline.identity.words && now.books === baseline.identity.books,
     'polish_original_word_or_book_identity_changed',
@@ -1305,6 +1313,19 @@ function selfTest() {
       .originalSenseBindings,
     1,
   );
+  // Match readPolishedContent's real return shape rather than the legacy
+  // readSite fixture, which also carries a top-level bookItems array.
+  const polishedShape = {
+    siteId: polishSource.data.siteId,
+    instanceId: polishSource.data.instanceId,
+    words: structuredClone(polishSource.data.words),
+    books: structuredClone(polishSource.data.books),
+    pack: polishSource.data.pack,
+  };
+  assert.deepEqual(
+    verifyPolishedBaseline(polishedShape, polishBaseline, polishSource.bundle),
+    verifyPolishedBaseline(polishSource.data, polishBaseline, polishSource.bundle),
+  );
   for (const [mutate, code] of [
     [
       (data) => {
@@ -1325,17 +1346,19 @@ function selfTest() {
       'polish_original_word_or_book_identity_changed',
     ],
   ]) {
-    const copied = structuredClone(polishSource.data);
-    mutate(copied);
-    assert.throws(
-      () => verifyPolishedBaseline(copied, polishBaseline, polishSource.bundle),
-      (error) => error.code === code,
-    );
+    for (const sourceShape of [polishSource.data, polishedShape]) {
+      const copied = structuredClone(sourceShape);
+      mutate(copied);
+      assert.throws(
+        () => verifyPolishedBaseline(copied, polishBaseline, polishSource.bundle),
+        (error) => error.code === code,
+      );
+    }
   }
   console.log(
     JSON.stringify({
       action: 'install.verify.self-test',
-      passed: 35 + polishSelfTest(),
+      passed: 39 + polishSelfTest(),
       databaseUsed: false,
     }),
   );

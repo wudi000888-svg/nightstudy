@@ -1,6 +1,6 @@
 # 夜读英语：查词、原子义项与语境例句设计
 
-日期：2026-10-16　状态：用户已批准全量施工，不兼容旧版；功能实现及本机隔离验收完成，发行/部署状态另列，不把内容首包当全词书逐义完成。源码审计基点：`5e3f7023df8edd5e97ee87a246f6abe5c3235a18`。
+日期：2026-10-16　状态：用户批准全量施工、不兼容旧版；功能实现、发行及两端部署验收完成，内容首包不等于全词书逐义完成。源码审计基点：`5e3f7023df8edd5e97ee87a246f6abe5c3235a18`；运行发行源码：`8639ccaf66cec01f7b3f29f7bfe5893bec558108`。
 
 本稿把“查到正确词形—辨认具体词义—在匹配语境中理解—听对应句音—收藏或继续学习”连成移动 H5 流程。产品保持浅青学习背景、清晰内容面与独立页面栈；首页四区、既有学习调度及数据保护规则继续遵循仓库 AGENTS.md 和 H5_APP_REDESIGN.md。
 
@@ -294,4 +294,43 @@ node scripts/check-learning-senses-install.mjs --single-site default
 
 ## 15. 发行与保数据升级状态
 
-0.11候选已完成上述本机功能与内容验证。现有Native部署的160,073,360字节私密备份已在55441独立随机测试库成功恢复（15条原迁移、770,611词及原2用户），未向业务库恢复或启动该恢复库的应用。四迁移增量、全部原业务表保护及重放演练正在执行；GitHub CI、默认Compose冷安装、镜像发布及生产切换尚待本节以真实结果补记。
+### 15.1 公开发行
+
+`0.11.0-alpha.1`已发布，运行源码为[`8639ccaf66cec01f7b3f29f7bfe5893bec558108`](https://github.com/wudi000888-svg/nightstudy/commit/8639ccaf66cec01f7b3f29f7bfe5893bec558108)。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38856139140)与[发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38856132567)均成功，包含默认完整Compose冷安装、原内容保护和四包成品音频检查。发行才发布镜像；未用main成功替代发行verify。公开附件的完整匿名下载、字节数与SHA核验通过，v1内容和v3句音的固定摘要见前文，发布后不覆盖同名包。
+
+匿名OCI实读确认version/revision/linux-amd64和响应digest一致；VPS使用空Docker认证配置拉取并运行同一固定index：
+
+```text
+ghcr.io/wudi000888-svg/nightstudy@sha256:9b996ca6957c52488763458b4ed1c6753383ac6a0cb373dc65958318e0a188fe
+```
+
+流水线附带provenance/SBOM；一个attestation描述符不代表有arm64运行镜像。
+
+### 15.2 真实旧库演练与两端增量
+
+Native旧部署的160,073,360字节私密备份已在55441的独立随机测试库两次实际恢复，原15条迁移、770,611词及2用户保留。最终工具在全新恢复库完成before→apply→replay：原47张表的全部旧行指纹不变，新增4条迁移后为50张表，精确增加98学习义项、98来源绑定、196例句、392句音身份与2内容包；再次执行业务新增/改写均0。新列默认值、复合外键、来源失效触发器、GIN/C排序索引与迁移checksum另行核对。演练中发现的SQL别名排序、列类型解析和空revision流完成时序问题均修复，最终完整重跑通过；旧失败日志和恢复后的核对证据保留，没有放宽比较规则。
+
+真实Native和VPS均已按同样范围完成增量、全旧行保护与零变更重放，再切换应用，ready均为`0.11.0-alpha.1`。只停止既有本站API：Native原PG进程、VPS原PG/翻译网关容器身份保持；未运行seed/reset、未向业务库restore、未终止未知客户端。各自停写后另外创建新custom备份并核验catalog；本次VPS新备份没有再次实际恢复，不能用Native恢复结果代替它。数据库相等证明截至应用启动前replay，启动后的正常维护/访问不宣称全行不变。
+
+Native沿用完整原环境和cwd，新API PID78913、原PG PID34947。新API/core/web产物存于外置盘；原API/core目录复制到外置私有备份、逐文件核hash后精确移除临时目录，旧web产物保留。实时dist链接已加入Git忽略，后续不要把构建命令直接写进这些正在运行的链接，应继续隔离构建再切换。VPS实际current已切到新release、镜像与源码label核对通过。原SSH传输在远端completed和HTTP/浏览器均核实后仍长留，最终仅关闭该本机SSH进程；不把其退出码当作远端升级成功证据，也未因此重跑部署。
+
+### 15.3 上线后公开验收与清理
+
+| 检查                     | Native                 | VPS                    |
+| ------------------------ | ---------------------- | ---------------------- |
+| 匿名HTTP                 | 338断言、120次GET/HEAD | 338断言、120次GET/HEAD |
+| 匿名Chromium手机视口     | 39检查、9图、62次响应  | 39检查、9图、61次响应  |
+| 页面与控制台错误         | 0                      | 0                      |
+| 生产身份/收藏/评分写请求 | 0                      | 0                      |
+
+两端均检查18本书、770,611词声明、sys匹配与全局排序、两页40项无重复、游标篡改/换条件拒绝、显式systme建议、bank/charge义项及精确例句、四个异读词禁音、真实媒体字节/SHA、HEAD/206/304/缺音404，以及服务端发布的39份PWA静态资源完整SHA与MIME。浏览器覆盖390×844、320×568及横屏、壳与系统返回333→333锚点、两义四句和真实US3.680秒/UK2.682秒播放及切换pause。VPS有一次允许的迟到详情GET取消（ERR_ABORTED），没有对应404/5xx；两端无跨源或写请求尝试。实体iOS/Android、真实软键盘与VPS容量未实测。
+
+首轮Native HTTP验收器误将phoneticSource来源标识当成IPA而失败；保留原失败JSON，修正公共DTO断言后两端完整重验338项通过。业务代码未为通过检查而改变，禁音仍核对false、全部实际IPA/音源为空、直接GET/HEAD404。该过程的诊断和旧证据均保留。
+
+最终验收后按固定55441集群system identifier、PID/端口/data与逐库OID清理5个测试库；无其它客户端才普通DROP，smart stop后仅删除本轮独立pg-data及空socket，并按hash移除5份测试环境/QA凭据文件。未强制删库、未终止未知客户端。原生产数据、两端新旧备份、失败/成功演练收据、runtime快照、实际运行build与媒体全部保留在私有位置。
+
+证据根目录为`/Volumes/XXX/Codex/work/nightstudy/011/`：`final-acceptance.private.json`、`native-public-smoke-v2.json`、`vps-public-smoke-v2.json`、两端`public-browser-20261016/browser-receipt.private.json`、`rehearsal-final-a76a099a2f48680af3ef302f/`、`deploy-native-7de7ac8434b191e425b5ca6e/`、`vps-upgrade-evidence-d855d3273776c1ba34682c14/`和`cleanup-9c680746c3dfb011f7bc50fe/`。VPS原始生产备份/收据仍在本站私有shared目录。它们不上传公开仓库。
+
+### 15.4 尚未完成的内容范围
+
+平台能力已上线，原子义项首包仍仅35词/98义/196句及392英美句音，35词也不宣称所有词义穷尽。18,732个有效内置词仍待逐义审核，其余全词典范围更大；0.10的词级例句不自动挂到每个新义项。后续沿13.3的逐词队列制作新不可变包，不能把本次功能上线描述为全部词书逐义完成。没有调用付费AI内容接口或下载语言模型，静态声学校验也不代替逐句专家听审。

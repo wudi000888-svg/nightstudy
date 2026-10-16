@@ -13,13 +13,13 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前发布：[0.10.0-alpha.3](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.10.0-alpha.3)。** 补齐18本内置词书的成对释义、词性和双语例句，扩充静态英美句音，精修小屏阅读、词卡和音频反馈，并优化书架查询。已通过完整 CI 和 Compose 冷安装，并完成本机及 VPS 升级、公开 HTTP 与移动页面验收。发行镜像与实际覆盖见 [0.10交付记录](https://github.com/wudi000888-svg/nightstudy/blob/main/docs/CONTENT_BILINGUAL_POLISH_010.md)。
+**当前发布：[0.11.0-alpha.1](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.11.0-alpha.1)。** 已通过完整 CI、Compose 冷安装和保数据升级演练，并在本机及 VPS 部署。两端分别通过338项公开接口与资源检查、39项匿名手机浏览器检查；逐义项例句、搜索与实际发音验证见 [0.11交付记录](docs/LOOKUP_SENSES_011.md#15-发行与保数据升级状态)。
 
-**0.11 改造正在验收：** 查词支持智能、前缀、包含、精确匹配及显式错拼建议，公共查词与本人生词本独立，服务端全局排序和签名游标保证分页条件。原子学习义项各自绑定不同语境的双语例句；首包为35词、98义、196句和392条英美成品句音，其余18,732个内置词仍待逐义审核，不能把旧词级例句当作每个意思的配句。源码实现、内容边界和验证记录见 [查词与义项改造](docs/LOOKUP_SENSES_011.md)。
+查词支持智能、前缀、包含、精确匹配及显式错拼建议，公共查词与本人生词本独立，服务端全局排序和签名游标保证分页条件。原子学习义项各自绑定不同语境的双语例句；首包为35词、98义、196句和392条英美成品句音，其余18,732个内置词仍待逐义审核，不能把旧词级例句当作每个意思的配句。源码实现、内容边界和验证记录见 [查词与义项改造](docs/LOOKUP_SENSES_011.md)。
 
 <img src="docs/media/mobile-lookup-0.11.png" alt="包含匹配与服务端排序" width="260"> <img src="docs/media/mobile-sense-0.11.png" alt="河岸义项及对应双语语境" width="260">
 
-0.11 本机隔离构建的匿名真实接口页面：查词列表与 bank 河岸义项。
+0.11 线上匿名真实页面：查词列表与 bank 河岸义项。
 
 保留单屏H5首页、独立页面栈、Learn / Review、雨夜动态和管理员自定义壁纸，支持主屏幕安装与用户确认的安全更新。早期交付及来源说明见 [0.9记录](docs/CONTENT_AUDIO_PERFORMANCE_09.md)、[开放内容与代码复用](docs/OPEN_CONTENT_REUSE.md) 和 [雨夜外观](docs/RAIN_NIGHT_UI.md)。
 
@@ -88,6 +88,8 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 架构约定见 [架构](docs/architecture/ARCHITECTURE.md)、[多站与并发方案](docs/architecture/MULTISITE_AND_SCALING.md)。PgBouncer、Redis provider、跨主机 HA 和实测高并发容量仍待完成。当前 API 契约见 [API.md](docs/API.md)。词典/词书分页和学习选词不再被前 500/1,000 词截断；熟词导出以游标分批流式输出全部记录。
 
 ## 验证记录
+
+0.11.0-alpha.1 的93份测试文件/794项、155项Python及186项检查器自测、四组类型检查和隔离构建通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38856139140) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38856132567) 完成完整Compose冷安装；固定linux/amd64镜像已匿名核验并部署。旧库备份在独立测试库实际恢复，四迁移增量和重放保护通过；Native与VPS各338项HTTP检查、39项匿名Chromium手机视口检查通过，未在生产创建测试用户或评分。实体手机、逐句专家审核及VPS并发容量仍未验收。范围与证据见 [本轮记录](docs/LOOKUP_SENSES_011.md)。
 
 0.10.0-alpha.3 的 85 份测试文件 / 734 项、Python 138 项、检查器 169 项，以及完整类型和格式检查均通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38840374791) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38841110467) 均通过真实 Compose 冷安装、原始内容保护及三包音频检查。Native 与 VPS 已升级，各 43 次公开 HTTP 检查及匿名手机页面复核通过；47 表增量/重放保护、制作复现及实际范围见 [0.10 记录](docs/CONTENT_BILINGUAL_POLISH_010.md#最终发行与两端部署2026-10-16)。
 

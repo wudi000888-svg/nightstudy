@@ -1,5 +1,8 @@
 node_modules/
 dist/
+apps/api/dist
+apps/web/dist
+packages/core/dist
 coverage/
 .env
 .env.*

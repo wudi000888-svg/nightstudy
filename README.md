@@ -13,7 +13,7 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前发布：[0.11.0-alpha.1](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.11.0-alpha.1)。** 已通过完整 CI、Compose 冷安装和保数据升级演练，并在本机及 VPS 部署。两端分别通过338项公开接口与资源检查、39项匿名手机浏览器检查；逐义项例句、搜索与实际发音验证见 [0.11交付记录](docs/LOOKUP_SENSES_011.md#15-发行与保数据升级状态)。
+**当前发布：[0.11.0-alpha.3](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.11.0-alpha.3)。** 已在本机及 VPS 部署，修复切书后的旧任务、每日计数与迟到响应。97文件839项测试、完整 CI 与 Compose 冷安装通过；两端各338项公开接口及39项匿名手机浏览器检查通过。真实切书、同步冲突与返回验收见 [修复记录](docs/BOOK_SWITCH_TASKS_FIX.md)；逐义项内容的实际范围仍见 [0.11交付记录](docs/LOOKUP_SENSES_011.md#15-发行与保数据升级状态)。
 
 查词支持智能、前缀、包含、精确匹配及显式错拼建议，公共查词与本人生词本独立，服务端全局排序和签名游标保证分页条件。原子学习义项各自绑定不同语境的双语例句；首包为35词、98义、196句和392条英美成品句音，其余18,732个内置词仍待逐义审核，不能把旧词级例句当作每个意思的配句。源码实现、内容边界和验证记录见 [查词与义项改造](docs/LOOKUP_SENSES_011.md)。
 
@@ -89,7 +89,9 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 
 ## 验证记录
 
-0.11.0-alpha.1 的93份测试文件/794项、155项Python及186项检查器自测、四组类型检查和隔离构建通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38856139140) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38856132567) 完成完整Compose冷安装；固定linux/amd64镜像已匿名核验并部署。旧库备份在独立测试库实际恢复，四迁移增量和重放保护通过；Native与VPS各338项HTTP检查、39项匿名Chromium手机视口检查通过，未在生产创建测试用户或评分。实体手机、逐句专家审核及VPS并发容量仍未验收。范围与证据见 [本轮记录](docs/LOOKUP_SENSES_011.md)。
+0.11.0-alpha.3 的97文件839项、类型/格式与冻结构建通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38863609506) 和 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38863835264) 均成功，包含完整Compose首装及Python/检查器自测。真实隔离 H5 验收保留两词完成数并重排新书四词，最终30项只读续验通过；两端均完成338项HTTP与39项匿名手机视口检查。应用升级保留原数据库和媒体，没有迁移、seed或生产测试评分；新备份仅核catalog。详见 [切书修复](docs/BOOK_SWITCH_TASKS_FIX.md)。
+
+历史0.11.0-alpha.1 的93份测试文件/794项、155项Python及186项检查器自测、四组类型检查和隔离构建通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38856139140) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38856132567) 完成完整Compose冷安装；固定linux/amd64镜像已匿名核验并部署。旧库备份在独立测试库实际恢复，四迁移增量和重放保护通过；Native与VPS各338项HTTP检查、39项匿名Chromium手机视口检查通过，未在生产创建测试用户或评分。实体手机、逐句专家审核及VPS并发容量仍未验收。范围与证据见 [对应记录](docs/LOOKUP_SENSES_011.md)。
 
 0.10.0-alpha.3 的 85 份测试文件 / 734 项、Python 138 项、检查器 169 项，以及完整类型和格式检查均通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38840374791) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38841110467) 均通过真实 Compose 冷安装、原始内容保护及三包音频检查。Native 与 VPS 已升级，各 43 次公开 HTTP 检查及匿名手机页面复核通过；47 表增量/重放保护、制作复现及实际范围见 [0.10 记录](docs/CONTENT_BILINGUAL_POLISH_010.md#最终发行与两端部署2026-10-16)。
 

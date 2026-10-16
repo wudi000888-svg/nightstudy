@@ -13,7 +13,7 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前源码：`0.10.0-alpha.2`。** 补齐18本内置词书的成对释义、词性和双语例句，扩充静态英美句音，精修小屏阅读、词卡和音频反馈，并优化书架查询。本机完整内容安装及回归检查已通过，发行镜像与线上升级结果见 [0.10交付记录](https://github.com/wudi000888-svg/nightstudy/blob/main/docs/CONTENT_BILINGUAL_POLISH_010.md)。
+**当前源码：`0.10.0-alpha.3`。** 补齐18本内置词书的成对释义、词性和双语例句，扩充静态英美句音，精修小屏阅读、词卡和音频反馈，并优化书架查询。本机完整内容安装及回归检查已通过，发行镜像与线上升级结果见 [0.10交付记录](https://github.com/wudi000888-svg/nightstudy/blob/main/docs/CONTENT_BILINGUAL_POLISH_010.md)。
 
 保留单屏H5首页、独立页面栈、Learn / Review、雨夜动态和管理员自定义壁纸，支持主屏幕安装与用户确认的安全更新。早期交付及来源说明见 [0.9记录](docs/CONTENT_AUDIO_PERFORMANCE_09.md)、[开放内容与代码复用](docs/OPEN_CONTENT_REUSE.md) 和 [雨夜外观](docs/RAIN_NIGHT_UI.md)。
 

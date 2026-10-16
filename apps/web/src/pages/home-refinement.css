@@ -1,0 +1,119 @@
+.h5-home-study {
+  position: relative;
+  gap: 4px;
+}
+.h5-home-study > .h5-home-count {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: clamp(28px, 7vw, 35px);
+  font-weight: 550;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+.h5-home-count > small {
+  font-size: 12px;
+  font-weight: 450;
+  letter-spacing: 0;
+  color: #52615b;
+}
+.h5-home-review .h5-home-count {
+  color: #315f59;
+}
+.h5-home-study > small {
+  max-width: 100%;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.h5-home-study > .h5-home-guest-note {
+  margin-top: 5px;
+  color: #52615b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.h5-home-continue-mark {
+  position: absolute;
+  top: 18px;
+  right: 15px;
+  color: #52615b;
+}
+.h5-home-study[data-entry-state='resume'],
+.h5-home-study[data-entry-state='other_task'] {
+  box-shadow:
+    0 8px 28px #020d191a,
+    inset 0 0 0 1px #ffffffb3;
+}
+.h5-home-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  text-shadow: 0 1px 6px #071822;
+}
+.h5-home-modules button {
+  position: relative;
+}
+.h5-home-module-label {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: #142c3cef;
+  color: #edf3f1;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+.h5-home-modules button:focus-visible .h5-home-module-label {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+@media (hover: hover) and (pointer: fine) {
+  .h5-home-modules button:hover .h5-home-module-label {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@media (orientation: portrait), (min-height: 541px) {
+  .h5-home-study-actions {
+    bottom: calc(max(136px, 16.5%) + env(safe-area-inset-bottom, 0px));
+  }
+  .h5-home-status {
+    bottom: calc(max(80px, 12.3%) + env(safe-area-inset-bottom, 0px));
+    min-height: 34px;
+  }
+}
+
+/* Study content is replaced immediately. These short incoming-only gestures
+   do not retain the previous session tree while a request or score resolves. */
+@keyframes h5-study-enter-incoming {
+  from {
+    opacity: 0.7;
+    transform: translate3d(12%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@keyframes h5-study-exit-incoming {
+  from {
+    opacity: 0.7;
+    transform: translate3d(-12%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .h5-home-module-label {
+    transition: none;
+  }
+}

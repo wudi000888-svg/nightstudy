@@ -1,0 +1,121 @@
+.task-plan-dialog .plan-refined-form,
+.plan-refined-fields {
+  display: grid;
+  gap: 19px;
+}
+.plan-refined-fields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.task-plan-dialog .task-selected-book {
+  padding: 13px;
+  background: var(--app-soft);
+  border-color: var(--app-line);
+}
+.task-plan-dialog .task-selected-book small,
+.task-plan-dialog .task-goal-input > span {
+  color: var(--app-muted);
+}
+.task-plan-dialog .task-book-icon {
+  color: var(--app-accent);
+  background: var(--app-soft);
+  border-color: var(--app-line);
+}
+.task-plan-dialog .task-goal-input input {
+  color: var(--app-text);
+  min-height: 53px;
+}
+.task-plan-dialog .task-goal-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.task-plan-dialog .task-goal-presets button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 3px;
+  border-radius: 13px;
+  border-color: var(--app-line);
+  background: var(--app-panel);
+  color: var(--app-muted);
+  font-size: 13px;
+}
+.task-plan-dialog .task-goal-presets button.selected {
+  background: var(--app-accent-soft, var(--app-soft));
+  color: var(--app-accent);
+  border-color: var(--app-accent);
+}
+.plan-refined-rules,
+.plan-refined-advanced {
+  font-size: 12px;
+  color: var(--app-muted);
+  line-height: 1.8;
+}
+.plan-refined-rules > summary,
+.plan-refined-advanced > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  list-style: none;
+  cursor: pointer;
+}
+.plan-refined-rules > summary::-webkit-details-marker,
+.plan-refined-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+.plan-refined-rules p {
+  margin: 4px 0 9px;
+}
+.plan-refined-advanced > summary > span {
+  margin-left: auto;
+  font-size: 12px;
+}
+.plan-refined-advanced .form-columns {
+  margin-top: 11px;
+}
+.task-plan-dialog .task-preview-counts {
+  padding: 16px;
+  border-color: var(--app-line);
+  background: var(--app-soft);
+  border-radius: 15px;
+  gap: 15px 9px;
+}
+.task-plan-dialog .task-preview-counts strong {
+  color: var(--app-text);
+  font-size: 26px;
+  font-weight: 450;
+}
+.task-plan-dialog .task-preview-counts span,
+.task-plan-dialog .task-preview-counts p {
+  color: var(--app-muted);
+}
+.task-plan-dialog .task-preview-counts span {
+  font-size: 11px;
+}
+.task-plan-dialog .task-preserve-note {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--app-line);
+  color: var(--app-text);
+  background: var(--app-soft);
+}
+.task-plan-dialog .task-preserve-note > svg {
+  color: var(--app-accent);
+}
+.task-plan-dialog .action-row {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding-top: 11px;
+  background: var(--app-panel);
+}
+.task-plan-dialog .action-row > .button {
+  min-height: 48px;
+  border-radius: 15px;
+}
+.task-plan-dialog summary:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 3px;
+}

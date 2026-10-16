@@ -193,6 +193,25 @@ it('keeps a successfully accepted session focused when its own URL synchronizati
   expect(focused(render())?.session.id).toBe(issued.id);
 });
 
+it('preserves the selected recognition option through the page callback and durable command', async () => {
+  render();
+  await fixture.shortcut!.start();
+  render();
+  await vi.waitFor(() => expect(fixture.read).toHaveBeenCalledOnce());
+  fixture.command.mockResolvedValue({ session: issued });
+  focused(render())!.onAct('reveal', undefined, undefined, 'opaque-selected-option');
+  await vi.waitFor(() => expect(fixture.command).toHaveBeenCalledOnce());
+  expect(fixture.command).toHaveBeenCalledWith(
+    'navigation-fixture',
+    'study/sessions/issued/commands',
+    expect.objectContaining({
+      action: 'reveal',
+      recognitionOptionId: 'opaque-selected-option',
+      expectedSessionRevision: issued.revision,
+    }),
+  );
+});
+
 it('allows its explicit start shortcut to consume the URL without cancelling that request or unlocking early', async () => {
   fixture.params = new URLSearchParams('start=1');
   fixture.location.search = '?start=1';

@@ -42,7 +42,6 @@ export function registerAppBackHandler(handler: (event: PopStateEvent) => void) 
 
 export function createAppBackHandler(
   position: () => { index: number; key: string },
-  ownsIndex: (index: number) => boolean,
   restore: (delta: number) => void,
 ) {
   let restoring: { index: number; key: string } | null = null;
@@ -56,7 +55,18 @@ export function createAppBackHandler(
       if (before.key === expected.key && before.index === expected.index && next === expected.index)
         return;
     }
-    if (!Number.isFinite(next) || next === before.index || !ownsIndex(next)) return;
+    // After reload, earlier app history entries still exist in the browser but
+    // are absent from this mount's in-memory navigation stack. An open layer
+    // must consume that traversal too; ownership is only relevant to page-level
+    // navigation, not to dismissing a layer on the retained current page.
+    if (
+      !Number.isSafeInteger(next) ||
+      !Number.isSafeInteger(before.index) ||
+      next < 0 ||
+      before.index < 0 ||
+      next === before.index
+    )
+      return;
     if (!consumeTopLayer()) return;
     event.stopImmediatePropagation();
     restoring = before;

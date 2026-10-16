@@ -2,11 +2,12 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Pin, Star, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Pin, Star, X } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
 import { api } from '../lib/api';
 import type { Word } from '../lib/types';
-import { WordCardContext } from '../lib/word-cards';
+import { WordCardContext, wordCardPlacement } from '../lib/word-cards';
+import { dictionaryText } from '../lib/dictionary';
 import { beforeAppBackEvent, screenDeactivateEvent } from '../lib/screen-lifecycle';
 import {
   isWordbookSaved,
@@ -23,6 +24,8 @@ import {
   WordSaveButton,
   WordView,
 } from './UI';
+import { AudioButton } from './Pronunciation';
+import './word-card-layers.css';
 
 interface ResolvedWord {
   word: Word | null;
@@ -57,6 +60,43 @@ export function WordCardContent({ word }: { word: Word }) {
   );
 }
 
+export function WordCardSummary({ word }: { word: Word }) {
+  const available = (word.senses?.length ? word.senses : word.dictionarySenses) ?? [];
+  const meanings = available
+    .filter((sense) => dictionaryText(sense.definitionZh) || dictionaryText(sense.definitionEn))
+    .slice(0, 2);
+  return (
+    <WordCardContext.Provider value={null}>
+      <div className="word-card-quick-content">
+        <AudioButton word={word} />
+        {meanings.length ? (
+          <div className="word-card-quick-meanings">
+            {meanings.map((sense) => (
+              <div className="word-card-quick-meaning" key={sense.id}>
+                {!!dictionaryText(sense.pos) && (
+                  <span className="sense-pos">{dictionaryText(sense.pos)}</span>
+                )}
+                {!!dictionaryText(sense.definitionZh) && (
+                  <p className="word-card-summary-zh" lang="zh-CN">
+                    {dictionaryText(sense.definitionZh)}
+                  </p>
+                )}
+                {!!dictionaryText(sense.definitionEn) && (
+                  <p className="word-card-summary-en" lang="en">
+                    {dictionaryText(sense.definitionEn)}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="word-card-summary-empty">暂未收录释义。</p>
+        )}
+      </div>
+    </WordCardContext.Provider>
+  );
+}
+
 export function WordCardProvider({ children }: { children: ReactNode }) {
   const { user, scope } = useApp();
   const currentScope = useRef(scope);
@@ -66,6 +106,11 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
   const [card, setCard] = useState<CardState | null>(null);
   const [pinned, setPinned] = useState(false);
   const [position, setPosition] = useState<Record<string, number> | undefined>(undefined);
+  const [placement, setPlacement] = useState('bottom');
+  const [detailOpen, setDetailOpen] = useState(false);
+  const detailVisible = useRef(false);
+  const detailDialog = useRef<HTMLDialogElement>(null);
+  const detailTrigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const origin = useRef<HTMLElement | null>(null);
   const hoveredSource = useRef<HTMLElement | null>(null);
@@ -109,6 +154,9 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     insideCard.current = false;
     onSource.current = false;
     focusRequested.current = false;
+    detailVisible.current = false;
+    setDetailOpen(false);
+    origin.current?.removeAttribute?.('data-word-card-active');
     setCard(null);
     setPinned(false);
     setActionError(null);
@@ -136,25 +184,34 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     }, 250);
   }, [dismiss]);
   const reposition = useCallback(() => {
-    if (!origin.current || window.innerWidth <= 660) {
+    if (!origin.current) {
       setPosition(undefined);
       return;
     }
     const rect = origin.current.getBoundingClientRect();
-    const width = Math.min(470, window.innerWidth - 32);
-    const below = window.innerHeight - rect.bottom;
-    const useBelow = below >= Math.min(320, rect.top);
-    const maxHeight = Math.min(
-      Math.max(120, window.innerHeight - 32),
-      Math.max(160, Math.min(640, (useBelow ? below : rect.top) - 24)),
+    const viewport = window.visualViewport;
+    const surface = panel.current?.querySelector<HTMLElement>('.word-card-panel');
+    const scroller = panel.current?.querySelector<HTMLElement>('.word-card-scroll');
+    // A short loading skeleton must not permanently constrain the resolved card.
+    // Measure the scroll content, rather than the already clipped panel alone.
+    const contentHeight =
+      surface && scroller
+        ? surface.scrollHeight - scroller.clientHeight + scroller.scrollHeight
+        : surface?.scrollHeight;
+    const measuredHeight =
+      contentHeight && Number.isFinite(contentHeight) ? Math.min(430, contentHeight) : undefined;
+    const next = wordCardPlacement(
+      rect,
+      {
+        left: viewport?.offsetLeft ?? 0,
+        top: viewport?.offsetTop ?? 0,
+        width: viewport?.width ?? window.innerWidth,
+        height: viewport?.height ?? window.innerHeight,
+      },
+      measuredHeight,
     );
-    const candidateTop = useBelow ? rect.bottom + 8 : rect.top - maxHeight - 8;
-    setPosition({
-      left: Math.max(16, Math.min(rect.left, window.innerWidth - width - 16)),
-      top: Math.max(16, Math.min(candidateTop, window.innerHeight - maxHeight - 16)),
-      width,
-      maxHeight,
-    });
+    setPosition(next.style);
+    setPlacement(next.placement);
   }, []);
   const pin = useCallback(() => {
     cancelClose();
@@ -165,14 +222,28 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     cancelClose();
     pinState.current = !pinState.current;
     setPinned(pinState.current);
+    setActionNotice(pinState.current ? '词卡已固定，可继续阅读原文' : '已取消固定词卡');
     if (!pinState.current) scheduleClose();
+  };
+  const closeDetails = useCallback(() => {
+    detailVisible.current = false;
+    if (detailDialog.current?.open) detailDialog.current.close();
+    setDetailOpen(false);
+    if (detailTrigger.current?.isConnected) detailTrigger.current.focus({ preventScroll: true });
+  }, []);
+  const showDetails = () => {
+    pin();
+    detailVisible.current = true;
+    setDetailOpen(true);
   };
   const openWord = useCallback(
     (text: string, anchor: HTMLElement, mode: 'hover' | 'pinned' = 'pinned') => {
-      if (panel.current?.contains(anchor)) return;
+      if (panel.current?.contains(anchor) || detailDialog.current?.contains(anchor)) return;
       if (mode === 'hover' && pinState.current) return;
       cancelClose();
+      origin.current?.removeAttribute?.('data-word-card-active');
       origin.current = anchor;
+      anchor.setAttribute?.('data-word-card-active', 'true');
       hoveredSource.current = anchor;
       onSource.current = mode === 'hover';
       insideCard.current = false;
@@ -239,7 +310,8 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     const back = (event: Event) => {
       if (event.defaultPrevented || !open.current) return;
       event.preventDefault();
-      dismiss(true);
+      if (detailVisible.current) closeDetails();
+      else dismiss(true);
     };
     const leave = () => dismiss();
     window.addEventListener(beforeAppBackEvent, back, true);
@@ -248,12 +320,21 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
       window.removeEventListener(beforeAppBackEvent, back, true);
       window.removeEventListener(screenDeactivateEvent, leave);
     };
-  }, [dismiss]);
+  }, [closeDetails, dismiss]);
+  useEffect(() => {
+    const dialog = detailDialog.current;
+    if (!detailOpen || !dialog) return;
+    if (!dialog.open) dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, [detailOpen]);
   useEffect(
     () => () => {
       generation.current++;
       open.current = false;
       controller.current?.abort();
+      origin.current?.removeAttribute?.('data-word-card-active');
       window.clearTimeout(closeTimer.current);
       window.clearTimeout(requestTimer.current);
     },
@@ -266,14 +347,16 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
       if (
         !(target instanceof Node) ||
         panel.current?.contains(target) ||
+        detailDialog.current?.contains(target) ||
         origin.current?.contains(target)
       )
         return;
       if (target instanceof Element && target.closest('.word-token')) return;
+      if (detailVisible.current) return;
       dismiss();
     };
     const keyboard = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !detailVisible.current) {
         event.preventDefault();
         dismiss(pinState.current || !!panel.current?.contains(document.activeElement));
       }
@@ -297,12 +380,19 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     document.addEventListener('pointermove', move);
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', reposition, true);
+    window.visualViewport?.addEventListener('resize', reposition);
+    window.visualViewport?.addEventListener('scroll', reposition);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reposition);
+    if (panel.current) observer?.observe(panel.current);
     return () => {
       document.removeEventListener('pointerdown', outside, true);
       document.removeEventListener('keydown', keyboard);
       document.removeEventListener('pointermove', move);
       window.removeEventListener('resize', reposition);
       window.removeEventListener('scroll', reposition, true);
+      window.visualViewport?.removeEventListener('resize', reposition);
+      window.visualViewport?.removeEventListener('scroll', reposition);
+      observer?.disconnect();
     };
   }, [card !== null, cancelClose, dismiss, reposition, scheduleClose]);
   useEffect(() => {
@@ -315,7 +405,8 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
     }
     const content = panel.current?.querySelector('.word-card-scroll');
     if (content) content.scrollTop = 0;
-  }, [card]);
+    reposition();
+  }, [card, reposition]);
   async function toggleSaved() {
     if (!user || !word || busyRef.current) return;
     const target = word;
@@ -351,131 +442,210 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
       {children}
       {card &&
         createPortal(
-          <div
-            ref={panel}
-            className="word-card-layer"
-            style={position}
-            role="dialog"
-            aria-modal="false"
-            aria-labelledby={titleId}
-            data-mode={pinned ? 'pinned' : 'hover'}
-            onPointerEnter={() => {
-              insideCard.current = true;
-              cancelClose();
-            }}
-            onPointerLeave={() => {
-              insideCard.current = false;
-              scheduleClose();
-            }}
-            onPointerDown={(event) => {
-              if (!(event.target as HTMLElement).closest?.('[data-word-card-pin]')) pin();
-            }}
-            onFocusCapture={(event) => {
-              if (!(event.target as HTMLElement).closest?.('[data-word-card-pin]')) pin();
-            }}
-          >
-            <div className="word-card-panel">
-              <div className="word-card-top">
-                <div className="word-card-heading" tabIndex={-1}>
-                  <h2 id={titleId}>{word?.lemma || card.queried}</h2>
-                </div>
-                <div className="word-card-tools">
-                  {word &&
-                    (user ? (
-                      <WordSaveButton
-                        lemma={word.lemma}
-                        saved={saved}
-                        consolidated={consolidated}
-                        busy={busy}
-                        disabled={collection.isFetching || !!collection.error || !collection.data}
-                        onClick={() => void toggleSaved()}
-                      />
-                    ) : (
-                      <IconActionHint label="登录后加入生词本">
-                        <Link
-                          className="icon-button word-save-button"
-                          to="/auth"
-                          aria-label={`登录后加入生词本 ${word.lemma}`}
-                        >
-                          <Star size={20} />
-                        </Link>
-                      </IconActionHint>
-                    ))}
-                  <IconActionHint label={pinned ? '取消固定卡片' : '固定卡片'}>
-                    <button
-                      type="button"
-                      className={`icon-button word-card-pin${pinned ? ' pinned' : ''}`}
-                      data-word-card-pin
-                      aria-label={pinned ? '取消固定词卡' : '固定词卡'}
-                      aria-pressed={pinned}
-                      onClick={togglePin}
-                    >
-                      <Pin size={17} fill={pinned ? 'currentColor' : 'none'} />
-                    </button>
-                  </IconActionHint>
-                  <button
-                    className="icon-button"
-                    aria-label="关闭词卡，返回原文"
-                    onClick={() => dismiss(true)}
-                  >
-                    <X size={19} />
-                  </button>
-                </div>
-              </div>
-              {actionNotice && (
-                <div className="word-card-save-notice" role="status">
-                  <span>{actionNotice}</span>
-                  <Link to="/wordbook">查看生词本</Link>
-                </div>
-              )}
-              {word && !!(actionError ?? collection.error) && (
-                <div className="word-card-action-notice">
-                  <ErrorNotice
-                    error={actionError ?? collection.error}
-                    onRetry={collection.error ? () => void collection.refetch() : undefined}
-                  />
-                </div>
-              )}
-              <div className="word-card-scroll">
-                {card.loading && <Loading text="正在查找…" />}
-                <ErrorNotice error={card.error} />
-                {!!card.error && (
-                  <button
-                    className="button ghost"
-                    onClick={() =>
-                      origin.current && openWord(card.queried, origin.current, 'pinned')
-                    }
-                  >
-                    重新查询
-                  </button>
-                )}
-                {card.result && !card.result.word && (
-                  <Empty
-                    title="没有找到这个词。"
-                    description="换个拼写试试。"
-                    action={
-                      <Link
-                        className="button ghost"
-                        to={`/lookup?q=${encodeURIComponent(card.queried)}`}
+          <>
+            <div
+              ref={panel}
+              className="word-card-layer"
+              style={position}
+              role="dialog"
+              aria-modal="false"
+              aria-labelledby={titleId}
+              data-mode={pinned ? 'pinned' : 'hover'}
+              data-placement={placement}
+              onPointerEnter={() => {
+                insideCard.current = true;
+                cancelClose();
+              }}
+              onPointerLeave={() => {
+                insideCard.current = false;
+                scheduleClose();
+              }}
+              onPointerDown={(event) => {
+                if (!(event.target as HTMLElement).closest?.('[data-word-card-pin]')) pin();
+              }}
+              onFocusCapture={(event) => {
+                if (!(event.target as HTMLElement).closest?.('[data-word-card-pin]')) pin();
+              }}
+            >
+              <div className="word-card-panel">
+                <div className="word-card-top">
+                  <div className="word-card-heading" tabIndex={-1}>
+                    <h2 id={titleId}>{word?.lemma || card.queried}</h2>
+                  </div>
+                  <div className="word-card-tools">
+                    {word &&
+                      (user ? (
+                        <WordSaveButton
+                          lemma={word.lemma}
+                          saved={saved}
+                          consolidated={consolidated}
+                          busy={busy}
+                          disabled={collection.isFetching || !!collection.error || !collection.data}
+                          onClick={() => void toggleSaved()}
+                        />
+                      ) : (
+                        <IconActionHint label="登录后加入生词本">
+                          <Link
+                            className="icon-button word-save-button"
+                            to="/auth"
+                            aria-label={`登录后加入生词本 ${word.lemma}`}
+                          >
+                            <Star size={20} />
+                          </Link>
+                        </IconActionHint>
+                      ))}
+                    <IconActionHint label={pinned ? '取消固定卡片' : '固定卡片'}>
+                      <button
+                        type="button"
+                        className={`icon-button word-card-pin${pinned ? ' pinned' : ''}`}
+                        data-word-card-pin
+                        aria-label={pinned ? '取消固定词卡' : '固定词卡'}
+                        aria-pressed={pinned}
+                        onClick={togglePin}
                       >
-                        到查词页搜索
-                      </Link>
-                    }
-                  />
+                        <Pin size={17} fill={pinned ? 'currentColor' : 'none'} />
+                      </button>
+                    </IconActionHint>
+                    <button
+                      className="icon-button"
+                      aria-label="关闭词卡，返回原文"
+                      onClick={() => dismiss(true)}
+                    >
+                      <X size={19} />
+                    </button>
+                  </div>
+                </div>
+                {actionNotice && (
+                  <div className="word-card-save-notice" role="status">
+                    <span>{actionNotice}</span>
+                    {!actionNotice.includes('固定') && <Link to="/wordbook">查看生词本</Link>}
+                  </div>
                 )}
+                {word && !!(actionError ?? collection.error) && (
+                  <div className="word-card-action-notice">
+                    <ErrorNotice
+                      error={actionError ?? collection.error}
+                      onRetry={collection.error ? () => void collection.refetch() : undefined}
+                    />
+                  </div>
+                )}
+                <div className="word-card-scroll">
+                  {card.loading && <Loading text="正在查找…" />}
+                  <ErrorNotice error={card.error} />
+                  {!!card.error && (
+                    <button
+                      className="button ghost"
+                      onClick={() =>
+                        origin.current && openWord(card.queried, origin.current, 'pinned')
+                      }
+                    >
+                      重新查询
+                    </button>
+                  )}
+                  {card.result && !card.result.word && (
+                    <Empty
+                      title="没有找到这个词。"
+                      description="换个拼写试试。"
+                      action={
+                        <Link
+                          className="button ghost"
+                          to={`/lookup?q=${encodeURIComponent(card.queried)}`}
+                        >
+                          到查词页搜索
+                        </Link>
+                      }
+                    />
+                  )}
+                  {word && (
+                    <>
+                      {card.result?.matchType === 'inflection' && (
+                        <Notice>
+                          {card.queried} → {card.result.matchedLemma}
+                        </Notice>
+                      )}
+                      <WordCardSummary word={word} />
+                    </>
+                  )}
+                </div>
                 {word && (
-                  <>
-                    {card.result?.matchType === 'inflection' && (
-                      <Notice>
-                        {card.queried} → {card.result.matchedLemma}
-                      </Notice>
-                    )}
-                    <WordCardContent word={word} />
-                  </>
+                  <button
+                    ref={detailTrigger}
+                    className="word-card-detail-trigger"
+                    type="button"
+                    aria-haspopup="dialog"
+                    aria-expanded={detailOpen}
+                    onClick={showDetails}
+                  >
+                    查看详细释义 <ArrowUpRight size={17} aria-hidden="true" />
+                  </button>
                 )}
               </div>
             </div>
-          </div>,
+            {word && detailOpen && (
+              <WordCardContext.Provider value={null}>
+                <dialog
+                  ref={detailDialog}
+                  className="word-card-detail-dialog"
+                  aria-labelledby={`${titleId}-detail`}
+                  onCancel={(event) => {
+                    event.preventDefault();
+                    closeDetails();
+                  }}
+                  onClick={(event) => {
+                    if (event.target === event.currentTarget) closeDetails();
+                  }}
+                >
+                  <div className="word-card-detail-panel">
+                    <div className="word-card-detail-top">
+                      <button
+                        className="icon-button"
+                        type="button"
+                        aria-label="返回简明词卡"
+                        onClick={closeDetails}
+                      >
+                        <ArrowLeft size={20} />
+                      </button>
+                      <h2 id={`${titleId}-detail`}>{word.lemma}</h2>
+                      {user && (
+                        <WordSaveButton
+                          lemma={word.lemma}
+                          saved={saved}
+                          consolidated={consolidated}
+                          busy={busy}
+                          disabled={collection.isFetching || !!collection.error || !collection.data}
+                          onClick={() => void toggleSaved()}
+                        />
+                      )}
+                      <button
+                        className="icon-button"
+                        type="button"
+                        aria-label="关闭详细释义，返回简明词卡"
+                        onClick={closeDetails}
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                    {actionNotice && (
+                      <p className="word-card-detail-feedback" role="status">
+                        {actionNotice}
+                      </p>
+                    )}
+                    {!!(actionError ?? collection.error) && (
+                      <div className="word-card-action-notice">
+                        <ErrorNotice
+                          error={actionError ?? collection.error}
+                          onRetry={collection.error ? () => void collection.refetch() : undefined}
+                        />
+                      </div>
+                    )}
+                    <div className="word-card-detail-scroll">
+                      <WordCardContent word={word} />
+                    </div>
+                  </div>
+                </dialog>
+              </WordCardContext.Provider>
+            )}
+          </>,
           document.body,
         )}
     </WordCardContext.Provider>

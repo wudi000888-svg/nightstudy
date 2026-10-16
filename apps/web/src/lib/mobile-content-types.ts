@@ -24,7 +24,8 @@ export interface LearningDay {
 }
 export interface LibraryWord {
   word: Word;
-  progress: Progress;
+  progress: Progress | null;
+  collection: { inWordbook: boolean; wordbookStatus: 'active' | 'consolidated' | null };
   learnedAt: string | null;
   reviewedAt: string | null;
   dueAt: string | null;
@@ -113,5 +114,6 @@ export interface AcademyAttempt {
 }
 export interface LibraryResponse {
   items: LibraryWord[];
-  page: PageInfo;
+  book: { id: string; title: string } | null;
+  page: PageInfo & { anchorWordId?: string };
 }

@@ -381,9 +381,15 @@ export interface SessionItem {
   status: string;
   bucket: 'new' | 'review' | null;
   question?: Question;
+  recognition?: {
+    options: { id: string; text: string; pos?: string }[];
+    selectedOptionId?: string;
+    correctOptionId?: string;
+  };
 }
 export interface StudySession {
   id: string;
+  learnRecallMode?: 'recall' | 'recognition';
   spellingEnabled?: boolean;
   bookId: string | null;
   mode: 'learn' | 'review' | 'daily' | 'extra-review';

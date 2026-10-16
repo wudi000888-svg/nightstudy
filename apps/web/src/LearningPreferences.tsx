@@ -16,6 +16,7 @@ export interface LearningPreferences {
   accent: 'us' | 'uk';
   autoPlay: boolean;
   spellingEnabled: boolean;
+  meaningChoiceEnabled: boolean;
   fontScale: 1 | 1.125 | 1.25;
   reminderEnabled: boolean;
   reminderTime: string;
@@ -27,6 +28,7 @@ export const defaultLearningPreferences: LearningPreferences = {
   accent: 'us',
   autoPlay: false,
   spellingEnabled: true,
+  meaningChoiceEnabled: true,
   fontScale: 1,
   reminderEnabled: false,
   reminderTime: '20:00',

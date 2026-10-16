@@ -57,5 +57,6 @@ export async function mutateWordbook(
   };
   client.setQueryData(queryKey, entry);
   void client.resetQueries({ queryKey: [scope, 'wordbook'] }).catch(() => {});
+  void client.resetQueries({ queryKey: [scope, 'library'] }).catch(() => {});
   return receipt;
 }

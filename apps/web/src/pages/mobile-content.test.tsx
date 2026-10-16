@@ -181,6 +181,10 @@ function find(tree: ReactNode, predicate: (node: Element) => boolean) {
 }
 function render(component: () => ReactNode) {
   state.cursor = state.refCursor = 0;
+  if (component === LearningLibraryPage) {
+    const wrapper = LearningLibraryPage();
+    return (wrapper.type as (props: unknown) => ReactElement)(wrapper.props);
+  }
   return component();
 }
 const click = (element: Element) => (element.props.onClick as () => void)();
@@ -226,8 +230,18 @@ function homeEntry(
   state: H5HomeEntry['state'],
   count = 0,
   sessionId: string | null = null,
+  route: 'learn' | 'review' = 'learn',
 ): H5HomeEntry {
-  return { state, count, sessionId, sessionRevision: null, phase: null, availableAt: null };
+  return {
+    state,
+    count,
+    sessionId,
+    sessionRevision: null,
+    phase: null,
+    sessionRoute: sessionId ? route : null,
+    sessionKind: sessionId ? (route === 'learn' ? 'new' : 'review') : null,
+    availableAt: null,
+  };
 }
 function homeSummary(): H5HomeSummary {
   return {
@@ -302,6 +316,49 @@ it('keeps the single-screen home to four areas and reads both action counts from
   expect(state.navigate.mock.calls).toEqual([['/learn?start=1'], ['/review?start=1']]);
   expect(post).not.toHaveBeenCalled();
 });
+it('shows no review words for a pure new-word blocker and resumes it through Learn', () => {
+  const summary = homeSummary();
+  summary.learn = homeEntry('resume', 3, 'new-only');
+  summary.review = homeEntry('other_task', 0, 'new-only');
+  state.remote['app/home'] = summary;
+  const tree = render(HomePage);
+  const review = find(
+    tree,
+    (node) => node.props['aria-label'] === 'Review，暂无复习，先完成新学，0词',
+  );
+  expect(
+    all(review).some((node) => node.props.className === 'h5-home-count' && text(node) === '0词'),
+  ).toBe(true);
+  click(review);
+  expect(state.navigate).toHaveBeenCalledWith('/learn?session=new-only');
+  expect(post).not.toHaveBeenCalled();
+});
+it('keeps the real new-word quota while an actual review task blocks Learn and resumes Review directly', () => {
+  const summary = homeSummary();
+  summary.learn = homeEntry('review_first', 4, 'review-only', 'review');
+  summary.review = homeEntry('resume', 2, 'review-only', 'review');
+  state.remote['app/home'] = summary;
+  const tree = render(HomePage);
+  const learn = find(tree, (node) => node.props['aria-label'] === 'Learn，先复习，再学新词，4词');
+  expect(
+    all(learn).some((node) => node.props.className === 'h5-home-count' && text(node) === '4词'),
+  ).toBe(true);
+  click(learn);
+  expect(state.navigate).toHaveBeenCalledWith('/review?session=review-only');
+});
+it('keeps each bucket count in a mixed group while both controls restore its canonical route', () => {
+  const summary = homeSummary();
+  summary.learn = { ...homeEntry('resume', 3, 'mixed'), sessionKind: 'mixed' };
+  summary.review = { ...homeEntry('resume', 1, 'mixed'), sessionKind: 'mixed' };
+  state.remote['app/home'] = summary;
+  const tree = render(HomePage);
+  click(find(tree, (node) => node.props['aria-label'] === 'Learn，继续当前学习组，3词'));
+  click(find(tree, (node) => node.props['aria-label'] === 'Review，继续当前学习组，1词'));
+  expect(state.navigate.mock.calls).toEqual([['/learn?session=mixed'], ['/learn?session=mixed']]);
+  expect(homeEntryDestination({ ...summary.review, sessionRoute: null }, 'review')).toBe(
+    '/learning?section=tasks',
+  );
+});
 it('opens the three retained modules and avatar as overlays rather than ordinary page links', () => {
   const tree = render(HomePage);
   for (const label of ['个人中心', '英语学堂', '我的内容', '我的学习'])
@@ -317,13 +374,13 @@ it('opens the three retained modules and avatar as overlays rather than ordinary
 it('preserves a visitor’s exact learning intention through login', () => {
   state.user = false;
   const tree = render(HomePage);
-  click(find(tree, (node) => node.props['aria-label'] === 'Review，开始学习'));
+  click(find(tree, (node) => node.props['aria-label'] === 'Review，登录查看复习'));
   expect(state.navigate).toHaveBeenCalledWith('/auth?next=%2Freview%3Fstart%3D1');
   expect(
     all(tree)
       .filter((node) => node.props.className === 'h5-home-count')
       .map((node) => text(node)),
-  ).toEqual(['—', '—']);
+  ).toEqual([]);
 });
 it('restores only known internal app destinations after authentication', () => {
   expect(authReturnPath('/review?start=1')).toBe('/review?start=1');
@@ -349,7 +406,7 @@ it('keeps unsynchronized or conflicting actions from issuing another task', () =
   expect(post).not.toHaveBeenCalled();
 });
 it('routes resume, review-first, wait and complete states without manufacturing empty groups', () => {
-  expect(homeEntryDestination(homeEntry('resume', 1, 'saved/task'), 'review')).toBe(
+  expect(homeEntryDestination(homeEntry('resume', 1, 'saved/task', 'review'), 'review')).toBe(
     '/review?session=saved%2Ftask',
   );
   expect(homeEntryDestination(homeEntry('other_task', 1, 'active'), 'learn')).toBe(
@@ -395,6 +452,74 @@ it('gives guests a real login destination for their private content and keeps pu
   expect(all(tree).filter((node) => node.props.to === '/auth').length).toBeGreaterThanOrEqual(7);
   expect(all(tree).some((node) => node.props.to === '/lookup')).toBe(true);
   expect(text(tree)).not.toContain('516');
+});
+
+it('opens the selected book by its real book id and only exposes available academy tools', () => {
+  state.remote['me/settings'] = { settings: { currentBookId: 'book/rain' } };
+  state.remote.books = {
+    items: [{ id: 'book/rain', title: '雨夜词书', learnedCount: 12, wordCount: 240 }],
+  };
+  state.remote.academy = {
+    items: [
+      { category: 'reading', audioAvailable: null },
+      { category: 'listening', audioAvailable: false },
+      { category: 'shadowing', audioAvailable: true },
+    ],
+  };
+  const tree = render(ContentPage);
+  expect(all(tree).some((node) => node.props.to === '/library?bookId=book%2Frain&view=all')).toBe(
+    true,
+  );
+  expect(text(tree)).toContain('雨夜词书');
+  for (const title of ['练习工具', '当前内容', '学习记录', '我的积累', '词库与导入'])
+    expect(text(tree)).toContain(title);
+  expect(all(tree).some((node) => node.props.to === '/academy?tab=reading')).toBe(true);
+  expect(all(tree).some((node) => node.props.to === '/academy?tab=shadowing')).toBe(true);
+  expect(all(tree).some((node) => node.props.to === '/academy?tab=listening')).toBe(false);
+});
+
+it('keeps the learning summary compact and moves calendar and statistics to their own details', () => {
+  const summary = homeSummary();
+  state.remote['app/home'] = summary;
+  state.plan = {
+    plan: { ...summary.plan, plannedReview: 24, plannedNew: 20 },
+    settings: {},
+  };
+  state.remote.books = {
+    items: [{ id: 'book-rain', title: '雨夜词书', goal: 'cet4', learnedCount: 32, wordCount: 240 }],
+  };
+  const tree = render(H5LearningPage);
+  expect(text(tree)).toContain('每日总目标');
+  expect(text(tree)).not.toContain('累计已学');
+  expect(all(tree).some((node) => node.type === LearningCalendar)).toBe(false);
+  for (const to of ['/learning?section=stats', '/learning?section=calendar', '/memory'])
+    expect(all(tree).some((node) => node.props.to === to)).toBe(true);
+  state.params = new URLSearchParams('section=calendar');
+  const calendar = render(H5LearningPage);
+  expect(all(calendar).some((node) => node.type === LearningCalendar)).toBe(true);
+  expect(all(calendar).some((node) => node.props.to === '/learning')).toBe(true);
+  expect(text(calendar)).not.toContain('每日总目标');
+});
+
+it('shows week and month learning amounts from recorded distinct-word values rather than review event counts', () => {
+  state.params = new URLSearchParams('section=stats');
+  state.remote.stats = {
+    today: { uniqueWords: 4, minutes: 8 },
+    totalLearned: 120,
+    totalReviews: 340,
+    trends: Array.from({ length: 10 }, (_, index) => ({
+      date: `2026-10-${String(index + 1).padStart(2, '0')}`,
+      newWords: 2,
+      reviewWords: 3,
+      reviews: 999,
+    })),
+  };
+  const week = render(H5LearningPage);
+  expect(all(week).filter((node) => node.type === 'li')).toHaveLength(7);
+  expect(text(week)).not.toContain('999');
+  expect(all(week).some((node) => node.props['aria-label'] === '新学2词，复习3词')).toBe(true);
+  click(find(week, (node) => node.type === 'button' && text(node) === '近一月'));
+  expect(all(render(H5LearningPage)).filter((node) => node.type === 'li')).toHaveLength(10);
 });
 
 const sourcePath = 'sentences/status?wordId=word-rain';
@@ -761,7 +886,8 @@ it('labels a resumed Home number as the current group, separate from unassigned 
     tree,
     (node) => node.type === 'button' && String(node.props['aria-label']).startsWith('Learn，'),
   );
-  expect(text(learn)).toContain('继续本组 6 词');
+  expect(text(learn)).toContain('继续这一组');
+  expect(text(find(learn, (node) => node.props.className === 'h5-home-count'))).toBe('6词');
   expect(text(learn)).not.toContain('21');
 });
 

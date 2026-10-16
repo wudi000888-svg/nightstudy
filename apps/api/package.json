@@ -1,6 +1,6 @@
 {
   "name": "@nightstudy/api",
-  "version": "0.11.0-alpha.3",
+  "version": "0.12.0-alpha.1",
   "private": true,
   "type": "module",
   "scripts": {

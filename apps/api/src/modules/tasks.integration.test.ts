@@ -795,7 +795,7 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     expect(reviewHome).toMatchObject({
       plan: { newRemaining: 0, reviewRemaining: 2 },
       review: { state: 'ready', count: 2 },
-      learn: { state: 'review_first', count: 2 },
+      learn: { state: 'review_first', count: 0 },
     });
     const reviewPlan = (await request(reviewActor.userId, 'GET', '/study/plan')).json().plan;
     expect(reviewPlan).toMatchObject({
@@ -1390,7 +1390,7 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     const home = (await request(userId, 'GET', '/app/home')).json();
     expect(home.plan).toMatchObject({ dailyTotalGoal: 5, newRemaining: 3, reviewRemaining: 2 });
     expect(home.review).toMatchObject({ state: 'ready', count: 2 });
-    expect(home.learn).toMatchObject({ state: 'review_first', count: 2 });
+    expect(home.learn).toMatchObject({ state: 'review_first', count: 3 });
     expect(await db.studySession.count({ where: { userId } })).toBe(0);
     const group = (await issue(userId, { mode: 'review' })).session;
     expect(group).toMatchObject({ taskKind: 'daily', mode: 'review' });
@@ -1399,7 +1399,13 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     const after = (await request(userId, 'GET', '/app/home')).json();
     expect(after.plan).toMatchObject({ dailyTotalGoal: 5, newRemaining: 3 });
     expect(after.review).toMatchObject({ state: 'resume', sessionId: group.id, count: 2 });
-    expect(after.learn).toMatchObject({ state: 'review_first', sessionId: group.id });
+    expect(after.learn).toMatchObject({
+      state: 'review_first',
+      count: 3,
+      sessionId: group.id,
+      sessionKind: 'review',
+      sessionRoute: 'review',
+    });
     expect(after.checkedIn).toBe(false);
   });
   it('keeps future reviews waiting and does not manufacture a group or reuse their reserved new-word slot', async () => {
@@ -1417,11 +1423,148 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     });
     expect(home.learn).toMatchObject({
       state: 'waiting',
-      count: 1,
+      count: 0,
       availableAt: due.toISOString(),
     });
     expect(await db.studySession.count({ where: { userId } })).toBe(0);
     expect((await issue(userId, { mode: 'review' })).session).toBeNull();
+  });
+  it('keeps a pure new-word task out of the Review count and points its blocker back to Learn', async () => {
+    const { userId } = await actor(3, 3);
+    let group = (await issue(userId)).session;
+    expect(group.items.every((item: any) => item.bucket === 'new')).toBe(true);
+    group = (await command(userId, group, 'reveal')).session;
+    const home = (await request(userId, 'GET', '/app/home')).json();
+    expect(home.learn).toMatchObject({
+      state: 'resume',
+      count: 3,
+      sessionId: group.id,
+      sessionKind: 'new',
+      sessionRoute: 'learn',
+    });
+    expect(home.review).toMatchObject({
+      state: 'other_task',
+      count: 0,
+      sessionId: group.id,
+      sessionKind: 'new',
+      sessionRoute: 'learn',
+    });
+    expect(home.plan).toMatchObject({ completedUnique: 0, completedNew: 0, completedReview: 0 });
+    expect(await db.reviewLog.count({ where: { userId } })).toBe(0);
+    const blocked = await request(userId, 'POST', '/study/sessions', {
+      mode: 'review',
+      commandId: randomUUID(),
+    });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().code).toBe('another_task_active');
+    expect(await db.studySession.count({ where: { userId } })).toBe(1);
+  });
+  it('counts unfinished new and review buckets independently within the same fixed mixed group', async () => {
+    const { userId } = await actor(4, 4);
+    await db.userLearningPreference.create({ data: { userId, spellingEnabled: false } });
+    await progress(userId, 0, new Date(Date.now() - 60000));
+    let group = (await issue(userId, { size: 4 })).session;
+    const newCount = group.items.filter((item: any) => item.bucket === 'new').length;
+    const reviewCount = group.items.filter((item: any) => item.bucket === 'review').length;
+    expect(newCount).toBe(3);
+    expect(reviewCount).toBe(1);
+    const home = (await request(userId, 'GET', '/app/home')).json();
+    expect(home.learn).toMatchObject({
+      state: 'resume',
+      count: 3,
+      sessionId: group.id,
+      sessionKind: 'mixed',
+      sessionRoute: 'learn',
+    });
+    expect(home.review).toMatchObject({
+      state: 'resume',
+      count: 1,
+      sessionId: group.id,
+      sessionKind: 'mixed',
+      sessionRoute: 'learn',
+    });
+    expect(group.items[0].bucket).toBe('review');
+    group = (await command(userId, group, 'reveal')).session;
+    group = (await command(userId, group, 'rate')).session;
+    const after = (await request(userId, 'GET', '/app/home')).json();
+    expect(after.learn).toMatchObject({
+      state: 'resume',
+      count: 3,
+      sessionKind: 'new',
+      sessionRoute: 'learn',
+    });
+    expect(after.review).toMatchObject({
+      state: 'other_task',
+      count: 0,
+      sessionKind: 'new',
+      sessionRoute: 'learn',
+    });
+    expect(after.plan).toMatchObject({ completedUnique: 1, completedNew: 0, completedReview: 1 });
+    expect(await db.reviewLog.count({ where: { userId } })).toBe(1);
+  });
+  it('keeps future same-day consolidation out of Review during spelling and until its real due time', async () => {
+    const { userId } = await actor(6, 3);
+    let group = (await issue(userId)).session;
+    while (group.phase === 'recall') {
+      group = (await command(userId, group, 'reveal')).session;
+      group = (await command(userId, group, 'rate', { rating: 'good' })).session;
+    }
+    expect(group.phase).toBe('practice');
+    const spelling = (await request(userId, 'GET', '/app/home')).json();
+    expect(spelling.plan).toMatchObject({
+      completedUnique: 3,
+      completedNew: 3,
+      completedReview: 0,
+      newRemaining: 3,
+      reviewRemaining: 3,
+      pendingConsolidationCount: 3,
+      pendingSpellingCount: 3,
+    });
+    expect(spelling.learn).toMatchObject({
+      state: 'resume',
+      count: 3,
+      phase: 'practice',
+      sessionKind: 'new',
+      sessionRoute: 'learn',
+    });
+    expect(spelling.review).toMatchObject({
+      state: 'other_task',
+      count: 0,
+      sessionKind: 'new',
+      sessionRoute: 'learn',
+    });
+    while (group.phase === 'practice') {
+      group = (
+        await command(userId, group, 'answer', { answer: group.items[group.cursor].word.lemma })
+      ).session;
+    }
+    const waiting = (await request(userId, 'GET', '/app/home')).json();
+    expect(waiting.plan).toMatchObject({
+      completedUnique: 3,
+      completedReview: 0,
+      newRemaining: 3,
+      pendingConsolidationCount: 3,
+      pendingSpellingCount: 0,
+    });
+    expect(waiting.review).toMatchObject({ state: 'waiting', count: 0, sessionId: null });
+    expect(new Date(waiting.review.availableAt).getTime()).toBeGreaterThan(Date.now());
+    expect(waiting.learn).toMatchObject({ state: 'ready', count: 3 });
+    const due = await db.studyProgress.findFirstOrThrow({
+      where: { userId },
+      orderBy: { dueAt: 'desc' },
+    });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(due.dueAt.getTime() + 1000));
+    const available = (await request(userId, 'GET', '/app/home')).json();
+    expect(available.review).toMatchObject({ state: 'ready', count: 3, sessionId: null });
+    expect(available.plan).toMatchObject({
+      completedUnique: 3,
+      completedNew: 3,
+      completedReview: 0,
+      newRemaining: 3,
+    });
+    expect(await db.reviewLog.count({ where: { userId } })).toBe(3);
+    expect(await db.studySession.count({ where: { userId } })).toBe(1);
   });
   it('only checks in after the real group finishes its required spelling and keeps another user isolated', async () => {
     const { userId } = await actor(1, 1),

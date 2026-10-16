@@ -36,7 +36,7 @@ describe('application transition ownership', () => {
     expect(state.finish(reopening.id)).toBe(false);
   });
 
-  it('drops every old private transition snapshot on scope teardown and skips study, initial and reduced-motion transitions', () => {
+  it('drops every old private transition snapshot on scope teardown and skips initial and reduced-motion transitions', () => {
     const state = new ScreenTransitionState();
     const privatePage = screen('/notes?note=account-a', 'private-a');
     const outgoing = state.begin(privatePage, screen('/', 'home', 'home'), 'POP')!;
@@ -45,9 +45,58 @@ describe('application transition ownership', () => {
     expect(state.finish(outgoing.id)).toBe(false);
     expect(state.begin(null, privatePage, 'POP')).toBeNull();
     expect(state.begin(privatePage, screen('/me', 'account-b'), 'PUSH', true)).toBeNull();
+    expect(state.current).toBeNull();
+  });
+
+  it('draws study entry and exit on the new active screen without drawing an outgoing study subtree', () => {
+    const state = new ScreenTransitionState();
+    const home = screen('/', 'home', 'home');
+    const study = screen('/learn?session=issued', 'task', 'study');
+    const opening = state.begin(home, study, 'PUSH')!;
+    expect(opening.kind).toBe('study-enter');
+    expect(opening.duration).toBe(200);
+    expect(state.current?.to.location.search).toBe('?session=issued');
+    expect(screenTransitionFrames(opening, 'incoming')?.[0]?.transform).toBe(
+      'translate3d(12%, 0, 0)',
+    );
+    expect(screenTransitionFrames(opening, 'outgoing')).toBeNull();
+    const exiting = state.begin(study, home, 'POP')!;
+    expect(exiting.kind).toBe('study-exit');
+    expect(exiting.duration).toBe(180);
+    expect(screenTransitionFrames(exiting, 'incoming')?.[0]?.transform).toBe(
+      'translate3d(-12%, 0, 0)',
+    );
+    expect(screenTransitionFrames(exiting, 'outgoing')).toBeNull();
+    expect(state.finish(opening.id)).toBe(false);
+    expect(state.current).toBe(exiting);
+  });
+
+  it('never animates task URL replacement, same-URL POP or switching directly between study modes', () => {
+    const state = new ScreenTransitionState();
+    const start = screen('/learn?start=1', 'start', 'study');
+    const issued = screen('/learn?session=issued', 'issued', 'study');
+    expect(state.begin(start, issued, 'REPLACE')).toBeNull();
     expect(
-      state.begin(privatePage, screen('/learn?session=issued', 'task', 'study'), 'PUSH'),
+      state.begin(issued, { ...issued, location: { ...issued.location, key: 'restored' } }, 'POP'),
     ).toBeNull();
+    expect(
+      state.begin(issued, screen('/review?session=review', 'review', 'study'), 'PUSH'),
+    ).toBeNull();
+    expect(state.current).toBeNull();
+  });
+
+  it('cancels entry ownership immediately on browser Back, a newer module route or reduced motion', () => {
+    const state = new ScreenTransitionState();
+    const home = screen('/', 'home', 'home');
+    const study = screen('/review?start=1', 'review', 'study');
+    const entry = state.begin(home, study, 'PUSH')!;
+    const back = state.begin(study, home, 'POP')!;
+    const next = state.begin(home, screen('/content', 'content'), 'PUSH')!;
+    expect(state.finish(entry.id)).toBe(false);
+    expect(state.finish(back.id)).toBe(false);
+    expect(state.current).toBe(next);
+    expect(state.begin(next.from, next.to, 'PUSH', true)).toBeNull();
+    expect(state.finish(next.id)).toBe(false);
     expect(state.current).toBeNull();
   });
 

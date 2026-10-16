@@ -1,6 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { Search, Trash2, Pause, Play, Pencil, ArrowLeft, X, ArrowDownUp } from 'lucide-react';
+import {
+  Search,
+  Trash2,
+  Pause,
+  Play,
+  Pencil,
+  ArrowLeft,
+  X,
+  SlidersHorizontal,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ArrowUpRight,
+} from 'lucide-react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp, useRemote } from '../AppContext';
 import { useScreenActive } from '../lib/screen-lifecycle';
@@ -8,6 +21,7 @@ import { api, post } from '../lib/api';
 import type { Word, WordbookItem } from '../lib/types';
 import { dictionaryText } from '../lib/dictionary';
 import { stopApplicationAudio } from '../lib/audio-manager';
+import { AudioButton } from '../components/Pronunciation';
 import {
   lookupConditions,
   lookupParams,
@@ -41,6 +55,21 @@ import {
 } from '../components/UI';
 import './mobile-lookup.css';
 
+function SavedWordPronunciation({ wordId }: { wordId: string }) {
+  const word = useRemote<{ word: Word }>('words', `words/${encodeURIComponent(wordId)}`);
+  return word.data?.word.id === wordId ? (
+    <AudioButton word={word.data.word} />
+  ) : word.error ? (
+    <button type="button" className="text-link" onClick={() => void word.refetch()}>
+      重新读取发音
+    </button>
+  ) : (
+    <span className="lookup-row-loading" role="status">
+      正在读取发音…
+    </span>
+  );
+}
+
 export function LookupPage({ initialTab = 'lookup' }: { initialTab?: LookupKind }) {
   const { scope } = useApp();
   return <LookupContent key={`${scope}:${initialTab}`} kind={initialTab} />;
@@ -70,6 +99,11 @@ function LookupContent({ kind }: { kind: LookupKind }) {
   const [editing, setEditing] = useState<WordbookBrief | null>(null);
   const [note, setNote] = useState('');
   const [detailRetry, setDetailRetry] = useState(0);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftMatch, setDraftMatch] = useState<LookupMatch>(match);
+  const [draftSort, setDraftSort] = useState<LookupSort>(sort);
+  const [showDefinitions, setShowDefinitions] = useState(false);
+  const [expandedWord, setExpandedWord] = useState<string | null>(null);
   const lifetime = useRef(0);
   const foreground = useRef(active);
   const locks = useRef(new Set<string>());
@@ -83,6 +117,18 @@ function LookupContent({ kind }: { kind: LookupKind }) {
   const inputRevision = useRef(0);
   const pendingInputRoute = useRef<{ q: string; revision: number } | null>(null);
   const sortExplicit = useRef(params.has('sort'));
+  const matchLabel = {
+    smart: '智能匹配',
+    prefix: '开头匹配',
+    contains: '包含匹配',
+    exact: '精确匹配',
+  }[match];
+  const sortLabel = {
+    relevance: '相关度',
+    'updated-desc': '最近更新',
+    az: 'A → Z',
+    za: 'Z → A',
+  }[sort];
   foreground.current = active;
   useEffect(() => {
     lifetime.current++;
@@ -101,6 +147,7 @@ function LookupContent({ kind }: { kind: LookupKind }) {
   function update(next: Partial<LookupConditions>, replace = true) {
     if (!foreground.current) return;
     stopApplicationAudio();
+    setExpandedWord(null);
     setParams(lookupParams({ ...conditions, ...next }, kind), { replace });
   }
   function submit(text = input) {
@@ -384,38 +431,35 @@ function LookupContent({ kind }: { kind: LookupKind }) {
               查找
             </button>
           </form>
-          <div className="lookup-search-options">
-            <label>
-              <span>匹配</span>
-              <select
-                aria-label="匹配方式"
-                value={match}
-                onChange={(event) => update({ match: event.target.value as LookupMatch })}
+          <div className="lookup-browse-toolbar">
+            <button
+              type="button"
+              className="lookup-filter-summary"
+              aria-label={`筛选与排序：${matchLabel}，${sortLabel}`}
+              onClick={() => {
+                setDraftMatch(match);
+                setDraftSort(sort);
+                setFilterOpen(true);
+              }}
+            >
+              <SlidersHorizontal size={16} />
+              <span>
+                {matchLabel} · {sortLabel}
+              </span>
+              <ChevronDown size={14} />
+            </button>
+            {kind === 'wordbook' && (
+              <button
+                type="button"
+                className="lookup-definition-toggle"
+                aria-label={showDefinitions ? '隐藏全部释义' : '显示全部释义'}
+                aria-pressed={showDefinitions}
+                onClick={() => setShowDefinitions((value) => !value)}
               >
-                <option value="smart">智能匹配</option>
-                <option value="prefix">开头匹配</option>
-                <option value="contains" disabled={Array.from(q).length < 3}>
-                  包含匹配
-                </option>
-                <option value="exact">精确匹配</option>
-              </select>
-            </label>
-            <label>
-              <ArrowDownUp size={15} />
-              <select
-                aria-label="排序方式"
-                value={sort}
-                onChange={(event) => {
-                  sortExplicit.current = true;
-                  update({ sort: event.target.value as LookupSort });
-                }}
-              >
-                <option value="relevance">相关度</option>
-                {kind === 'wordbook' && <option value="updated-desc">最近更新</option>}
-                <option value="az">A → Z</option>
-                <option value="za">Z → A</option>
-              </select>
-            </label>
+                {showDefinitions ? <EyeOff size={17} /> : <Eye size={17} />}
+                <span>释义</span>
+              </button>
+            )}
           </div>
         </>
       )}
@@ -482,11 +526,13 @@ function LookupContent({ kind }: { kind: LookupKind }) {
           ) : (
             <>
               <div className="lookup-results-summary" role="status" aria-live="polite">
-                {busyList
-                  ? '正在查找…'
-                  : firstPage
-                    ? `${q ? `“${q}” · ` : ''}${firstPage.page.total === null ? `已显示 ${items.length} 个词` : `${firstPage.page.total} 个匹配`}`
-                    : ''}
+                {listChanged
+                  ? ''
+                  : busyList
+                    ? '正在查找…'
+                    : firstPage
+                      ? `${q ? `“${q}” · ` : ''}${firstPage.page.total === null ? `已显示 ${items.length} 个词` : `${firstPage.page.total} 个匹配`}`
+                      : ''}
               </div>
               {listChanged ? (
                 <Notice>
@@ -513,7 +559,7 @@ function LookupContent({ kind }: { kind: LookupKind }) {
               ) : (
                 list.isPending && <Loading text="正在读取词语…" />
               )}
-              {suggestions.length > 0 && (
+              {suggestions.length > 0 && !listChanged && (
                 <section className="lookup-suggestions" aria-label="拼写建议">
                   <span>可能想查</span>
                   <div>
@@ -532,115 +578,141 @@ function LookupContent({ kind }: { kind: LookupKind }) {
                   </div>
                 </section>
               )}
-              <section
-                ref={listElement}
-                className="lookup-results"
-                aria-label={kind === 'wordbook' ? '我的生词本列表' : '词典搜索结果'}
-                aria-busy={busyList}
-              >
-                {items.map((item) => {
-                  const savedItem = isWordbookBrief(item) ? item : null;
-                  const word = savedItem ? savedItem.word : (item as DictionaryBrief);
-                  const rowBusy = mutationWords.has(word.id);
-                  return (
-                    <article className="lookup-result-row" key={item.id}>
-                      <button
-                        className="lookup-result-word"
-                        type="button"
-                        aria-label={`查看 ${word.lemma} 完整词条`}
-                        onClick={() => choose(word)}
+              {!listChanged && (
+                <section
+                  ref={listElement}
+                  className="lookup-results"
+                  aria-label={kind === 'wordbook' ? '我的生词本列表' : '词典搜索结果'}
+                  aria-busy={busyList}
+                >
+                  {items.map((item) => {
+                    const savedItem = isWordbookBrief(item) ? item : null;
+                    const word = savedItem ? savedItem.word : (item as DictionaryBrief);
+                    const rowBusy = mutationWords.has(word.id);
+                    const expanded = expandedWord === word.id;
+                    return (
+                      <article
+                        className={`lookup-result-row${savedItem ? ' lookup-compact-row' : ''}${expanded ? ' is-expanded' : ''}`}
+                        key={item.id}
+                        data-word-id={word.id}
                       >
-                        <span className="lookup-result-lemma">
-                          {word.lemma}
-                          {word.matchType === 'exact' && <small>精确</small>}
-                        </span>
-                        <span className="lookup-result-definition">
-                          {word.pos?.length > 0 && <em>{word.pos.join(' / ')}</em>}
-                          {dictionaryText(word.definitionZh) ||
-                            dictionaryText(word.definitionEn) ||
-                            '查看词义'}
-                        </span>
-                      </button>
-                      {savedItem && (
-                        <>
-                          <div className="lookup-result-personal">
-                            {savedItem.note && <p>{savedItem.note}</p>}
-                            <small>
-                              {savedItem.status === 'consolidated' || savedItem.graduatedAt
-                                ? '已巩固'
-                                : savedItem.paused
-                                  ? '已暂停复习'
-                                  : savedItem.progress?.dueAt
-                                    ? `下次复习 ${formatDate(savedItem.progress.dueAt)}`
-                                    : '等待复习'}
-                            </small>
-                          </div>
-                          <div className="lookup-row-actions">
-                            {savedItem.status === 'consolidated' || savedItem.graduatedAt ? (
+                        <button
+                          className="lookup-result-word"
+                          type="button"
+                          aria-label={
+                            savedItem
+                              ? `${expanded ? '收起' : '展开'} ${word.lemma}`
+                              : `查看 ${word.lemma} 完整词条`
+                          }
+                          aria-expanded={savedItem ? expanded : undefined}
+                          onClick={() => {
+                            if (savedItem) setExpandedWord(expanded ? null : word.id);
+                            else choose(word);
+                          }}
+                        >
+                          <span className="lookup-result-lemma">
+                            {word.lemma}
+                            {word.matchType === 'exact' && <small>精确</small>}
+                            {savedItem && <ChevronDown size={16} className="lookup-row-chevron" />}
+                          </span>
+                          {(!savedItem || showDefinitions || expanded) && (
+                            <span className="lookup-result-definition">
+                              {word.pos?.length > 0 && <em>{word.pos.join(' / ')}</em>}
+                              {dictionaryText(word.definitionZh) ||
+                                dictionaryText(word.definitionEn) ||
+                                '查看词义'}
+                            </span>
+                          )}
+                        </button>
+                        {savedItem && expanded && (
+                          <>
+                            <SavedWordPronunciation wordId={word.id} />
+                            <div className="lookup-result-personal">
+                              {savedItem.note && <p>{savedItem.note}</p>}
+                              <small>
+                                {savedItem.status === 'consolidated' || savedItem.graduatedAt
+                                  ? '已巩固'
+                                  : savedItem.paused
+                                    ? '已暂停复习'
+                                    : savedItem.progress?.dueAt
+                                      ? `下次复习 ${formatDate(savedItem.progress.dueAt)}`
+                                      : '等待复习'}
+                              </small>
+                            </div>
+                            <div className="lookup-row-actions">
                               <button
                                 type="button"
+                                aria-label={`查看 ${word.lemma} 完整词条`}
+                                onClick={() => choose(word)}
+                              >
+                                完整词条 <ArrowUpRight size={15} />
+                              </button>
+                              {savedItem.status === 'consolidated' || savedItem.graduatedAt ? (
+                                <button
+                                  type="button"
+                                  disabled={rowBusy}
+                                  onClick={() =>
+                                    void mutate(
+                                      word.id,
+                                      (isCurrent) =>
+                                        mutateWordbook(client, scope, word.id, false, isCurrent),
+                                      '已重新加入生词本。',
+                                    )
+                                  }
+                                >
+                                  重新加入
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    title="编辑备注"
+                                    aria-label={`编辑 ${word.lemma} 备注`}
+                                    disabled={rowBusy}
+                                    onClick={() => {
+                                      setEditing(savedItem);
+                                      setNote(savedItem.note);
+                                    }}
+                                  >
+                                    <Pencil size={16} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title={savedItem.paused ? '恢复复习' : '暂停复习'}
+                                    aria-label={`${savedItem.paused ? '恢复' : '暂停'} ${word.lemma} 复习`}
+                                    disabled={rowBusy}
+                                    onClick={() =>
+                                      void change(savedItem, { paused: !savedItem.paused })
+                                    }
+                                  >
+                                    {savedItem.paused ? <Play size={16} /> : <Pause size={16} />}
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                type="button"
+                                title="移除收藏"
+                                aria-label={`移除 ${word.lemma} 收藏，保留学习进度`}
                                 disabled={rowBusy}
                                 onClick={() =>
                                   void mutate(
                                     word.id,
                                     (isCurrent) =>
-                                      mutateWordbook(client, scope, word.id, false, isCurrent),
-                                    '已重新加入生词本。',
+                                      mutateWordbook(client, scope, word.id, true, isCurrent),
+                                    '已移除收藏，学习进度仍保留。',
                                   )
                                 }
                               >
-                                重新加入
+                                <Trash2 size={16} />
                               </button>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  title="编辑备注"
-                                  aria-label={`编辑 ${word.lemma} 备注`}
-                                  disabled={rowBusy}
-                                  onClick={() => {
-                                    setEditing(savedItem);
-                                    setNote(savedItem.note);
-                                  }}
-                                >
-                                  <Pencil size={16} />
-                                </button>
-                                <button
-                                  type="button"
-                                  title={savedItem.paused ? '恢复复习' : '暂停复习'}
-                                  aria-label={`${savedItem.paused ? '恢复' : '暂停'} ${word.lemma} 复习`}
-                                  disabled={rowBusy}
-                                  onClick={() =>
-                                    void change(savedItem, { paused: !savedItem.paused })
-                                  }
-                                >
-                                  {savedItem.paused ? <Play size={16} /> : <Pause size={16} />}
-                                </button>
-                              </>
-                            )}
-                            <button
-                              type="button"
-                              title="移除收藏"
-                              aria-label={`移除 ${word.lemma} 收藏，保留学习进度`}
-                              disabled={rowBusy}
-                              onClick={() =>
-                                void mutate(
-                                  word.id,
-                                  (isCurrent) =>
-                                    mutateWordbook(client, scope, word.id, true, isCurrent),
-                                  '已移除收藏，学习进度仍保留。',
-                                )
-                              }
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </article>
-                  );
-                })}
-              </section>
+                            </div>
+                          </>
+                        )}
+                      </article>
+                    );
+                  })}
+                </section>
+              )}
               {!list.isPending && !list.error && !items.length && (
                 <Empty
                   title={
@@ -655,7 +727,7 @@ function LookupContent({ kind }: { kind: LookupKind }) {
                   }
                 />
               )}
-              {list.hasNextPage && (
+              {list.hasNextPage && !listChanged && (
                 <button
                   type="button"
                   className="lookup-load-more"
@@ -671,6 +743,53 @@ function LookupContent({ kind }: { kind: LookupKind }) {
           )}
         </>
       )}
+      <Dialog open={filterOpen && !entry} title="筛选与排序" onClose={() => setFilterOpen(false)}>
+        <div className="lookup-filter-panel">
+          <p>这些条件会应用于全部匹配词。</p>
+          <label className="field">
+            匹配方式
+            <select
+              aria-label="匹配方式"
+              value={draftMatch}
+              onChange={(event) => setDraftMatch(event.target.value as LookupMatch)}
+            >
+              <option value="smart">智能匹配</option>
+              <option value="prefix">开头匹配</option>
+              <option
+                value="contains"
+                disabled={!!q && !/[\p{L}\p{N}]{3}/u.test(q.normalize('NFKC'))}
+              >
+                包含匹配
+              </option>
+              <option value="exact">精确匹配</option>
+            </select>
+          </label>
+          <label className="field">
+            排序方式
+            <select
+              aria-label="排序方式"
+              value={draftSort}
+              onChange={(event) => setDraftSort(event.target.value as LookupSort)}
+            >
+              <option value="relevance">相关度</option>
+              {kind === 'wordbook' && <option value="updated-desc">最近更新</option>}
+              <option value="az">A → Z</option>
+              <option value="za">Z → A</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="button primary full"
+            onClick={() => {
+              sortExplicit.current = true;
+              update({ match: draftMatch, sort: draftSort });
+              setFilterOpen(false);
+            }}
+          >
+            应用筛选
+          </button>
+        </div>
+      </Dialog>
       <Dialog open={!!editing} title="留下自己的语境" onClose={() => setEditing(null)}>
         <label className="field">
           备注

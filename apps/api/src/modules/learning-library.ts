@@ -17,6 +17,7 @@ import {
   type Db,
 } from './shared.js';
 import { decodeCursor, pageInfo } from './pagination.js';
+import { browseLibrary } from './library-browse.js';
 import { verifiedLearningSenses, type AtomicLearningSense } from './learning-sense-view.js';
 
 const listInput = z
@@ -41,6 +42,7 @@ const preferencePatch = z
     accent: z.enum(['us', 'uk']).optional(),
     autoPlay: z.boolean().optional(),
     spellingEnabled: z.boolean().optional(),
+    meaningChoiceEnabled: z.boolean().optional(),
     fontScale: z.union([z.literal(1), z.literal(1.125), z.literal(1.25)]).optional(),
     reminderEnabled: z.boolean().optional(),
     reminderTime: z
@@ -54,6 +56,7 @@ export const defaultLearningPreferences = {
   accent: 'us',
   autoPlay: false,
   spellingEnabled: true,
+  meaningChoiceEnabled: true,
   fontScale: 1,
   reminderEnabled: false,
   reminderTime: '20:00',
@@ -66,6 +69,7 @@ const preferencesDto = (value: UserLearningPreference | null) =>
         accent: value.accent,
         autoPlay: value.autoPlay,
         spellingEnabled: value.spellingEnabled,
+        meaningChoiceEnabled: value.meaningChoiceEnabled,
         fontScale: value.fontScale,
         reminderEnabled: value.reminderEnabled,
         reminderTime: value.reminderTime,
@@ -215,93 +219,7 @@ export async function registerLearningLibrary(app: FastifyInstance, getContext: 
       return { preferences: preferencesDto(saved) };
     });
   });
-  app.get('/library/words', async (req) => {
-    const ctx = await getContext(req),
-      user = requireUser(ctx);
-    const query = parse(
-      listInput
-        .omit({ wordId: true })
-        .extend({ view: z.enum(['learning', 'recent', 'learned']).default('learning') })
-        .strict(),
-      req.query,
-    );
-    const scope = `library-words:${ctx.siteId}:${ctx.instanceId}:${user.id}:${digest([query.view, query.q])}`;
-    const cursor = libraryCursor(scope, query.cursor);
-    const where: Prisma.StudyProgressWhereInput = {
-      userId: user.id,
-      firstLearnedAt: { not: null },
-      ...(query.view === 'recent'
-        ? { lastReviewAt: { gte: new Date(Date.now() - 30 * 86400000) } }
-        : {}),
-      word: {
-        status: 'published',
-        ...(query.q
-          ? {
-              OR: [
-                { lemma: { contains: query.q, mode: 'insensitive' } },
-                { normalizedLemma: { contains: normalize(query.q) } },
-              ],
-            }
-          : {}),
-        ...(query.view === 'learning'
-          ? { userWords: { none: { userId: user.id, paused: true } } }
-          : {}),
-      },
-    };
-    const [rows, total] = await Promise.all([
-      ctx.prisma.studyProgress.findMany({
-        where: {
-          ...where,
-          ...(cursor
-            ? {
-                OR: [
-                  { updatedAt: { lt: cursor.at } },
-                  { updatedAt: cursor.at, id: { lt: cursor.id } },
-                ],
-              }
-            : {}),
-        },
-        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-        take: query.limit + 1,
-        include: { word: { include: wordInclude } },
-      }),
-      ctx.prisma.studyProgress.count({ where }),
-    ]);
-    const page = pageInfo(rows, query.limit, total, scope, (row) =>
-      JSON.stringify({ at: row.updatedAt.toISOString(), id: row.id }),
-    );
-    const wordIds = page.items.map((row) => row.wordId);
-    const [counts, memberships] = await Promise.all([
-      ctx.prisma.reviewLog.groupBy({
-        by: ['wordId'],
-        where: { userId: user.id, wordId: { in: wordIds }, wasNew: false },
-        _count: { _all: true },
-      }),
-      ctx.prisma.userWord.findMany({
-        where: { userId: user.id, wordId: { in: wordIds } },
-        select: { wordId: true, paused: true },
-      }),
-    ]);
-    return {
-      items: page.items.map((row) => ({
-        word: {
-          ...wordDto({
-            ...row.word,
-            senses: row.word.senses.slice(0, 3),
-            examples: row.word.examples.slice(0, 1),
-          }),
-          senseCount: row.word.senses.filter(learningSense).length,
-        },
-        progress: progressDto(row),
-        reviewedAt: row.lastReviewAt?.toISOString() ?? null,
-        dueAt: row.dueAt.toISOString(),
-        learnedAt: row.firstLearnedAt?.toISOString() ?? null,
-        reviewCount: counts.find((count) => count.wordId === row.wordId)?._count._all ?? 0,
-        paused: memberships.find((item) => item.wordId === row.wordId)?.paused ?? false,
-      })),
-      page: page.page,
-    };
-  });
+  app.get('/library/words', async (req) => browseLibrary(await getContext(req), req.query));
   app.get('/sentences', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx),

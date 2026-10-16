@@ -1,0 +1,300 @@
+.library-browser {
+  max-width: 720px;
+  margin-inline: auto;
+  padding-top: 10px;
+}
+.library-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 22px;
+}
+.library-heading > svg {
+  color: var(--app-accent);
+  flex: 0 0 auto;
+}
+.library-heading > div {
+  min-width: 0;
+}
+.library-heading h1 {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.library-heading p {
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.library-heading > span {
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+.library-status-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  margin-bottom: 15px;
+  overflow-x: auto;
+  border-radius: 13px;
+  background: var(--app-soft);
+  scrollbar-width: none;
+}
+.library-status-tabs button {
+  flex: 1 0 auto;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+}
+.library-status-tabs button[aria-pressed='true'] {
+  background: var(--app-panel);
+  box-shadow: var(--app-shadow);
+  color: var(--app-accent);
+}
+.library-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 6px;
+  padding: 6px 7px 6px 13px;
+  border: 1px solid rgba(56, 100, 106, 0.12);
+  border-radius: 16px;
+  background: var(--app-panel);
+}
+.library-search > svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+.library-search input {
+  min-width: 0;
+  width: 100%;
+  flex: 1;
+  padding: 8px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 16px;
+}
+.library-search button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--app-accent);
+  color: var(--app-accent-ink);
+  font-size: 13px;
+}
+.library-search .library-clear {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  min-width: 40px;
+  background: transparent;
+  color: var(--muted);
+}
+.library-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.library-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+.library-toolbar button[aria-pressed='true'] {
+  padding-inline: 10px;
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+.library-search-hint,
+.library-location-status {
+  margin: 5px 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.library-location-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.library-location-status button {
+  min-height: 44px;
+  padding: 6px 0 6px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--app-accent);
+  font-size: 12px;
+}
+.library-rows {
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--app-panel);
+}
+.library-row {
+  padding-inline: 17px;
+  border-bottom: 1px solid rgba(56, 100, 106, 0.09);
+  scroll-margin-block: 20px;
+}
+.library-row:last-child {
+  border: 0;
+}
+.library-row.is-expanded {
+  background: var(--app-soft);
+}
+.library-row.is-located {
+  box-shadow: inset 3px 0 0 var(--app-accent);
+  background: var(--app-accent-soft);
+}
+.library-row-heading {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+  min-height: 64px;
+  padding: 16px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+.library-lemma {
+  overflow-wrap: anywhere;
+  font-size: 19px;
+  font-weight: 650;
+}
+.library-row-heading > small {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--app-soft);
+  color: var(--muted);
+  font-size: 10px;
+}
+.library-row-heading > svg {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--muted);
+}
+.library-row-chevron {
+  transition: transform 160ms ease;
+}
+.library-row.is-expanded .library-row-chevron {
+  transform: rotate(180deg);
+}
+.library-definition {
+  margin: -5px 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.library-definition em {
+  margin-right: 7px;
+  color: var(--app-accent);
+  font-style: normal;
+}
+.library-row-detail {
+  padding-bottom: 10px;
+}
+.library-row-detail .pronunciation-lines {
+  gap: 10px 16px;
+}
+.library-row-detail .pronunciation-ipa {
+  font-size: 14px;
+}
+.library-english-definition {
+  margin: 12px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.library-review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 15px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.library-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.library-row-actions > button,
+.library-row-actions > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--app-accent);
+  font-size: 12px;
+  text-decoration: none;
+}
+.library-row-actions > a {
+  margin-left: auto;
+  color: var(--muted);
+}
+.library-load-more {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 13px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--app-panel);
+  color: var(--app-accent);
+}
+.library-sort-options {
+  display: grid;
+  gap: 8px;
+}
+.library-sort-options > button:not(.primary) {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--app-soft);
+  color: var(--ink);
+  text-align: left;
+}
+.library-sort-options > button[aria-pressed='true'] {
+  border-color: var(--app-accent);
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+.library-browser button:focus-visible,
+.library-browser input:focus-visible,
+.library-browser a:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .library-row-chevron {
+    transition: none;
+  }
+}

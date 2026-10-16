@@ -771,6 +771,7 @@ model UserLearningPreference {
   accent          String   @default("us")
   autoPlay        Boolean  @default(false)
   spellingEnabled Boolean  @default(true)
+  meaningChoiceEnabled Boolean @default(true)
   fontScale       Float    @default(1)
   reminderEnabled Boolean  @default(false)
   reminderTime    String   @default("20:00")

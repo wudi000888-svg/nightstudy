@@ -332,7 +332,12 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
       }
     }
   }
-  async function act(action: 'reveal' | 'rate' | 'answer', rating?: Rating, answerValue?: string) {
+  async function act(
+    action: 'reveal' | 'rate' | 'answer',
+    rating?: Rating,
+    answerValue?: string,
+    recognitionOptionId?: string,
+  ) {
     if (!session || busyRef.current || waitingSync || session.status !== 'in_progress') return;
     const item = session.items.find((value) => value.id === session.currentItemId);
     if (!item) return;
@@ -350,6 +355,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         action,
         ...(rating ? { rating } : {}),
         ...(action === 'answer' ? { answer: (answerValue ?? answer).trim() } : {}),
+        ...(action === 'reveal' && recognitionOptionId ? { recognitionOptionId } : {}),
         expectedSessionRevision: session.revision,
         expectedProgressRevision: item.progressRevision,
       });
@@ -826,7 +832,9 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
           waitingSync={waitingSync}
           answer={answer}
           onAnswer={setAnswer}
-          onAct={(action, rating, value) => void act(action, rating, value)}
+          onAct={(action, rating, value, recognitionOptionId) =>
+            void act(action, rating, value, recognitionOptionId)
+          }
           onState={(action) => void changeState(action)}
           onRead={() => void readCurrent()}
           onBack={dashboard}

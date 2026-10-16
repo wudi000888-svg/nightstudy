@@ -15,12 +15,22 @@ const taskInclude = {
 type Task = Prisma.StudySessionGetPayload<{ include: typeof taskInclude }>;
 
 function entry(state: EntryState, count = 0, task: Task | null = null, at: Date | null = null) {
+  const kinds = task ? buckets(task) : null;
+  const sessionKind = kinds
+    ? kinds.size > 1
+      ? 'mixed'
+      : kinds.has('new')
+        ? 'new'
+        : 'review'
+    : null;
   return {
     state,
     count,
     sessionId: task?.id ?? null,
     sessionRevision: task?.revision ?? null,
     phase: task?.phase ?? null,
+    sessionKind,
+    sessionRoute: task ? (sessionKind === 'review' ? 'review' : 'learn') : null,
     availableAt: at?.toISOString() ?? null,
   };
 }
@@ -30,15 +40,17 @@ function unfinished(task: Task) {
       !item.rated || (obj(item.questionJson).spellingEnabled !== false && !item.exerciseDone),
   );
 }
+function bucket(task: Task, item: Task['items'][number]) {
+  const bucket = obj(item.questionJson).taskBucket;
+  return bucket === 'new' || bucket === 'review'
+    ? bucket
+    : (task.plan?.words.find((word) => word.wordId === item.wordId)?.bucket ?? 'review');
+}
 function buckets(task: Task) {
-  return new Set(
-    task.items.map((item) => {
-      const bucket = obj(item.questionJson).taskBucket;
-      return bucket === 'new' || bucket === 'review'
-        ? bucket
-        : (task.plan?.words.find((word) => word.wordId === item.wordId)?.bucket ?? 'review');
-    }),
-  );
+  return new Set(unfinished(task).map((item) => bucket(task, item)));
+}
+function unfinishedCount(task: Task, kind: 'new' | 'review') {
+  return unfinished(task).filter((item) => bucket(task, item) === kind).length;
 }
 function shiftDay(label: string, days: number) {
   const date = new Date(`${label}T12:00:00Z`);
@@ -136,6 +148,11 @@ export async function appHomeSnapshot(db: Db, userId: string, at?: Date) {
   ]);
   const nextReview = futureReviews[0];
   const reviewNow = reviewCandidates.length;
+  // The general plan counter also contains today's already-counted, future
+  // consolidation words. They are not currently available Review work.
+  const primaryReviewRemaining = words.filter(
+    (word) => word.bucket === 'review' && !word.firstRatedAt,
+  ).length;
   const active = pending.find(
     (task) => task.status === 'in_progress' && task.taskKind !== 'extra-review',
   );
@@ -146,13 +163,14 @@ export async function appHomeSnapshot(db: Db, userId: string, at?: Date) {
     pending.find((task) => buckets(task).has(kind));
   const learnTask = choose('new'),
     reviewTask = choose('review');
-  const taskEntry = (task: Task | undefined) => {
+  const taskEntry = (task: Task | undefined, kind: 'new' | 'review') => {
     if (!task) return null;
+    const ownCount = unfinishedCount(task, kind);
     if (active && active.id !== task.id && task.taskKind !== 'extra-review')
-      return entry('other_task', unfinished(active).length, active);
+      return entry('other_task', ownCount, active);
     return available(task)
-      ? entry('resume', unfinished(task).length, task)
-      : entry('waiting', unfinished(task).length, task, task.deferredUntil);
+      ? entry('resume', ownCount, task)
+      : entry('waiting', ownCount, task, task.deferredUntil);
   };
   const checkedIn = calendar.days.at(-1)!.checkedIn;
   const dailyGoalComplete =
@@ -160,24 +178,24 @@ export async function appHomeSnapshot(db: Db, userId: string, at?: Date) {
     summary.assignedUnique === 0 &&
     summary.pendingSpellingCount === 0 &&
     summary.pendingConsolidationCount === 0;
-  let review = taskEntry(reviewTask);
+  let review = taskEntry(reviewTask, 'review');
   if (!review) {
-    if (active) review = entry('other_task', unfinished(active).length, active);
+    if (active) review = entry('other_task', reviewNow || primaryReviewRemaining, active);
     else if (reviewNow) review = entry('ready', reviewNow);
-    else if (nextReview) review = entry('waiting', summary.reviewRemaining, null, nextReview.dueAt);
+    else if (nextReview) review = entry('waiting', primaryReviewRemaining, null, nextReview.dueAt);
     else review = entry(dailyGoalComplete ? 'complete' : 'empty');
   }
-  let learn = taskEntry(learnTask);
+  let learn = taskEntry(learnTask, 'new');
   if (!learn) {
-    if (active) learn = entry('review_first', unfinished(active).length, active);
+    if (active) learn = entry('review_first', summary.newRemaining, active);
     else if (!summary.bookId) learn = entry('setup');
     else if (reviewNow || review.state === 'resume')
-      learn = entry('review_first', review.count, reviewTask ?? null);
+      learn = entry('review_first', summary.newRemaining, reviewTask ?? null);
     else if (summary.newRemaining > 0) learn = entry('ready', summary.newRemaining);
     else if (summary.reviewRemaining > 0)
       learn = entry(
         nextReview ? 'waiting' : 'review_first',
-        summary.reviewRemaining,
+        summary.newRemaining,
         null,
         nextReview?.dueAt ?? null,
       );

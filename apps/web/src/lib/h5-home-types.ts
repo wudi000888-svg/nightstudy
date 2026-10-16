@@ -2,10 +2,14 @@
 export interface H5HomeEntry {
   state:
     'setup' | 'resume' | 'ready' | 'waiting' | 'review_first' | 'other_task' | 'complete' | 'empty';
+  /** This entry's new/review bucket only; a blocking task never donates its count. */
   count: number;
   sessionId: string | null;
   sessionRevision: number | null;
   phase: string | null;
+  /** The fixed task being resumed can have a different purpose from this entry. */
+  sessionKind: 'new' | 'review' | 'mixed' | null;
+  sessionRoute: 'learn' | 'review' | null;
   availableAt: string | null;
 }
 

@@ -20,6 +20,7 @@ import { useBookPlan } from '../components/tasks/useBookPlan';
 import { SiteHomeAtmosphere } from '../components/HomeAtmosphere';
 import './h5-home.css';
 import './mobile-content.css';
+import './home-refinement.css';
 
 export function bookKindLabel(book: Pick<Book, 'kind'>) {
   return book.kind === 'phrases' ? '词组本' : '词书';
@@ -100,8 +101,10 @@ const homeEntryText = {
 } as const;
 
 export function homeEntryDestination(entry: H5HomeEntry, mode: 'learn' | 'review') {
-  if (entry.sessionId && ['resume', 'other_task'].includes(entry.state))
-    return `/${mode}?session=${encodeURIComponent(entry.sessionId)}`;
+  if (entry.sessionId && ['resume', 'other_task', 'review_first'].includes(entry.state))
+    return entry.sessionRoute
+      ? `/${entry.sessionRoute}?session=${encodeURIComponent(entry.sessionId)}`
+      : '/learning?section=tasks';
   if (entry.state === 'setup') return '/books';
   if (entry.state === 'review_first') return '/review?start=1';
   if (entry.state === 'ready') return `/${mode}?start=1`;
@@ -187,13 +190,25 @@ export function HomePage() {
           const entry = summary?.[mode];
           const label = mode === 'learn' ? 'Learn' : 'Review';
           const detail = !user
-            ? '开始学习'
+            ? mode === 'learn'
+              ? '登录开始学习'
+              : '登录查看复习'
             : blocked
               ? '记录待同步'
               : home.isFetching
                 ? '正在更新…'
                 : entry
-                  ? homeEntryText[entry.state]
+                  ? entry.state === 'other_task'
+                    ? entry.sessionKind === 'new'
+                      ? mode === 'review' && entry.count === 0
+                        ? '暂无复习，先完成新学'
+                        : '先完成当前新学'
+                      : entry.sessionKind === 'review'
+                        ? '先完成当前复习'
+                        : '先完成当前学习组'
+                    : entry.state === 'resume' && entry.sessionKind === 'mixed'
+                      ? '继续当前学习组'
+                      : homeEntryText[entry.state]
                   : home.error
                     ? '重新连接'
                     : '正在读取…';
@@ -204,19 +219,28 @@ export function HomePage() {
               className={`h5-home-study h5-home-${mode}`}
               disabled={!!user && (home.isFetching || (!summary && !home.error))}
               aria-busy={!!user && home.isFetching}
-              aria-label={`${label}，${detail}${entry ? `，${entry.count}词` : ''}`}
+              aria-label={`${label}，${detail}${user && entry ? `，${entry.count}词` : ''}`}
+              data-entry-state={blocked ? 'sync' : (entry?.state ?? (!user ? 'guest' : 'loading'))}
               onClick={() => (home.error && !summary ? void home.refetch() : openStudy(mode))}
             >
               <strong>{label}</strong>
-              <span className="h5-home-count">{user ? (entry?.count ?? '—') : '—'}</span>
-              <small>
-                {entry &&
+              {user ? (
+                <span className="h5-home-count">
+                  <span>{entry?.count ?? '—'}</span>
+                  {entry && <small>词</small>}
+                </span>
+              ) : (
+                <span className="h5-home-guest-note">
+                  {mode === 'learn' ? '遇见新的表达' : '让记忆更清晰'}
+                </span>
+              )}
+              <small>{detail}</small>
+              {entry &&
                 ['resume', 'other_task'].includes(entry.state) &&
                 !home.isFetching &&
-                !blocked
-                  ? `继续本组 ${entry.count} 词`
-                  : detail}
-              </small>
+                !blocked && (
+                  <ArrowRight className="h5-home-continue-mark" size={18} aria-hidden="true" />
+                )}
             </button>
           );
         })}
@@ -242,6 +266,9 @@ export function HomePage() {
           onClick={() => openModule('academy')}
         >
           <GraduationCap size={28} />
+          <span className="h5-home-module-label" role="tooltip">
+            英语学堂
+          </span>
         </button>
         <button
           type="button"
@@ -250,6 +277,9 @@ export function HomePage() {
           onClick={() => openModule('content')}
         >
           <PanelsTopLeft size={27} />
+          <span className="h5-home-module-label" role="tooltip">
+            我的内容
+          </span>
         </button>
         <button
           type="button"
@@ -258,6 +288,9 @@ export function HomePage() {
           onClick={() => openModule('learning')}
         >
           <ChartNoAxesCombined size={27} />
+          <span className="h5-home-module-label" role="tooltip">
+            我的学习
+          </span>
         </button>
       </nav>
     </section>

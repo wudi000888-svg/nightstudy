@@ -61,6 +61,17 @@ export function PreferencesSettings() {
       </fieldset>
       <label className="mobile-setting-toggle">
         <span>
+          <strong>新词辨义</strong>
+          <small>先选择词义，再看语境。词义选项不足时使用回忆模式，新设置从下一组生效。</small>
+        </span>
+        <input
+          type="checkbox"
+          checked={draft.meaningChoiceEnabled}
+          onChange={(event) => edit({ ...draft, meaningChoiceEnabled: event.target.checked })}
+        />
+      </label>
+      <label className="mobile-setting-toggle">
+        <span>
           <strong>自动播放单词发音</strong>
           <small>进入词卡时播放默认口音，浏览器可能需要先点一次播放。</small>
         </span>

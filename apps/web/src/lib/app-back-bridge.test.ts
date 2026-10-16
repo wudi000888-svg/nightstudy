@@ -33,15 +33,7 @@ it('runs the pre-router bridge before a router listener registered earlier than 
   cleanups.push(() => target.removeEventListener('popstate', router));
   // Layout effects run after BrowserRouter has subscribed. They register only
   // the current account handler; the early bridge already owns listener order.
-  cleanups.push(
-    registerAppBackHandler(
-      createAppBackHandler(
-        () => position,
-        (index) => [1, 2].includes(index),
-        restore,
-      ),
-    ),
-  );
+  cleanups.push(registerAppBackHandler(createAppBackHandler(() => position, restore)));
   const dialog = (event: Event) => {
     order.push('layer');
     if (!dialogOpen) return;
@@ -92,15 +84,7 @@ it('gives a later push priority over an old restoration without bypassing the ne
   let position = { index: 2, key: 'learning' };
   const restore = vi.fn();
   cleanups.push(installAppBackBridge(target as unknown as Window));
-  cleanups.push(
-    registerAppBackHandler(
-      createAppBackHandler(
-        () => position,
-        () => true,
-        restore,
-      ),
-    ),
-  );
+  cleanups.push(registerAppBackHandler(createAppBackHandler(() => position, restore)));
   const close = vi.fn((event: Event) => event.preventDefault());
   target.addEventListener(beforeAppBackEvent, close);
   cleanups.push(() => target.removeEventListener(beforeAppBackEvent, close));

@@ -59,7 +59,7 @@ function ExampleContext({
     <details className="study-context-card" open>
       <summary>
         <span className="study-section-label">
-          <MessageCircle size={16} /> 语境 <span>{examples.length} 条例句</span>
+          <MessageCircle size={16} /> 双语例句
           <ChevronDown size={15} className="study-context-chevron" aria-hidden="true" />
         </span>
         <span className="study-context-preview" lang={example.english ? 'en' : 'zh-CN'}>
@@ -72,7 +72,8 @@ function ExampleContext({
       <div className="study-context-body" id={bodyId}>
         <div className="study-context-toolbar">
           <span>
-            {example.contextLabel || '本义项语境'} · {activeIndex + 1} / {examples.length}
+            {example.contextLabel || '本义项语境'}
+            {examples.length > 1 ? ` · ${activeIndex + 1} / ${examples.length}` : ''}
           </span>
           {examples.length > 1 && (
             <div className="study-context-arrows">
@@ -141,22 +142,35 @@ export function StudyWordDetails({
   onSenseChange?: (id: string) => void;
   showDirectory?: boolean;
 }) {
-  const [index, setIndex] = useState(0);
+  const [selection, setSelection] = useState({
+    wordId: word.id,
+    focusId: selectedSenseId,
+    senseId: selectedSenseId,
+  });
+  const [extension, setExtension] = useState('collocations');
   const meaningId = useId();
-  const controlledIndex = selectedSenseId
-    ? senses.findIndex((entry) => entry.id === selectedSenseId)
+  const extensionId = useId();
+  const currentSenseId = onSenseChange
+    ? selectedSenseId
+    : selection.wordId === word.id && selection.focusId === selectedSenseId
+      ? selection.senseId
+      : selectedSenseId;
+  const selectedIndex = currentSenseId
+    ? senses.findIndex((entry) => entry.id === currentSenseId)
     : -1;
-  const activeIndex = Math.max(
-    0,
-    Math.min(controlledIndex >= 0 ? controlledIndex : index, senses.length - 1),
-  );
+  const activeIndex = Math.max(0, Math.min(selectedIndex, senses.length - 1));
   const sense = senses[activeIndex];
   useEffect(() => () => stopApplicationAudio(), [word.id, sense?.id]);
   const examples = studyExamples(word, sense);
   const collocations = (word.collocations ?? []).filter((entry) => dictionaryText(entry.lemma));
+  const extensions = [
+    ...(collocations.length ? [{ id: 'collocations', label: '词组搭配' }] : []),
+    ...(englishSenses.length ? [{ id: 'english', label: '英文解释' }] : []),
+  ];
+  const activeExtension = extensions.find((entry) => entry.id === extension) ?? extensions[0];
   function select(next: number) {
     stopApplicationAudio();
-    setIndex(next);
+    setSelection({ wordId: word.id, focusId: selectedSenseId, senseId: senses[next]?.id });
     if (senses[next]) onSenseChange?.(senses[next].id);
   }
   return (
@@ -229,50 +243,89 @@ export function StudyWordDetails({
           interactive={interactive}
         />
       )}
-      {englishSenses.length > 0 && (
-        <details className="study-independent-english" aria-label="这个词的独立英文解释">
-          <summary>
-            更多英文释义 <span>{englishSenses.length} 义</span>
-            <ChevronDown size={16} aria-hidden="true" />
-          </summary>
-          {englishSenses.map((entry) => (
-            <div key={entry.id}>
-              {entry.pos && <span className="sense-pos">{entry.pos}</span>}
-              <BilingualDefinition english={entry.definitionEn} interactive={interactive} />
-            </div>
-          ))}
-        </details>
-      )}
-      {collocations.length > 0 && (
-        <details className="study-collocations" aria-label="词组搭配">
-          <summary>
-            <span>
-              常用搭配 <small>{collocations.length}</small>
-            </span>
-            <ChevronDown size={16} />
-          </summary>
-          <div className="study-collocations-list">
-            {collocations.map((entry) => (
-              <article key={entry.id}>
-                <p lang="en">
-                  <InteractiveEnglish text={entry.lemma} enabled={interactive} />
-                </p>
-                {entry.pos && <span className="sense-pos">{entry.pos}</span>}
-                {dictionaryText(entry.definitionZh) && (
-                  <p lang="zh-CN">{dictionaryText(entry.definitionZh)}</p>
-                )}
-                {dictionaryText(entry.definitionEn) && (
-                  <p className="meaning-en" lang="en">
-                    <InteractiveEnglish
-                      text={dictionaryText(entry.definitionEn)}
-                      enabled={interactive}
-                    />
-                  </p>
-                )}
-              </article>
+      {activeExtension && (
+        <section className="study-extensions" aria-label="相关内容">
+          <div className="study-extension-tabs" role="tablist" aria-label="相关内容分类">
+            {extensions.map((entry, order) => (
+              <button
+                type="button"
+                role="tab"
+                id={`${extensionId}-${entry.id}-tab`}
+                aria-controls={`${extensionId}-${entry.id}-panel`}
+                aria-selected={entry.id === activeExtension.id}
+                tabIndex={entry.id === activeExtension.id ? 0 : -1}
+                key={entry.id}
+                onClick={() => setExtension(entry.id)}
+                onKeyDown={(event) => {
+                  const next =
+                    event.key === 'ArrowRight'
+                      ? (order + 1) % extensions.length
+                      : event.key === 'ArrowLeft'
+                        ? (order + extensions.length - 1) % extensions.length
+                        : event.key === 'Home'
+                          ? 0
+                          : event.key === 'End'
+                            ? extensions.length - 1
+                            : -1;
+                  if (next < 0) return;
+                  event.preventDefault();
+                  const target = extensions[next]!;
+                  setExtension(target.id);
+                  event.currentTarget.parentElement
+                    ?.querySelector<HTMLButtonElement>(`[id="${extensionId}-${target.id}-tab"]`)
+                    ?.focus();
+                }}
+              >
+                {entry.label}
+              </button>
             ))}
           </div>
-        </details>
+          {extensions.map((entry) => (
+            <div
+              className="study-extension-panel"
+              role="tabpanel"
+              aria-label={entry.label}
+              aria-labelledby={`${extensionId}-${entry.id}-tab`}
+              id={`${extensionId}-${entry.id}-panel`}
+              hidden={entry.id !== activeExtension.id}
+              tabIndex={0}
+              key={entry.id}
+            >
+              {entry.id === 'english' ? (
+                <div className="study-independent-english" aria-label="这个词的独立英文解释">
+                  {englishSenses.map((entry) => (
+                    <div key={entry.id}>
+                      {entry.pos && <span className="sense-pos">{entry.pos}</span>}
+                      <BilingualDefinition english={entry.definitionEn} interactive={interactive} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="study-collocations-list">
+                  {collocations.map((entry) => (
+                    <article key={entry.id}>
+                      <p lang="en">
+                        <InteractiveEnglish text={entry.lemma} enabled={interactive} />
+                      </p>
+                      {entry.pos && <span className="sense-pos">{entry.pos}</span>}
+                      {dictionaryText(entry.definitionZh) && (
+                        <p lang="zh-CN">{dictionaryText(entry.definitionZh)}</p>
+                      )}
+                      {dictionaryText(entry.definitionEn) && (
+                        <p className="meaning-en" lang="en">
+                          <InteractiveEnglish
+                            text={dictionaryText(entry.definitionEn)}
+                            enabled={interactive}
+                          />
+                        </p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </section>
       )}
     </div>
   );

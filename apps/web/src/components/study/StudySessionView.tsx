@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -25,7 +25,12 @@ export interface StudySessionViewProps {
   waitingSync: boolean;
   answer: string;
   onAnswer: (value: string) => void;
-  onAct: (action: 'reveal' | 'rate' | 'answer', rating?: Rating, answer?: string) => void;
+  onAct: (
+    action: 'reveal' | 'rate' | 'answer',
+    rating?: Rating,
+    answer?: string,
+    recognitionOptionId?: string,
+  ) => void;
   onState: (action: 'pause' | 'resume' | 'defer') => void;
   onRead: () => void;
   onBack: () => void;
@@ -77,8 +82,35 @@ export function StudySessionView({
     : (feedback?.position ?? Math.min(session.items.length, session.cursor + 1));
   const progress = spellingPhase ? spelled : rated;
   const locked = busy || waitingSync;
+  const [choice, setChoice] = useState<{ itemId: string; optionId: string } | null>(null);
+  const recognition =
+    session.learnRecallMode === 'recognition' &&
+    session.mode !== 'review' &&
+    session.mode !== 'extra-review' &&
+    item?.bucket === 'new' &&
+    item.recognition &&
+    item.recognition.options.length >= 3
+      ? item.recognition
+      : undefined;
+  const choiceFeedback = !!(
+    recognition &&
+    item?.revealed &&
+    choice?.itemId === item.id &&
+    recognition.selectedOptionId === choice.optionId &&
+    recognition.correctOptionId
+  );
+  const showChoices = !!recognition && (!item?.revealed || choiceFeedback);
   const formId = useId();
   const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (paused || completed || session.status === 'cancelled' || choice?.itemId !== item?.id)
+      setChoice(null);
+  }, [paused, completed, session.status, choice?.itemId, item?.id]);
+  useEffect(() => {
+    if (!choiceFeedback) return;
+    const timer = window.setTimeout(() => setChoice(null), 450);
+    return () => window.clearTimeout(timer);
+  }, [choiceFeedback, item?.id]);
   useEffect(() => {
     const close = (event: Event) => {
       if (event.defaultPrevented || !menu.current?.open) return;
@@ -145,7 +177,7 @@ export function StudySessionView({
         <div className="study-focus-title">
           <span>{session.bookTitle || '复习已学词'}</span>
           <strong>
-            {phaseLabel}
+            {showChoices && phaseLabel === '回忆词义' ? '辨认词义' : phaseLabel}
             <span>
               {' '}
               {position} / {session.items.length}
@@ -166,6 +198,7 @@ export function StudySessionView({
               </button>
             )}
             {item?.revealed &&
+              !choiceFeedback &&
               !practice &&
               !completed &&
               !paused &&
@@ -293,24 +326,65 @@ export function StudySessionView({
           </div>
         ) : item ? (
           <div
-            className={`study-learning-word${item.revealed ? ' is-revealed' : ''}`}
+            className={`study-learning-word${item.revealed && !choiceFeedback ? ' is-revealed' : ''}`}
             key={item.id}
           >
             <span className="study-eyebrow">
-              {item.revealed
-                ? '在语境里确认它'
-                : item.bucket === 'review'
-                  ? '还记得这个词吗？'
-                  : '先想一想它的意思'}
+              {showChoices
+                ? '选出最符合的词义'
+                : item.revealed
+                  ? '在语境里确认它'
+                  : item.bucket === 'review'
+                    ? '还记得这个词吗？'
+                    : '先想一想它的意思'}
             </span>
             <WordView
               word={item.word}
               focusSenseId={item.focusSenseId}
-              hideMeanings={!item.revealed}
+              hideMeanings={!item.revealed || choiceFeedback}
               presentation="study"
               headerAction={<StudyBookmark key={item.wordId} word={item.word} />}
             />
-            {!item.revealed && <p className="study-recall-hint">试着回忆词义，准备好了再揭晓。</p>}
+            {showChoices && recognition ? (
+              <div className="study-meaning-choice" aria-label="辨认词义" aria-busy={busy}>
+                <div className="study-choice-options" role="group" aria-label="选择词义">
+                  {recognition.options.map((option, order) => {
+                    const correct = choiceFeedback && recognition.correctOptionId === option.id;
+                    const incorrect = choiceFeedback && choice?.optionId === option.id && !correct;
+                    return (
+                      <button
+                        type="button"
+                        className={`study-choice-option${correct ? ' is-correct' : ''}${incorrect ? ' is-incorrect' : ''}`}
+                        key={option.id}
+                        aria-pressed={choice?.itemId === item.id && choice.optionId === option.id}
+                        disabled={locked || item.revealed}
+                        onClick={() => {
+                          setChoice({ itemId: item.id, optionId: option.id });
+                          onAct('reveal', undefined, undefined, option.id);
+                        }}
+                      >
+                        <span className="study-choice-order" aria-hidden="true">
+                          {correct ? <Check size={18} /> : String.fromCharCode(65 + order)}
+                        </span>
+                        <span className="study-choice-copy">
+                          {option.pos && <i>{option.pos}</i>}
+                          {option.text}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="study-choice-status" role="status">
+                  {choiceFeedback
+                    ? recognition.correctOptionId === choice?.optionId
+                      ? '选对了，再到例句里确认。'
+                      : '先看清这个意思，再到例句里记住它。'
+                    : '选择后查看释义与例句。'}
+                </p>
+              </div>
+            ) : !item.revealed ? (
+              <p className="study-recall-hint">试着回忆词义，准备好了再揭晓。</p>
+            ) : null}
           </div>
         ) : (
           <Empty
@@ -381,7 +455,11 @@ export function StudySessionView({
             </button>
           </>
         ) : item && !practice ? (
-          !item.revealed ? (
+          choiceFeedback ? (
+            <button className="study-main-action" onClick={() => setChoice(null)}>
+              查看释义 <ArrowRight size={18} />
+            </button>
+          ) : !item.revealed ? (
             <button className="study-main-action" disabled={locked} onClick={() => onAct('reveal')}>
               {busy ? '正在揭晓…' : '看答案'}
               <ArrowRight size={18} />

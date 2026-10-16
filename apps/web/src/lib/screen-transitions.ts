@@ -10,7 +10,7 @@ export interface ScreenTransition {
   id: number;
   from: TransitionScreen;
   to: TransitionScreen;
-  kind: 'open' | 'close' | 'forward' | 'back' | 'content';
+  kind: 'open' | 'close' | 'forward' | 'back' | 'content' | 'study-enter' | 'study-exit';
   duration: number;
 }
 export type TransitionRole = 'incoming' | 'outgoing';
@@ -30,28 +30,44 @@ export class ScreenTransitionState {
     if (
       !from ||
       reduced ||
-      from.kind === 'study' ||
-      to.kind === 'study' ||
+      // A session URL/phase replacement owns its own lifecycle. In particular,
+      // same-URL POP must not keep an old study tree alive while a save resolves.
+      (from.kind === 'study' && to.kind === 'study') ||
       (from.location.key === to.location.key &&
         locationHref(from.location) === locationHref(to.location))
     )
       return null;
     const kind =
-      to.kind === 'home'
-        ? 'close'
-        : from.kind === 'home'
-          ? 'open'
-          : from.id === to.id
-            ? 'content'
-            : action === 'POP'
-              ? 'back'
-              : 'forward';
+      to.kind === 'study'
+        ? 'study-enter'
+        : from.kind === 'study'
+          ? 'study-exit'
+          : to.kind === 'home'
+            ? 'close'
+            : from.kind === 'home'
+              ? 'open'
+              : from.id === to.id
+                ? 'content'
+                : action === 'POP'
+                  ? 'back'
+                  : 'forward';
     this.current = {
       id: this.epoch,
       from,
       to,
       kind,
-      duration: kind === 'open' ? 240 : kind === 'close' ? 210 : kind === 'content' ? 180 : 220,
+      duration:
+        kind === 'study-enter'
+          ? 200
+          : kind === 'study-exit'
+            ? 180
+            : kind === 'open'
+              ? 240
+              : kind === 'close'
+                ? 210
+                : kind === 'content'
+                  ? 180
+                  : 220,
     };
     return this.current;
   }
@@ -70,6 +86,21 @@ export function screenTransitionFrames(
   transition: ScreenTransition,
   role: TransitionRole,
 ): Keyframe[] | null {
+  // Draw only the newly active screen. The previous study subtree is discarded
+  // immediately, so motion cannot restart requests, playback or pending ratings.
+  if (transition.kind === 'study-enter' || transition.kind === 'study-exit')
+    return role === 'incoming'
+      ? [
+          {
+            opacity: 0.7,
+            transform:
+              transition.kind === 'study-enter'
+                ? 'translate3d(12%, 0, 0)'
+                : 'translate3d(-12%, 0, 0)',
+          },
+          { opacity: 1, transform: 'translate3d(0, 0, 0)' },
+        ]
+      : null;
   if (transition.kind === 'content')
     return role === 'incoming'
       ? [

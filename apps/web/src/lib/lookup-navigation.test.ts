@@ -30,6 +30,7 @@ const state = vi.hoisted(() => {
     client: null as QueryClient | null,
     words: [] as LookupResponse['items'],
     suggestions: [] as LookupResponse['suggestions'],
+    listError: null as unknown,
     queryOptions: null as null | {
       queryKey: unknown[];
       queryFn: (value: { pageParam: null; signal: AbortSignal }) => Promise<unknown>;
@@ -102,7 +103,7 @@ vi.mock('@tanstack/react-query', async (original) => ({
         ],
       },
       isPending: false,
-      error: null,
+      error: state.listError,
     };
   },
 }));
@@ -177,6 +178,7 @@ beforeEach(() => {
   state.pending = [];
   state.words = [];
   state.suggestions = [];
+  state.listError = null;
   state.queryOptions = null;
   state.scrollY = 0;
   state.router = createMemoryRouter([{ path: '*', element: null }], {
@@ -253,6 +255,89 @@ it('keeps q searches as lists and sends every matching/sort condition to the ser
       .map((e) => e.props['aria-label']),
   ).toEqual(['查看 water 完整词条', '查看 wait 完整词条']);
 });
+
+it('keeps filter edits local until applying them together to the server query', async () => {
+  await state.router!.navigate('/lookup?q=claim&match=smart&sort=relevance');
+  let tree = await settle();
+  const summary = find(tree, (element) =>
+    String(element.props['aria-label']).startsWith('筛选与排序：'),
+  );
+  (summary.props.onClick as () => void)();
+  tree = render();
+  const panel = find(
+    tree,
+    (element) => element.type === Dialog && element.props.title === '筛选与排序',
+  );
+  expect(panel.props.open).toBe(true);
+  (
+    find(panel, (element) => element.props['aria-label'] === '匹配方式').props.onChange as (
+      event: unknown,
+    ) => void
+  )({ target: { value: 'prefix' } });
+  (
+    find(panel, (element) => element.props['aria-label'] === '排序方式').props.onChange as (
+      event: unknown,
+    ) => void
+  )({ target: { value: 'za' } });
+  expect(state.router!.state.location.search).toBe('?q=claim&match=smart&sort=relevance');
+  tree = render();
+  (
+    find(tree, (element) => element.type === 'button' && element.props.children === '应用筛选')
+      .props.onClick as () => void
+  )();
+  tree = await settle();
+  expect(state.router!.state.location.search).toBe('?q=claim&match=prefix&sort=za');
+  expect(
+    find(tree, (element) => element.type === Dialog && element.props.title === '筛选与排序').props
+      .open,
+  ).toBe(false);
+});
+
+it('starts private word lists with quiet word forms and expands only the selected row', async () => {
+  await state.router!.navigate('/wordbook');
+  state.words = [
+    {
+      id: 'saved-water',
+      wordId: water.id,
+      word: waterBrief,
+      note: 'one note',
+      favorite: true,
+      paused: false,
+      status: 'active',
+      progress: null,
+    },
+  ];
+  let tree = await settle('wordbook');
+  expect(
+    elements(tree).some((element) => element.props.className === 'lookup-result-definition'),
+  ).toBe(false);
+  expect(elements(tree).some((element) => element.props['aria-label'] === '编辑 water 备注')).toBe(
+    false,
+  );
+  (
+    find(tree, (element) => element.props['aria-label'] === '展开 water').props
+      .onClick as () => void
+  )();
+  tree = render('wordbook');
+  expect(find(tree, (element) => element.props['aria-label'] === '编辑 water 备注')).toBeDefined();
+  expect(state.router!.state.location.pathname).toBe('/wordbook');
+  (
+    find(tree, (element) => element.props['aria-label'] === '收起 water').props
+      .onClick as () => void
+  )();
+  tree = render('wordbook');
+  (
+    find(tree, (element) => element.props['aria-label'] === '显示全部释义').props
+      .onClick as () => void
+  )();
+  tree = render('wordbook');
+  expect(
+    find(tree, (element) => element.props.className === 'lookup-result-definition'),
+  ).toBeDefined();
+  expect(elements(tree).some((element) => element.props['aria-label'] === '编辑 water 备注')).toBe(
+    false,
+  );
+});
 it('matches the server contains guard for accented letters and literal punctuation', async () => {
   for (const [q, enabled] of [
     ['naïve', true],
@@ -264,6 +349,22 @@ it('matches the server contains guard for accented letters and literal punctuati
     await settle();
     expect(state.infiniteEnabled, q).toBe(enabled);
   }
+});
+
+it('hides a cached result list and its suggestions when the signed list version is no longer valid', async () => {
+  await state.router!.navigate('/lookup?q=wat');
+  state.words = [waterBrief];
+  state.suggestions = [{ id: 'water', lemma: 'water', matchType: 'spelling' }];
+  let tree = await settle();
+  expect(
+    find(tree, (element) => element.props['aria-label'] === '查看 water 完整词条'),
+  ).toBeDefined();
+  state.listError = { status: 409, code: 'list_changed' };
+  tree = render();
+  expect(
+    elements(tree).some((element) => element.props['aria-label'] === '查看 water 完整词条'),
+  ).toBe(false);
+  expect(elements(tree).some((element) => element.props['aria-label'] === '拼写建议')).toBe(false);
 });
 it('keeps a private q route private when opening and returning from a word', async () => {
   await state.router!.navigate('/wordbook?q=wa&match=prefix&sort=za&status=consolidated');
@@ -287,6 +388,8 @@ it('keeps a private q route private when opening and returning from a word', asy
   ((tree as Element).props.ref as { current: unknown }).current = { closest: () => screenScroll };
   (list.props.ref as { current: unknown }).current = { scrollTop: 58 };
   state.scrollY = 420;
+  (find(tree, (e) => e.props['aria-label'] === '展开 water').props.onClick as () => void)();
+  tree = await settle('wordbook');
   (
     find(tree, (e) => e.props['aria-label'] === '查看 water 完整词条').props.onClick as () => void
   )();
@@ -469,6 +572,8 @@ it('unmounts private notes on account changes and rejects a late save receipt', 
     },
   ];
   let tree = render('wordbook');
+  (find(tree, (e) => e.props['aria-label'] === '展开 water').props.onClick as () => void)();
+  tree = render('wordbook');
   (find(tree, (e) => e.props['aria-label'] === '编辑 water 备注').props.onClick as () => void)();
   tree = render('wordbook');
   let resolve!: (value: unknown) => void;
@@ -480,7 +585,7 @@ it('unmounts private notes on account changes and rejects a late save receipt', 
   );
   (
     find(
-      find(tree, (e) => e.type === Dialog),
+      find(tree, (e) => e.type === Dialog && e.props.title === '留下自己的语境'),
       (e) => e.type === 'button',
     ).props.onClick as () => void
   )();
@@ -496,7 +601,9 @@ it('unmounts private notes on account changes and rejects a late save receipt', 
   tree = render('wordbook');
   resolve({ item: { id: 'saved-water', wordId: water.id, note: 'private-a-note' } });
   await settle('wordbook');
-  expect(find(tree, (e) => e.type === Dialog).props.open).toBe(false);
+  expect(
+    find(tree, (e) => e.type === Dialog && e.props.title === '留下自己的语境').props.open,
+  ).toBe(false);
   expect(find(tree, (e) => e.type === 'textarea').props.value).toBe('');
   expect(
     state.client!.getQueryData(wordbookEntryKey('lookup-test:user-a', water.id)),

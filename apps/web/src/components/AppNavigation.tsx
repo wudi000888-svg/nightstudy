@@ -205,7 +205,6 @@ export function AppNavigationProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     const pop = createAppBackHandler(
       () => ({ index: current.current.index, key: current.current.location.key }),
-      (next) => state.current.history.has(next),
       (delta) => window.history.go(delta),
     );
     return registerAppBackHandler(pop);

@@ -29,6 +29,7 @@ import { findEligibleBookItems, findEligibleProgress } from './learning-eligibil
 import { applyCurrentPronunciationPolicy, supplementIssuedWord } from './content-presentation.js';
 import { wordPronunciationCompatible } from './learning-sense-view.js';
 import { applyFamiliarityPolicy, collectionState } from './collection-state.js';
+import { createRecognitionQuestion, readRecognitionQuestion } from './study-recognition.js';
 import {
   ensureDailyPlan,
   planView,
@@ -80,6 +81,8 @@ export function sessionDto(
     const latest = progress.find((x) => x.wordId === item.wordId);
     const visible = item.revealed || session.phase === 'practice' || session.status === 'completed';
     const currentWord = visible ? currentWords.get(item.wordId) : undefined;
+    const recognition =
+      question.taskBucket === 'new' ? readRecognitionQuestion(question.recognition) : null;
     return {
       id: item.id,
       wordId: item.wordId,
@@ -94,6 +97,21 @@ export function sessionDto(
         question.taskBucket === 'new' || question.taskBucket === 'review'
           ? question.taskBucket
           : (session.plan?.words.find((word) => word.wordId === item.wordId)?.bucket ?? null),
+      ...(recognition && session.phase === 'recall'
+        ? {
+            recognition: {
+              options: recognition.options,
+              ...(item.revealed
+                ? {
+                    correctOptionId: recognition.correctOptionId,
+                    ...(recognition.selectedOptionId
+                      ? { selectedOptionId: recognition.selectedOptionId }
+                      : {}),
+                  }
+                : {}),
+            },
+          }
+        : {}),
       word: visible
         ? currentWord
           ? supplementIssuedWord(snapshot, currentWord, item.wordId)
@@ -129,6 +147,11 @@ export function sessionDto(
     status: session.status,
     phase: session.phase,
     spellingEnabled: sessionSpellingEnabled(session),
+    learnRecallMode: session.items.some((item) =>
+      readRecognitionQuestion(obj(item.questionJson).recognition),
+    )
+      ? 'recognition'
+      : 'recall',
     cursor: session.cursor,
     step: session.step,
     revision: session.revision,
@@ -538,8 +561,24 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
       });
       const learningPreference = await tx.userLearningPreference.findUnique({
         where: { userId: user.id },
-        select: { spellingEnabled: true },
+        select: { spellingEnabled: true, meaningChoiceEnabled: true },
       });
+      const recognitionPool =
+        learningPreference?.meaningChoiceEnabled !== false &&
+        chosen.some((item) => item.bucket === 'new')
+          ? await tx.word.findMany({
+              where: {
+                status: 'published',
+                learningSenses: { some: { status: 'published' } },
+                ...((input.bookId ?? plan.sourceBookId)
+                  ? { bookItems: { some: { bookId: (input.bookId ?? plan.sourceBookId)! } } }
+                  : { id: { in: chosen.map((item) => item.word.id) } }),
+              },
+              orderBy: { id: 'asc' },
+              take: 160,
+              include: wordInclude,
+            })
+          : [];
       const session = await tx.studySession.create({
         data: {
           userId: user.id,
@@ -561,6 +600,15 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
                   ...spellingQuestion(snapshot, item.focusSenseId),
                   taskBucket: item.bucket,
                   spellingEnabled: learningPreference?.spellingEnabled ?? true,
+                  ...(item.bucket === 'new' && learningPreference?.meaningChoiceEnabled !== false
+                    ? {
+                        recognition: createRecognitionQuestion(
+                          item.word,
+                          item.focusSenseId,
+                          recognitionPool,
+                        ),
+                      }
+                    : {}),
                 }),
                 progressRevision: progress.find((p) => p.wordId === item.word.id)?.revision ?? 0,
               };
@@ -627,10 +675,12 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
           action: z.enum(['reveal', 'rate', 'answer']),
           rating: z.enum(['again', 'hard', 'good', 'easy']).optional(),
           answer: z.string().max(160).optional(),
+          recognitionOptionId: z.string().min(1).max(80).optional(),
           expectedSessionRevision: z.number().int().nonnegative(),
           expectedProgressRevision: z.number().int().nonnegative().optional(),
         })
-        .strict(),
+        .strict()
+        .refine((value) => value.recognitionOptionId === undefined || value.action === 'reveal'),
       req.body,
     );
     const hash = digest({ sessionId: params.id, ...input });
@@ -685,11 +735,30 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
       let collection: Awaited<ReturnType<typeof applyFamiliarityPolicy>> | undefined;
       let result: Record<string, unknown> | undefined;
       if (input.action === 'reveal') {
-        if (session.phase !== 'recall' || item.rated)
+        if (session.phase !== 'recall' || item.rated || item.revealed)
           throw new HttpError(409, 'invalid_study_phase');
+        const question = obj(item.questionJson);
+        const recognition =
+          question.taskBucket === 'new' ? readRecognitionQuestion(question.recognition) : null;
+        if (
+          input.recognitionOptionId &&
+          !recognition?.options.some((option) => option.id === input.recognitionOptionId)
+        )
+          throw new HttpError(400, 'invalid_recognition_option', '请重新读取当前词的选项');
         await tx.sessionItem.update({
           where: { id: item.id },
-          data: { revealed: true, status: 'revealed' },
+          data: {
+            revealed: true,
+            status: 'revealed',
+            ...(recognition && input.recognitionOptionId
+              ? {
+                  questionJson: json({
+                    ...question,
+                    recognition: { ...recognition, selectedOptionId: input.recognitionOptionId },
+                  }),
+                }
+              : {}),
+          },
         });
         await tx.studySession.update({
           where: { id: session.id },

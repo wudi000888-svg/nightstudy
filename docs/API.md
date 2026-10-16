@@ -54,7 +54,7 @@
 
 `GET /app/home` 要求当前站点登录，返回 `Cache-Control: no-store`。同一 serializable 事务及学习设置行锁内读取服务器时间、每日唯一词计划、可继续任务和学习日历；允许初始化/刷新当天计划，但不会签发学习组、写评价或制造签到。`userId` 等请求参数不能改变认证身份。
 
-响应包含 `asOf/localDate/timeZone/startsAt/endsAt`、`checkedIn`、`dailyGoalComplete`、`plan`、`learn/review` 和 `calendar`。`plan` 提供计划 id/revision、词书、每日总词数、已完成唯一词数、待新学/复习、待拼写与短期巩固数；新学与复习共用每日总额，复习优先占位。`learn/review` 为 `{state,count,sessionId,sessionRevision,phase,availableAt}`；state 为 `setup/resume/ready/waiting/review_first/other_task/complete/empty`。`resume` 恢复原组与阶段；`waiting` 表示真实到期或延期时间，不能提前造题；`other_task` 明确另一现行组，客户端不另外创建冲突任务。
+响应包含 `asOf/localDate/timeZone/startsAt/endsAt`、`checkedIn`、`dailyGoalComplete`、`plan`、`learn/review` 和 `calendar`。`plan` 提供计划 id/revision、词书、每日总词数、已完成唯一词数、待新学/复习、待拼写与短期巩固数；新学与复习共用每日总额，复习优先占位。`learn/review` 为 `{state,count,sessionId,sessionRevision,phase,sessionKind,sessionRoute,availableAt}`；state 为 `setup/resume/ready/waiting/review_first/other_task/complete/empty`。count 只统计该入口自身的新学或复习桶，不借阻挡任务的另一桶数量。`sessionKind` 为 `new/review/mixed/null`，`sessionRoute` 为 `learn/review/null`，恢复任务时按它选择页面，不能按点击入口推测组类型。`resume` 恢复原组与阶段；`waiting` 表示真实到期或延期时间，不能提前造题；`other_task` 明确另一现行组，客户端不另外创建冲突任务。
 
 `calendar.days` 为含今天的最近 30 个学习日，提供 `localDate/checkedIn/completedGroups`，`calendar.streak` 按实际历史连续天数计算，不截断为 30 天。仅服务器已保存为 `completed` 的完整组，且每项已评价并完成该组签发时要求的拼写，才点亮完成时所在学习日；空组、只揭晓、待拼写与客户端待同步事件不算签到。关闭拼写的组不要求虚构练习记录。学习日使用计划记录的时区与 04:00 边界；跨日完成按完成时所在学习日计。签到与每日总目标达成分别判断，仍需短期巩固或拼写时不能显示整日完成。
 
@@ -144,7 +144,7 @@ goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固�
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `GET /learning-preferences`        | `{preferences}`；没有已保存偏好时返回默认值，不创建数据库行                                                    |
 | `PUT /learning-preferences`        | `expectedRevision` 加需修改的偏好字段；返回 `{preferences}`，首次保存为 revision=1                             |
-| `GET /library/words`               | view=learning/recent/learned，q、limit、cursor 可选；返回本人真实学习词条和进度                                |
+| `GET /library/words`               | bookId、view、q、sort、locate、limit、cursor 可选；返回当前词书或本人学习词表及精确总数                        |
 | `GET /sentences`                   | q、wordId、limit、cursor 可选；本人收藏快照列表                                                                |
 | `GET /sentences/status?wordId=...` | 返回 `{wordId,items:[{sourceType,sourceId,saved,sentenceId}]}`，一次核对当前源的精确收藏状态，不依赖列表第一页 |
 | `POST /sentences`                  | `{sourceType:'word-example',sourceId,wordId?}`；只接受当前发布义项的同版双语例句，返回 `{sentence,duplicate}`  |
@@ -155,9 +155,13 @@ goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固�
 | `PATCH /notes/:id`                 | `{expectedRevision,title?,body?,wordId?}`；wordId 可设为 null，返回 `{note}`                                   |
 | `DELETE /notes/:id`                | `{expectedRevision}`；返回 `{deleted:true}`                                                                    |
 
-偏好默认值为 `theme:'day'`、`accent:'us'`、`autoPlay:false`、`spellingEnabled:true`、`fontScale:1`、`reminderEnabled:false`、`reminderTime:'20:00'`、`revision:0`。theme 可选 day/night/system，accent 可选 us/uk，fontScale 只接受 1/1.125/1.25，reminderTime 为24小时制 HH:mm。PUT 使用独立于每日计划设置的 revision；过期或并发首次保存返回409 `learning_preferences_conflict`，details.preferences 是当前值。提醒仅是打开页面时的本地偏好，不代表服务器推送能力。拼写开关只影响之后签发的新学习组，现有组保留签发时的值。
+偏好默认值为 `theme:'day'`、`accent:'us'`、`autoPlay:false`、`spellingEnabled:true`、`meaningChoiceEnabled:true`、`fontScale:1`、`reminderEnabled:false`、`reminderTime:'20:00'`、`revision:0`。theme 可选 day/night/system，accent 可选 us/uk，fontScale 只接受 1/1.125/1.25，reminderTime 为24小时制 HH:mm。PUT 使用独立于每日计划设置的 revision；过期或并发首次保存返回409 `learning_preferences_conflict`，details.preferences 是当前值。提醒仅是打开页面时的本地偏好，不代表服务器推送能力。拼写和辨义开关只影响之后签发的新学习组，现有组保留签发时的值。
 
-学习库、句库、笔记列表默认50条、最多100条，q 最长120字符。学习库只列存在真实 firstLearnedAt 的已发布词；learning 排除本人暂停的词，recent 限最近30天有真实评价的词，learned 列全部已学词。每项含 word、progress、reviewedAt、dueAt、learnedAt、reviewCount、paused；reviewCount 不包含首学评价，学习库摘要只带有限释义与例句。
+学习库、句库、笔记列表默认50条、最多100条，q 最长120字符。学习库传 bookId 时只读本人可见的公共或私有书，默认 view=all、sort=book，可选 all/unlearned/learning/recent/learned/known；不传 bookId 默认 view=learning、sort=recent，不接受 all/unlearned 或 book 排序。其余排序为 az/za/recent，均覆盖全部筛选结果。q 是规范化词形的包含查找，书内定位与全局词典的纠错建议各有独立用途。
+
+learning 排除本人暂停的已学词，recent 限最近30天有真实评价的词，learned 列全部已学词，known 按本人有效熟词声明或自动熟词认定过滤。返回 `{book,items,page}`；book 为 `{id,title}` 或 null，每项含 word、可空 progress、reviewedAt、dueAt、learnedAt、reviewCount、paused、collection；reviewCount 不包含首学评价。word 仅含有限简释、音标、音频与 detailAvailable，不附完整例句或搭配，详情由词条接口独立读取。
+
+`locate=wordId` 只用于首屏，返回从该词开始的一页及 `page.anchorWordId`；目标不在本人当前书与筛选范围内时404 `library_anchor_not_found`。不能与 cursor 同传。后续页使用严格排他的签名游标，15分钟有效，绑定站点实例、路径、本人、书、查询和排序；条件错误400 `invalid_cursor`、过期410 `cursor_expired`、内容或个人集合版本变化409 `list_changed`。计数与行在同一 RepeatableRead 快照读取；不能只对当前页重新排序。
 
 句库新收藏仅接受当前已发布词的WordExample，必须绑定同词、同内容版本、来源摘要仍核对通过的published LearningSense，且语境及英中句文均非空；旧词级句和内嵌Sense句不能新加入。历史收藏只读保留，不接受客户端提交自写例句或伪造来源。收藏保存句文、对应义项及版本快照，源编辑不会回写已有快照。同源同内容并发收藏去重；源正文或归因变化后，当前版本可能显示未收藏，旧快照仍在句库中。状态接口最多读取1000个有效源，超限返回413 `sentence_sources_limit`，不会静默截断。每人最多5000句，超限429 `sentence_limit`；源不可见、空句、挂起或被排除时404 `sentence_source_not_found`。收藏项包含 id、wordId、sourceType/sourceId、exampleEn/exampleZh、metadata、createdAt；源词被删除后 wordId 可为 null。
 
@@ -238,6 +242,8 @@ pause保留固定内容、历史与未评分预约；deferUntil须为未来且�
 没有可立即签发项时session=null，reason可能为planned_reviews_pending（预留的复习稍后到期）、daily_goal_complete、no_new_words或nothing_due。这不代表所有已签发任务或未安排逾期词已经完成，客户端继续展示真实待办。
 
 评分流程仍是当前item先reveal，再rate（again/hard/good/easy，必须含expectedProgressRevision）。session.spellingEnabled 为签发时偏好快照；开启时整组评分后进入practice，当前题用answer；关闭时最后一次真实评分后直接completed，exerciseDone 保持 false，不伪造已完成拼写。phase保持recall/practice/completed，step为prompt/revealed/exercise/completed。拼写只记录练习，不能写FSRS或伪造评分。巩固是到达真实FSRS dueAt后再回忆并评分，产生真实ReviewLog，不是重复增加当日词数，也不是将点击看答案当作复习成功。
+
+辨义启用时，签发的新学桶可有 `item.recognition.options:[{id,text,pos}]`，选项是固定的3或4项，id 为不透明随机值；仅从同书已审且来源绑定有效的原子义项产生同词性干扰项，不足则正常回忆。Review/extra-review 不出辨义题。`session.learnRecallMode` 表示该组是否有辨义项，仍须检查当前 item。揭晓前不返回 correctOptionId 或 selectedOptionId；揭晓后才返回已固定答案和选中项。`reveal` 可带 recognitionOptionId，必须属于当前题；非 reveal 传该字段或无效选项返回400。只修改揭晓阶段和固定选中项，不创建 StudyProgress、ReviewLog 或每日完成数；新的重复揭晓返回409，原 commandId 同内容重试仍幂等。选择后仍须明确 rate，已签发题目的偏好、选项与阶段在刷新后恢复。
 
 接受真实rate时同步返回collection：inWordbook、known及本次transition（graduated/auto-known/auto-known-withdrawn/restored/null）。自动分层只依真实FSRS Review状态、stability与最近Again之后的不同学习日Good/Easy复习，不把首学、拼写或重复回执当作新证据；14天/3日与90天/5日规则见 [内容说明](CONTENT.md#生词本与熟词本)。
 

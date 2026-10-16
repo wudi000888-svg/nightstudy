@@ -258,6 +258,7 @@ it('publishes an accepted save even if list refresh fails, and clears the exact 
     isWordbookSaved(client.getQueryData(wordbookEntryKey(state.scope, word.id)), word.id),
   ).toBe(true);
   expect(refresh).toHaveBeenCalledWith({ queryKey: [state.scope, 'wordbook'] });
+  expect(refresh).toHaveBeenCalledWith({ queryKey: [state.scope, 'library'] });
   vi.mocked(post).mockResolvedValue({
     deleted: true,
     progressRetained: true,
@@ -320,7 +321,12 @@ it('refreshes the exact card entry when the corresponding wordbook row is remove
     progressRetained: true,
     collection: { ...collection, inWordbook: false, wordbookStatus: null },
   });
-  const tree = renderWordbook();
+  let tree = renderWordbook();
+  (
+    find(tree, (element) => element.props['aria-label'] === '展开 water').props
+      .onClick as () => void
+  )();
+  tree = renderWordbook();
   const remove = find(
     tree,
     (element) => element.props['aria-label'] === '移除 water 收藏，保留学习进度',
@@ -353,6 +359,11 @@ it('separates active and consolidated pagination keys and offers re-add rather t
   state.wordbookItems = [
     { ...item, word, progress: null, status: 'consolidated', graduatedAt: '2026-10-15T00:00:00Z' },
   ];
+  tree = renderWordbook();
+  (
+    find(tree, (element) => element.props['aria-label'] === '展开 water').props
+      .onClick as () => void
+  )();
   tree = renderWordbook();
   const options = state.listOptions.at(-1)!;
   expect(options.queryKey).toEqual([

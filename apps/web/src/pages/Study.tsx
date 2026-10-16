@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Play, RotateCcw } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
 import { api, ApiError, newId, post } from '../lib/api';
@@ -45,6 +45,23 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
   const { user, scope, pending, sync, syncNote, conflicts, discardConflict } = useApp();
   const client = useQueryClient();
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const shortcutLocation = useRef<{ key: string; pathname: string; search: string } | null>(null);
+  const route = useRef({ key: location.key, requestKey: location.key });
+  if (route.current.key !== location.key) {
+    // Consuming our own start=1 intent is the same request; browser POP is a new intent.
+    const ownShortcut = shortcutLocation.current;
+    route.current = {
+      key: location.key,
+      requestKey:
+        ownShortcut?.key === route.current.key &&
+        ownShortcut.pathname === location.pathname &&
+        ownShortcut.search === location.search
+          ? route.current.requestKey
+          : location.key,
+    };
+    shortcutLocation.current = null;
+  }
   const plan = useRemote<TaskPlanResponse>('plan', 'study/plan', !!user);
   const saved = useRemote<TaskListResponse>(
     'study-tasks-active',
@@ -102,12 +119,19 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     [],
   );
 
-  function isCurrent(requestScope: string, requestLife: number) {
+  function isCurrent(requestScope: string, requestLife: number, requestKey: string) {
     return (
       currentScope.current === requestScope &&
       lifetime.current === requestLife &&
+      route.current.requestKey === requestKey &&
       selectionGeneration.current === learningGeneration(requestScope)
     );
+  }
+
+  function refreshAccepted(requestScope: string) {
+    if (currentScope.current !== requestScope) return;
+    void client.invalidateQueries({ queryKey: [requestScope] });
+    window.dispatchEvent(new CustomEvent('nightstudy-synced', { detail: { scope: requestScope } }));
   }
 
   useEffect(() => {
@@ -158,7 +182,12 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     return () => window.removeEventListener(bookChangedEvent, changed);
   }, [scope, setParams]);
 
-  function showTaskError(value: unknown, id: string | undefined, requestLife: number) {
+  function showTaskError(
+    value: unknown,
+    id: string | undefined,
+    requestLife: number,
+    requestKey: string,
+  ) {
     setError(value);
     if (!(value instanceof ApiError) || value.code !== 'task_cancelled' || !id) return;
     setSession((current) =>
@@ -166,7 +195,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     );
     void api<{ session: StudySession }>(`study/sessions/${encodeURIComponent(id)}`)
       .then(({ session: latest }) => {
-        if (!isCurrent(scope, requestLife)) return;
+        if (!isCurrent(scope, requestLife, requestKey)) return;
         setSession((current) => mergeStudySession(current, latest));
         setFeedback(undefined);
         setAnswer('');
@@ -205,7 +234,8 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     if (busyRef.current || !user) return;
     lifetime.current++;
     const requestScope = scope,
-      requestLife = lifetime.current;
+      requestLife = lifetime.current,
+      requestKey = route.current.requestKey;
     busyRef.current = true;
     setBusy(true);
     setError(null);
@@ -214,18 +244,20 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     setAnswer('');
     try {
       if (navigator.onLine) {
-        const flushed = await flushCommands(scope, () => isCurrent(requestScope, requestLife));
+        const flushed = await flushCommands(scope, () =>
+          isCurrent(requestScope, requestLife, requestKey),
+        );
         if (flushed.pending)
           throw new Error('仍有学习操作等待同步。请先同步并核对已有任务，再安排或继续。');
         if (flushed.applied) await client.invalidateQueries({ queryKey: [scope] });
       } else if (pending) throw new Error('已有操作暂存等待联网同步，请保留当前记录。');
-      if (!isCurrent(requestScope, requestLife)) return;
+      if (!isCurrent(requestScope, requestLife, requestKey)) return;
       let result: { session: StudySession | null; reason?: string };
       if (resumeId) {
         const read = await api<{ session: StudySession }>(
           `study/sessions/${encodeURIComponent(resumeId)}`,
         );
-        if (!isCurrent(requestScope, requestLife)) return;
+        if (!isCurrent(requestScope, requestLife, requestKey)) return;
         result = read.session.status === 'paused' ? await updateTask(read.session, 'resume') : read;
       } else {
         const body = extra
@@ -243,7 +275,10 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         });
         startCommand.current = null;
       }
-      if (!isCurrent(requestScope, requestLife)) return;
+      if (!isCurrent(requestScope, requestLife, requestKey)) {
+        refreshAccepted(requestScope);
+        return;
+      }
       setSession((current) => (result.session ? mergeStudySession(current, result.session) : null));
       setReason(
         result.reason
@@ -256,13 +291,13 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
       );
       void client.invalidateQueries({ queryKey: [scope] });
     } catch (value) {
-      if (isCurrent(requestScope, requestLife)) {
-        showTaskError(value, resumeId, requestLife);
+      if (isCurrent(requestScope, requestLife, requestKey)) {
+        showTaskError(value, resumeId, requestLife, requestKey);
         void plan.refetch();
         void saved.refetch();
       }
     } finally {
-      if (isCurrent(requestScope, requestLife)) {
+      if (isCurrent(requestScope, requestLife, requestKey)) {
         busyRef.current = false;
         setBusy(false);
       }
@@ -272,21 +307,26 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     if (!session || session.status === 'cancelled' || busyRef.current || waitingSync) return;
     lifetime.current++;
     const requestScope = scope,
-      requestLife = lifetime.current;
+      requestLife = lifetime.current,
+      requestKey = route.current.requestKey;
     busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
       const result = await updateTask(session, action);
-      if (!isCurrent(requestScope, requestLife)) return;
+      if (!isCurrent(requestScope, requestLife, requestKey)) {
+        refreshAccepted(requestScope);
+        return;
+      }
       setSession((current) => mergeStudySession(current, result.session));
       setFeedback(undefined);
       setAnswer('');
       void client.invalidateQueries({ queryKey: [scope] });
     } catch (value) {
-      if (isCurrent(requestScope, requestLife)) showTaskError(value, session.id, requestLife);
+      if (isCurrent(requestScope, requestLife, requestKey))
+        showTaskError(value, session.id, requestLife, requestKey);
     } finally {
-      if (isCurrent(requestScope, requestLife)) {
+      if (isCurrent(requestScope, requestLife, requestKey)) {
         busyRef.current = false;
         setBusy(false);
       }
@@ -298,7 +338,8 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     if (!item) return;
     lifetime.current++;
     const requestScope = scope,
-      requestLife = lifetime.current;
+      requestLife = lifetime.current,
+      requestKey = route.current.requestKey;
     busyRef.current = true;
     setBusy(true);
     setError(null);
@@ -312,16 +353,20 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         expectedSessionRevision: session.revision,
         expectedProgressRevision: item.progressRevision,
       });
-      if (!isCurrent(requestScope, requestLife)) return;
+      if (!isCurrent(requestScope, requestLife, requestKey)) {
+        refreshAccepted(requestScope);
+        return;
+      }
       setSession((current) => mergeStudySession(current, result.session));
       if (result.session.status === 'cancelled') setFeedback(undefined);
       else if (result.result) setFeedback({ ...result.result, position: item.ordinal + 1 });
       setAnswer('');
       void client.invalidateQueries({ queryKey: [scope] });
     } catch (value) {
-      if (isCurrent(requestScope, requestLife)) showTaskError(value, session.id, requestLife);
+      if (isCurrent(requestScope, requestLife, requestKey))
+        showTaskError(value, session.id, requestLife, requestKey);
     } finally {
-      if (isCurrent(requestScope, requestLife)) {
+      if (isCurrent(requestScope, requestLife, requestKey)) {
         busyRef.current = false;
         setBusy(false);
       }
@@ -331,12 +376,13 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     if (!session || busyRef.current) return;
     lifetime.current++;
     const requestScope = scope,
-      requestLife = lifetime.current;
+      requestLife = lifetime.current,
+      requestKey = route.current.requestKey;
     setBusy(true);
     busyRef.current = true;
     try {
       const result = await api<{ session: StudySession }>(`study/sessions/${session.id}`);
-      if (isCurrent(requestScope, requestLife)) {
+      if (isCurrent(requestScope, requestLife, requestKey)) {
         setSession((current) =>
           current?.id === result.session.id ? mergeStudySession(current, result.session) : current,
         );
@@ -345,9 +391,9 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         setAnswer('');
       }
     } catch (value) {
-      if (isCurrent(requestScope, requestLife)) setError(value);
+      if (isCurrent(requestScope, requestLife, requestKey)) setError(value);
     } finally {
-      if (isCurrent(requestScope, requestLife)) {
+      if (isCurrent(requestScope, requestLife, requestKey)) {
         setBusy(false);
         busyRef.current = false;
       }
@@ -357,14 +403,15 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     if (busyRef.current) return;
     lifetime.current++;
     const requestScope = scope,
-      requestLife = lifetime.current;
+      requestLife = lifetime.current,
+      requestKey = route.current.requestKey;
     setBusy(true);
     busyRef.current = true;
     try {
       const result = await api<{ session: StudySession }>(
         `study/sessions/${encodeURIComponent(sessionId)}`,
       );
-      if (!isCurrent(requestScope, requestLife)) return;
+      if (!isCurrent(requestScope, requestLife, requestKey)) return;
       setSession((current) => mergeStudySession(current, result.session));
       setFeedback(undefined);
       setAnswer('');
@@ -372,15 +419,23 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
       linkLoaded.current = `${scope}:${result.session.id}`;
       linkStudySession(params, result.session.id, setParams);
     } catch (value) {
-      if (isCurrent(requestScope, requestLife)) setError(value);
+      if (isCurrent(requestScope, requestLife, requestKey)) setError(value);
       throw value;
     } finally {
-      if (isCurrent(requestScope, requestLife)) {
+      if (isCurrent(requestScope, requestLife, requestKey)) {
         setBusy(false);
         busyRef.current = false;
       }
     }
   }
+  useEffect(() => {
+    if (route.current.requestKey !== location.key) return;
+    busyRef.current = false;
+    setBusy(false);
+    // An accepted operation may have completed after this navigation. Read its
+    // server snapshot rather than leaving an old card, without clearing a new URL's focus.
+    if (session?.id && params.get('session') === session.id) void readCurrent();
+  }, [location.key]);
   useEffect(() => {
     const id = params.get('session');
     if (user && id && linkLoaded.current !== `${scope}:${id}`) {
@@ -394,13 +449,21 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
   useEffect(() => {
     if (!session?.id || !user) return;
     const id = session.id;
-    const synced = () => {
+    const synced = (event?: Event) => {
+      if (
+        event &&
+        'detail' in event &&
+        (event as CustomEvent<{ scope?: string }>).detail?.scope &&
+        (event as CustomEvent<{ scope?: string }>).detail.scope !== scope
+      )
+        return;
       if (busyRef.current) return;
       const requestScope = scope,
-        requestLife = lifetime.current;
+        requestLife = lifetime.current,
+        requestKey = route.current.requestKey;
       api<{ session: StudySession }>(`study/sessions/${id}`)
         .then((value) => {
-          if (isCurrent(requestScope, requestLife) && !busyRef.current) {
+          if (isCurrent(requestScope, requestLife, requestKey) && !busyRef.current) {
             setSession((current) =>
               current?.id === id ? mergeStudySession(current, value.session) : current,
             );
@@ -409,7 +472,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
           }
         })
         .catch((value) => {
-          if (isCurrent(requestScope, requestLife)) setError(value);
+          if (isCurrent(requestScope, requestLife, requestKey)) setError(value);
         });
     };
     window.addEventListener('nightstudy-synced', synced);
@@ -442,6 +505,11 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     consume: () => {
       const next = new URLSearchParams(params);
       next.delete('start');
+      shortcutLocation.current = {
+        key: location.key,
+        pathname: location.pathname,
+        search: next.size ? `?${next}` : '',
+      };
       setParams(next, { replace: true });
     },
     start,
@@ -507,12 +575,13 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
           onRead={readServerTask}
           onDiscard={async (row) => {
             const requestScope = scope,
-              requestLife = lifetime.current;
+              requestLife = lifetime.current,
+              requestKey = route.current.requestKey;
             await discardConflict(row.id);
-            if (!isCurrent(requestScope, requestLife)) return;
+            if (!isCurrent(requestScope, requestLife, requestKey)) return;
             setError(null);
             if (row.sessionId) await readServerTask(row.sessionId);
-            if (!isCurrent(requestScope, requestLife)) return;
+            if (!isCurrent(requestScope, requestLife, requestKey)) return;
             await client.invalidateQueries({ queryKey: [scope] });
           }}
         />

@@ -33,6 +33,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('react-router-dom', async (original) => ({
   ...(await original<typeof import('react-router-dom')>()),
   useSearchParams: () => [new URLSearchParams(), vi.fn()],
+  useLocation: () => ({ key: 'study-route', pathname: '/learn', search: '' }),
 }));
 vi.mock('../AppContext', () => ({
   useApp: () => ({

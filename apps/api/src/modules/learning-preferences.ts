@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { HttpError } from '../context.js';
 import { goal, id, settings, learningDayWindow, type Db } from './shared.js';
 import { visibleBookWhere } from './book-access.js';
@@ -14,6 +15,43 @@ export const learningPreferencesInput = z
     expectedRevision: z.number().int().nonnegative().optional(),
   })
   .strict();
+
+/** Settings row lock and caller transaction make task invalidation and a book
+ * selection one atomic transition. Memory evidence is deliberately untouched. */
+export async function cancelOpenStudyTasks(
+  db: Db,
+  userId: string,
+  extraWhere: Prisma.StudySessionWhereInput = {},
+) {
+  const sessions = await db.studySession.findMany({
+    where: { ...extraWhere, userId, status: { in: ['in_progress', 'paused'] } },
+    select: { id: true },
+  });
+  const ids = sessions.map((session) => session.id);
+  if (!ids.length) return [];
+  const assignments = await db.dailyPlanWord.findMany({
+    where: { activeSessionId: { in: ids }, plan: { userId } },
+    select: { planId: true },
+  });
+  await db.studySession.updateMany({
+    where: { id: { in: ids }, userId },
+    data: { status: 'cancelled', pausedAt: null, deferredUntil: null, revision: { increment: 1 } },
+  });
+  await db.dailyPlanWord.deleteMany({
+    where: { activeSessionId: { in: ids }, firstRatedAt: null, plan: { userId } },
+  });
+  await db.dailyPlanWord.updateMany({
+    where: { activeSessionId: { in: ids }, firstRatedAt: { not: null }, plan: { userId } },
+    data: { activeSessionId: null, deferredUntil: null, status: 'completed' },
+  });
+  const planIds = [...new Set(assignments.map((word) => word.planId))];
+  if (planIds.length)
+    await db.dailyPlan.updateMany({
+      where: { id: { in: planIds }, userId },
+      data: { revision: { increment: 1 } },
+    });
+  return ids;
+}
 
 export async function updateLearningPreferences(
   db: Db,
@@ -69,6 +107,8 @@ export async function updateLearningPreferences(
               )?.endsAt ?? learningDayWindow(now, current.timeZone).endsAt,
           }
       : {};
+  if (input.currentBookId !== undefined && input.currentBookId !== current.currentBookId)
+    await cancelOpenStudyTasks(db, userId);
   return db.userSettings.update({
     where: { userId },
     data: {

@@ -7,6 +7,7 @@ import type { Book } from '../../lib/types';
 import { PlanConfirm } from './PlanConfirm';
 import type { TaskPlanResponse } from './types';
 import { useScreenActive } from '../../lib/screen-lifecycle';
+import { acceptBookPlan } from '../../lib/learning-state';
 
 export function useBookPlan() {
   const { user, scope } = useApp();
@@ -37,6 +38,7 @@ export function useBookPlan() {
       navigate('/auth');
       return;
     }
+    generation.current++;
     setSelected(book);
   }
   const settings = query.data?.settings;
@@ -63,12 +65,16 @@ export function useBookPlan() {
             : null
         }
         issuedCount={query.data?.plan.assignedUnique}
-        onClose={() => setSelected(null)}
+        switchingBook={!!settings?.currentBookId && settings.currentBookId !== selected?.id}
+        onClose={() => {
+          generation.current++;
+          setSelected(null);
+        }}
         onConfirm={async (values, revision, commandId) => {
           if (!selected) return;
-          const request = generation.current;
+          const request = ++generation.current;
           const navigationGeneration = navigation.current.generation;
-          await post<TaskPlanResponse>('study/plan/confirm', {
+          const result = await post<TaskPlanResponse>('study/plan/confirm', {
             bookId: selected.id,
             ...values,
             expectedRevision: revision,
@@ -76,8 +82,15 @@ export function useBookPlan() {
           });
           if (request !== generation.current) return;
           setSelected(null);
-          await client.invalidateQueries({ queryKey: [scope] });
+          const applied = await acceptBookPlan(
+            client,
+            scope,
+            settings?.currentBookId ?? null,
+            result,
+            () => request === generation.current,
+          );
           if (
+            applied &&
             request === generation.current &&
             navigation.current.active &&
             navigationGeneration === navigation.current.generation

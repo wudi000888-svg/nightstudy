@@ -29,6 +29,7 @@ export interface StudySessionViewProps {
   onState: (action: 'pause' | 'resume' | 'defer') => void;
   onRead: () => void;
   onBack: () => void;
+  onTasks: () => void;
   onNext: () => void;
   onFeedbackDone: () => void;
 }
@@ -50,6 +51,7 @@ export function StudySessionView({
   onState,
   onRead,
   onBack,
+  onTasks,
   onNext,
   onFeedbackDone,
 }: StudySessionViewProps) {
@@ -87,6 +89,45 @@ export function StudySessionView({
     window.addEventListener(beforeAppBackEvent, close);
     return () => window.removeEventListener(beforeAppBackEvent, close);
   }, []);
+  if (session.status === 'cancelled')
+    return (
+      <section className="study-session-view" aria-label="已结束的学习任务">
+        <header className="study-focus-header">
+          <IconActionHint label="返回原页">
+            <button
+              type="button"
+              className="study-focus-icon"
+              aria-label="返回原页"
+              onClick={onBack}
+            >
+              <ArrowLeft size={23} />
+            </button>
+          </IconActionHint>
+          <div className="study-focus-title">
+            <span>{session.bookTitle || '复习已学词'}</span>
+            <strong>任务已结束</strong>
+          </div>
+        </header>
+        <div className="study-focus-scroll">
+          <div className="study-focus-state">
+            <span className="study-state-symbol">
+              <CheckCircle2 size={27} />
+            </span>
+            <h2>这组任务已结束</h2>
+            <p>切换词书后，未完成的任务已结束。已提交的学习记录和今日已完成词数都保留。</p>
+            <p>
+              本组已评价 {rated} 词 · 已拼写 {spelled} 词
+            </p>
+            {waitingSync && <p>本地待同步操作仍保留，请在任务页逐条核对处理。</p>}
+          </div>
+        </div>
+        <footer className="study-thumb-dock">
+          <button type="button" className="study-main-action" onClick={onTasks}>
+            查看当前任务 <ArrowRight size={18} />
+          </button>
+        </footer>
+      </section>
+    );
   return (
     <section className="study-session-view" aria-label="专注学习">
       <header className="study-focus-header">

@@ -18,6 +18,7 @@ export function PlanConfirm({
   book,
   initial,
   issuedCount = 0,
+  switchingBook = false,
   loading = false,
   error,
   onClose,
@@ -28,6 +29,7 @@ export function PlanConfirm({
   book: Book | null;
   initial: TaskPlanValues | null;
   issuedCount?: number;
+  switchingBook?: boolean;
   loading?: boolean;
   error?: unknown;
   onClose: () => void;
@@ -242,9 +244,11 @@ export function PlanConfirm({
                   <strong>{preview.preview.unplannedOverdueCount}</strong>
                 </div>
                 <p>
-                  今日已完成 {preview.preview.completedUnique} 词 · 保留已安排{' '}
-                  {preview.preview.retainedAssignedCount}{' '}
-                  词。预览不会签发任务，最终以确认时的进度为准。
+                  今日已完成 {preview.preview.completedUnique} 词
+                  {switchingBook
+                    ? ` · 今日剩余额度 ${Math.max(0, draft.dailyTotalGoal - preview.preview.completedUnique)} 词，按新词书重新安排。`
+                    : ` · 保留已安排 ${preview.preview.retainedAssignedCount} 词。`}
+                  预览不会签发任务，最终以确认时的进度为准。
                 </p>
               </div>
             )}
@@ -285,10 +289,9 @@ export function PlanConfirm({
             <div className="task-preserve-note">
               <ShieldCheck size={17} />
               <span>
-                {issuedCount
-                  ? `已有 ${issuedCount} 个词的任务保留。`
-                  : '已有签发任务与学习记录保留。'}
-                改变目标或切换词书，只调整之后的安排。
+                {switchingBook
+                  ? '确认后结束原词书全部未完成任务，按今日剩余额度重新安排。已学词、复习记录和今日已完成数保留。'
+                  : `${issuedCount ? `已有 ${issuedCount} 个词的任务保留。` : '已有签发任务保留。'}调整目标只改变之后的安排，已提交的学习记录保留。`}
               </span>
             </div>
             <div className="action-row">

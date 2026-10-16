@@ -139,7 +139,10 @@ export function selectLearningSense(senses: Sense[], focusSenseId?: string | nul
     available.find((sense) => sense.definitionZh.trim())
   );
 }
-export function selectWordLearningSense(word: WordWithSenses, focusSenseId?: string | null) {
+export function selectWordLearningSense(
+  word: Pick<WordWithSenses, 'id' | 'senses' | 'learningSenses'>,
+  focusSenseId?: string | null,
+) {
   const atomic = verifiedLearningSenses(word);
   if (!atomic.length) return selectLearningSense(word.senses, focusSenseId);
   return (

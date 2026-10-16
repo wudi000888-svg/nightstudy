@@ -18,6 +18,7 @@ import {
   transact,
 } from './shared.js';
 import { appHomeSnapshot } from './app-home.js';
+import { learningSenseBindingHash, learningSenseTextHash } from './learning-sense-integrity.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const suite = url ? describe : describe.skip;
@@ -32,8 +33,10 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     .replace(/[0-9]/g, (value) => String.fromCharCode(97 + Number(value)));
   const ids = Array.from({ length: 6 }, (_, index) => `${prefix}-word-${index}`);
   const users: string[] = [];
+  const contentFixtureIds: string[] = [];
   const books: string[] = [];
   const cookies = new Map<string, string>();
+  const actorIps = new Map<string, string>();
   const password = 'Task-integration-2026!';
   const ip = `10.84.${Number.parseInt(prefix.slice(-2), 16) || 1}.1`;
   const webRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'nightstudy-tasks-'));
@@ -63,14 +66,14 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
   let app: FastifyInstance, passwordHash: string;
   const request = (
     actor: string | null,
-    method: 'GET' | 'POST' | 'PATCH' | 'PUT',
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
     route: string,
     payload?: unknown,
   ) =>
     app.inject({
       method,
       url: `/api/v2${route}`,
-      remoteAddress: ip,
+      remoteAddress: actor ? (actorIps.get(actor) ?? ip) : ip,
       headers: {
         host: 'tasks.test',
         ...(actor ? { cookie: cookies.get(actor) ?? '' } : {}),
@@ -82,6 +85,7 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     const userId = `${prefix}-user-${users.length}`,
       bookId = `${prefix}-book-${users.length}`;
     users.push(userId);
+    actorIps.set(userId, ip.slice(0, ip.lastIndexOf('.') + 1) + String(users.length + 1));
     books.push(bookId);
     await db.user.create({
       data: {
@@ -123,7 +127,7 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     const login = await app.inject({
       method: 'POST',
       url: '/api/auth/sign-in/email',
-      remoteAddress: ip,
+      remoteAddress: actorIps.get(userId)!,
       headers: { host: 'tasks.test', 'content-type': 'application/json' },
       payload: JSON.stringify({ email: `${userId}@example.test`, password }),
     });
@@ -242,11 +246,593 @@ suite('PostgreSQL persisted total-word plans, task lifecycle and real FSRS state
     await app?.close();
     await db.studySession.deleteMany({ where: { userId: { in: users } } });
     await db.user.deleteMany({ where: { id: { in: users } } });
-    await db.word.deleteMany({ where: { id: { in: ids } } });
-    await db.rateBucket.deleteMany({ where: { key: { contains: ip } } });
+    await db.senseSourceBinding.deleteMany({ where: { wordId: { in: contentFixtureIds } } });
+    await db.learningSense.deleteMany({ where: { wordId: { in: contentFixtureIds } } });
+    await db.word.deleteMany({ where: { id: { in: [...ids, ...contentFixtureIds] } } });
+    await db.rateBucket.deleteMany({
+      where: {
+        OR: [ip, ...actorIps.values()].map((clientIp) => ({ key: { contains: clientIp } })),
+      },
+    });
     await db.$disconnect();
     fs.rmSync(webRoot, { recursive: true, force: true });
   }, 60000);
+
+  async function alternateBook(userId: string, wordIds = ids.slice(2)) {
+    const bookId = `${prefix}-switched-${randomUUID()}`;
+    books.push(bookId);
+    await db.book.create({
+      data: {
+        id: bookId,
+        slug: bookId,
+        ownerId: userId,
+        title: 'Replacement synthetic book',
+        description: 'Original synthetic switched-book fixture',
+        goal: 'daily',
+        version: 'integration-only',
+        items: { create: wordIds.map((wordId, ordinal) => ({ wordId, ordinal })) },
+      },
+    });
+    return bookId;
+  }
+  it('replaces old book tasks atomically but preserves real ratings, today unique completion and accepted receipts', async () => {
+    const { userId } = await actor(3, 2),
+      bookB = await alternateBook(userId);
+    const createCommand = randomUUID();
+    const created = await issue(userId, { commandId: createCommand });
+    let old = created.session;
+    old = (await command(userId, old, 'reveal')).session;
+    const first = old.items[old.cursor],
+      ratingCommand = randomUUID();
+    const ratingBody = {
+      commandId: ratingCommand,
+      itemId: first.id,
+      action: 'rate',
+      rating: 'easy',
+      expectedSessionRevision: old.revision,
+      expectedProgressRevision: first.progressRevision,
+    };
+    const accepted = await request(
+      userId,
+      'POST',
+      `/study/sessions/${old.id}/commands`,
+      ratingBody,
+    );
+    expect(accepted.statusCode, accepted.body).toBe(200);
+    old = accepted.json().session;
+    const memory = await db.studyProgress.findMany({ where: { userId } }),
+      logs = await db.reviewLog.findMany({ where: { userId } });
+    const preview = (
+      await request(
+        userId,
+        'GET',
+        `/study/plan/preview?bookId=${bookB}&dailyTotalGoal=3&groupSize=2`,
+      )
+    ).json();
+    expect(preview.preview).toMatchObject({
+      completedUnique: 1,
+      retainedAssignedCount: 0,
+      newPlanned: 3,
+    });
+    const confirmBody = {
+      bookId: bookB,
+      dailyTotalGoal: 3,
+      groupSize: 2,
+      expectedRevision: preview.settingsRevision,
+      commandId: randomUUID(),
+    };
+    const changed = await request(userId, 'POST', '/study/plan/confirm', confirmBody);
+    expect(changed.statusCode, changed.body).toBe(200);
+    expect(changed.json().plan).toMatchObject({
+      bookId: bookB,
+      completedUnique: 1,
+      assignedUnique: 0,
+      pendingSpellingCount: 0,
+      newRemaining: 2,
+    });
+    expect(await db.studyProgress.findMany({ where: { userId } })).toEqual(memory);
+    expect(await db.reviewLog.findMany({ where: { userId } })).toEqual(logs);
+    const cancelled = (await request(userId, 'GET', `/study/sessions/${old.id}`)).json().session;
+    expect(cancelled).toMatchObject({
+      status: 'cancelled',
+      currentItemId: null,
+      revision: old.revision + 1,
+    });
+    expect(cancelled.items.filter((x: any) => x.rated)).toHaveLength(1);
+    for (const action of ['pause', 'resume', 'defer']) {
+      const rejected = await request(userId, 'POST', `/study/tasks/${old.id}/state`, {
+        action,
+        commandId: randomUUID(),
+        expectedSessionRevision: old.revision,
+        ...(action === 'defer' ? { deferUntil: new Date(Date.now() + 60000).toISOString() } : {}),
+      });
+      expect(rejected.statusCode, rejected.body).toBe(409);
+      expect(rejected.json().code).toBe('task_cancelled');
+    }
+    const rejected = await request(userId, 'POST', `/study/sessions/${old.id}/commands`, {
+      commandId: randomUUID(),
+      itemId: old.items[old.cursor].id,
+      action: 'reveal',
+      expectedSessionRevision: old.revision,
+    });
+    expect(rejected.statusCode, rejected.body).toBe(409);
+    expect(rejected.json().code).toBe('task_cancelled');
+    const repeatedRating = await request(
+      userId,
+      'POST',
+      `/study/sessions/${old.id}/commands`,
+      ratingBody,
+    );
+    expect(repeatedRating.json()).toMatchObject({
+      duplicate: true,
+      session: { status: 'cancelled', currentItemId: null },
+    });
+    const repeatedCreate = await issue(userId, { commandId: createCommand });
+    expect(repeatedCreate).toMatchObject({
+      duplicate: true,
+      session: { id: old.id, status: 'cancelled', currentItemId: null },
+    });
+    expect((await request(userId, 'GET', '/study/tasks?status=active')).json().items).toHaveLength(
+      0,
+    );
+    expect((await request(userId, 'GET', '/study/tasks?status=cancelled')).json().page.total).toBe(
+      1,
+    );
+    const home = (await request(userId, 'GET', '/app/home')).json();
+    expect(home).toMatchObject({
+      checkedIn: false,
+      plan: { bookId: bookB, completedUnique: 1, pendingSpellingCount: 0, newRemaining: 2 },
+      learn: { state: 'ready', count: 2 },
+    });
+    const fresh = await issue(userId, { bookId: bookB });
+    expect(fresh.session.bookId).toBe(bookB);
+    expect(fresh.session.id).not.toBe(old.id);
+    expect(fresh.session.items.every((x: any) => ids.slice(2).includes(x.wordId))).toBe(true);
+    const replayConfirm = await request(userId, 'POST', '/study/plan/confirm', confirmBody);
+    expect(replayConfirm.json().duplicate).toBe(true);
+    expect(
+      (await db.studySession.findUniqueOrThrow({ where: { id: fresh.session.id } })).status,
+    ).toBe('in_progress');
+    const oldBookRequest = await request(userId, 'POST', '/study/sessions', {
+      mode: 'learn',
+      bookId: created.session.bookId,
+      commandId: randomUUID(),
+    });
+    expect(oldBookRequest.statusCode).toBe(409);
+    expect(oldBookRequest.json().code).toBe('book_selection_changed');
+    const stalePlan = await request(userId, 'POST', '/study/sessions', {
+      mode: 'learn',
+      bookId: bookB,
+      commandId: randomUUID(),
+      expectedPlanRevision: changed.json().plan.revision,
+    });
+    expect(stalePlan.statusCode).toBe(409);
+    expect(stalePlan.json().code).toBe('plan_conflict');
+  });
+  it('cancels paused/deferred, pure review, extra review and rated-only spelling on a real book change, while same-book settings keep tasks', async () => {
+    const { userId, bookId } = await actor(3, 1),
+      bookB = await alternateBook(userId);
+    const group = (await issue(userId)).session;
+    const deferred = await request(userId, 'POST', `/study/tasks/${group.id}/state`, {
+      action: 'defer',
+      commandId: randomUUID(),
+      expectedSessionRevision: group.revision,
+      deferUntil: new Date(Date.now() + 86400000).toISOString(),
+    });
+    expect(deferred.statusCode).toBe(200);
+    const extra = [];
+    for (const [index, kind] of ['daily', 'extra-review', 'daily'].entries())
+      extra.push(
+        await db.studySession.create({
+          data: {
+            userId,
+            bookId: null,
+            mode: 'review',
+            taskKind: kind,
+            status: index === 1 ? 'paused' : 'in_progress',
+            phase: index === 2 ? 'practice' : 'recall',
+            items: {
+              create: {
+                wordId: ids[index + 1]!,
+                ordinal: 0,
+                rated: index === 2,
+                revealed: index === 2,
+                contentSnapshot: {},
+                questionJson: { spellingEnabled: true },
+              },
+            },
+          },
+        }),
+      );
+    const same = await request(userId, 'PATCH', '/me/settings', {
+      currentBookId: bookId,
+      dailyTotalGoal: 4,
+    });
+    expect(same.statusCode).toBe(200);
+    expect(
+      await db.studySession.count({ where: { userId, status: { in: ['paused', 'in_progress'] } } }),
+    ).toBe(4);
+    const changed = await request(userId, 'PATCH', '/me/settings', { currentBookId: bookB });
+    expect(changed.statusCode).toBe(200);
+    expect(await db.studySession.count({ where: { userId, status: 'cancelled' } })).toBe(4);
+    const plan = (await request(userId, 'GET', '/study/plan')).json().plan;
+    expect(plan).toMatchObject({
+      bookId: bookB,
+      completedUnique: 0,
+      assignedUnique: 0,
+      pendingSpellingCount: 0,
+      newRemaining: 4,
+    });
+    expect(await db.dailyPlanWord.count({ where: { planId: plan.id, firstRatedAt: null } })).toBe(
+      0,
+    );
+    expect(await db.studyProgress.count({ where: { userId } })).toBe(0);
+    expect(await db.reviewLog.count({ where: { userId } })).toBe(0);
+  });
+  it('repairs explicit old-book sessions on direct task reads without guessing that null-book global reviews belong to an old book', async () => {
+    const { userId, bookId } = await actor(3, 1),
+      bookB = await alternateBook(userId);
+    const old = (await issue(userId)).session;
+    const global = await db.studySession.create({
+      data: {
+        userId,
+        bookId: null,
+        mode: 'review',
+        taskKind: 'extra-review',
+        status: 'paused',
+        items: {
+          create: {
+            wordId: ids[5]!,
+            ordinal: 0,
+            contentSnapshot: {},
+            questionJson: { spellingEnabled: false },
+          },
+        },
+      },
+    });
+    await db.userSettings.update({
+      where: { userId },
+      data: { currentBookId: bookB, revision: { increment: 1 } },
+    });
+    const oldView = await request(userId, 'GET', `/study/sessions/${old.id}`);
+    expect(oldView.json().session).toMatchObject({ status: 'cancelled', currentItemId: null });
+    expect((await db.studySession.findUniqueOrThrow({ where: { id: old.id } })).status).toBe(
+      'cancelled',
+    );
+    expect((await db.studySession.findUniqueOrThrow({ where: { id: global.id } })).status).toBe(
+      'paused',
+    );
+    const selected = await request(userId, 'POST', `/books/${bookId}/select`, {});
+    expect(selected.statusCode).toBe(200);
+    expect((await db.studySession.findUniqueOrThrow({ where: { id: global.id } })).status).toBe(
+      'cancelled',
+    );
+  });
+
+  it('persists historical wrong-book cancellation even when a direct stale command or state action returns 409', async () => {
+    for (const route of ['command', 'state']) {
+      const { userId } = await actor(3, 2),
+        bookB = await alternateBook(userId);
+      let old = (await issue(userId)).session;
+      old = (await command(userId, old, 'reveal')).session;
+      old = (await command(userId, old, 'rate')).session;
+      const items = await db.sessionItem.findMany({
+        where: { sessionId: old.id },
+        orderBy: { id: 'asc' },
+      });
+      const memory = await db.studyProgress.findMany({ where: { userId } });
+      const logs = await db.reviewLog.findMany({ where: { userId } });
+      await db.userSettings.update({
+        where: { userId },
+        data: { currentBookId: bookB, revision: { increment: 1 } },
+      });
+      const response =
+        route === 'command'
+          ? await request(userId, 'POST', `/study/sessions/${old.id}/commands`, {
+              commandId: randomUUID(),
+              itemId: old.items[old.cursor].id,
+              action: 'reveal',
+              expectedSessionRevision: old.revision,
+            })
+          : await request(userId, 'POST', `/study/tasks/${old.id}/state`, {
+              commandId: randomUUID(),
+              action: 'resume',
+              expectedSessionRevision: old.revision,
+            });
+      expect(response.statusCode, response.body).toBe(409);
+      expect(response.json().code).toBe('task_cancelled');
+      const persisted = await db.studySession.findUniqueOrThrow({ where: { id: old.id } });
+      expect(persisted).toMatchObject({ status: 'cancelled', revision: old.revision + 1 });
+      expect(
+        await db.sessionItem.findMany({ where: { sessionId: old.id }, orderBy: { id: 'asc' } }),
+      ).toEqual(items);
+      expect(await db.studyProgress.findMany({ where: { userId } })).toEqual(memory);
+      expect(await db.reviewLog.findMany({ where: { userId } })).toEqual(logs);
+      expect(await db.dailyPlanWord.count({ where: { activeSessionId: old.id } })).toBe(0);
+    }
+  });
+
+  it('keeps today unique completion across a switch while reserving global reviews before new-book words', async () => {
+    const { userId } = await actor(5, 2),
+      bookB = await alternateBook(userId, [ids[2]!, ids[3]!]);
+    await progress(userId, 5, new Date(Date.now() - 60000));
+    const first = (await issue(userId)).session;
+    expect(first.items.map((item: any) => item.wordId)).toContain(ids[5]);
+    await finish(userId, first);
+    let second = (await issue(userId)).session;
+    second = (await command(userId, second, 'reveal')).session;
+    second = (await command(userId, second, 'rate')).session;
+    await progress(userId, 4, new Date(Date.now() - 60000));
+    const beforeLogs = await db.reviewLog.findMany({ where: { userId }, orderBy: { id: 'asc' } });
+    const beforeMemory = await db.studyProgress.findMany({
+      where: { userId },
+      orderBy: { id: 'asc' },
+    });
+    const preview = (await request(userId, 'GET', `/study/plan/preview?bookId=${bookB}`)).json();
+    expect(preview.preview).toMatchObject({
+      completedUnique: 3,
+      retainedAssignedCount: 0,
+      reviewPlanned: 2,
+      newPlanned: 3,
+    });
+    const changed = await request(userId, 'POST', '/study/plan/confirm', {
+      bookId: bookB,
+      dailyTotalGoal: 5,
+      groupSize: 2,
+      expectedRevision: preview.settingsRevision,
+      commandId: randomUUID(),
+    });
+    expect(changed.statusCode, changed.body).toBe(200);
+    expect(changed.json().plan).toMatchObject({
+      completedUnique: 3,
+      completedNew: 2,
+      completedReview: 1,
+      plannedReview: 2,
+      plannedNew: 3,
+      reviewRemaining: 1,
+      newRemaining: 1,
+      assignedUnique: 0,
+      pendingSpellingCount: 0,
+    });
+    expect(await db.reviewLog.findMany({ where: { userId }, orderBy: { id: 'asc' } })).toEqual(
+      beforeLogs,
+    );
+    expect(await db.studyProgress.findMany({ where: { userId }, orderBy: { id: 'asc' } })).toEqual(
+      beforeMemory,
+    );
+    const replacement = (await issue(userId, { bookId: bookB })).session;
+    expect(replacement.items.map((item: any) => item.wordId)).toEqual([ids[4], ids[2]]);
+    expect((await db.studySession.findUniqueOrThrow({ where: { id: second.id } })).status).toBe(
+      'cancelled',
+    );
+  });
+
+  it('cancels yesterday unfinished words and spelling after 04:00 without moving yesterday ratings into today', async () => {
+    const { userId } = await actor(3, 2),
+      bookB = await alternateBook(userId);
+    let old = (await issue(userId)).session;
+    old = (await command(userId, old, 'reveal')).session;
+    old = (await command(userId, old, 'rate')).session;
+    const beforeLogs = await db.reviewLog.findMany({ where: { userId } });
+    const beforeMemory = await db.studyProgress.findMany({ where: { userId } });
+    const window = learningDayWindow(new Date(), 'Asia/Shanghai');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(window.endsAt.getTime() + 1000));
+    const changed = await request(userId, 'PATCH', '/me/settings', { currentBookId: bookB });
+    expect(changed.statusCode, changed.body).toBe(200);
+    const home = (await request(userId, 'GET', '/app/home')).json();
+    expect(home).toMatchObject({
+      checkedIn: false,
+      plan: { completedUnique: 0, pendingSpellingCount: 0, newRemaining: 3 },
+    });
+    const plan = (await request(userId, 'GET', '/study/plan')).json().plan;
+    expect(plan).toMatchObject({
+      completedUnique: 0,
+      assignedUnique: 0,
+      pendingSpellingCount: 0,
+      newRemaining: 3,
+    });
+    const snapshot = (await request(userId, 'GET', `/study/sessions/${old.id}`)).json().session;
+    expect(snapshot).toMatchObject({ status: 'cancelled', currentItemId: null });
+    expect(snapshot.items.filter((item: any) => item.rated)).toHaveLength(1);
+    expect(snapshot.items.filter((item: any) => !item.rated)).toHaveLength(1);
+    expect(await db.reviewLog.findMany({ where: { userId } })).toEqual(beforeLogs);
+    expect(await db.studyProgress.findMany({ where: { userId } })).toEqual(beforeMemory);
+  });
+
+  it('serializes concurrent book confirmation and rating without discarding accepted evidence or reviving the old task', async () => {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const { userId } = await actor(2, 2),
+        bookB = await alternateBook(userId);
+      const issued = (await issue(userId)).session;
+      const revealed = (await command(userId, issued, 'reveal')).session;
+      const item = revealed.items[revealed.cursor];
+      const ratingBody = {
+        commandId: randomUUID(),
+        action: 'rate',
+        itemId: item.id,
+        rating: 'easy',
+        expectedSessionRevision: revealed.revision,
+        expectedProgressRevision: item.progressRevision,
+      };
+      const prefs = await db.userSettings.findUniqueOrThrow({ where: { userId } });
+      const confirmBody = {
+        commandId: randomUUID(),
+        expectedRevision: prefs.revision,
+        bookId: bookB,
+        dailyTotalGoal: 2,
+        groupSize: 2,
+      };
+      const [rating, confirm] = await Promise.all([
+        request(userId, 'POST', `/study/sessions/${issued.id}/commands`, ratingBody),
+        request(userId, 'POST', '/study/plan/confirm', confirmBody),
+      ]);
+      expect(confirm.statusCode, confirm.body).toBe(200);
+      expect([200, 409], rating.body).toContain(rating.statusCode);
+      const accepted = rating.statusCode === 200;
+      if (!accepted) expect(rating.json().code).toBe('task_cancelled');
+      const logs = await db.reviewLog.findMany({ where: { userId } });
+      const memory = await db.studyProgress.findMany({ where: { userId } });
+      expect(logs).toHaveLength(accepted ? 1 : 0);
+      expect(memory).toHaveLength(accepted ? 1 : 0);
+      const latest = (await request(userId, 'GET', `/study/sessions/${issued.id}`)).json().session;
+      expect(latest).toMatchObject({ status: 'cancelled', currentItemId: null });
+      const replay = await request(
+        userId,
+        'POST',
+        `/study/sessions/${issued.id}/commands`,
+        ratingBody,
+      );
+      expect(replay.statusCode, replay.body).toBe(accepted ? 200 : 409);
+      if (accepted)
+        expect(replay.json()).toMatchObject({ duplicate: true, session: { status: 'cancelled' } });
+      else expect(replay.json().code).toBe('task_cancelled');
+      expect(await db.reviewLog.findMany({ where: { userId } })).toEqual(logs);
+      expect(await db.studyProgress.findMany({ where: { userId } })).toEqual(memory);
+      const plan = (await request(userId, 'GET', '/study/plan')).json().plan;
+      expect(plan).toMatchObject({
+        bookId: bookB,
+        completedUnique: accepted ? 1 : 0,
+        assignedUnique: 0,
+        pendingSpellingCount: 0,
+        newRemaining: accepted ? 1 : 2,
+      });
+    }
+  });
+
+  it('counts and issues the same eligible raw and atomic meanings after skipping unusable early candidates', async () => {
+    const { userId } = await actor(3, 2);
+    const words = Array.from({ length: 4 }, (_, index) => `${prefix}-eligibility-${index}`);
+    contentFixtureIds.push(...words);
+    await db.word.createMany({
+      data: words.map((id, index) => ({
+        id,
+        lemma: `eligibility${suffix}${String.fromCharCode(97 + index)}`,
+        normalizedLemma: `eligibility${suffix}${String.fromCharCode(97 + index)}`,
+      })),
+    });
+    await db.sense.createMany({
+      data: words.map((wordId, index) => ({
+        id: wordId + '-source',
+        wordId,
+        pos: 'n.',
+        definitionZh: index === 0 ? '   ' : '测试语义',
+        definitionEn: 'A synthetic test meaning.',
+        contentMetadata:
+          index === 1 || index === 3
+            ? {
+                lexicalQuality: {
+                  excludeFromLearning: true,
+                  field: 'definitionZh',
+                  sourceTextSha256: learningSenseTextHash('测试语义'),
+                },
+              }
+            : {},
+      })),
+    });
+    const source = await db.sense.findUniqueOrThrow({ where: { id: words[3]! + '-source' } });
+    const binding = {
+      id: prefix + '-eligibility-binding',
+      wordId: source.wordId,
+      learningSenseId: prefix + '-eligibility-meaning',
+      sourceSenseId: source.id,
+      relation: 'corrected-from',
+      sourcePosSha256: learningSenseTextHash(source.pos),
+      sourceDefinitionZhSha256: learningSenseTextHash(source.definitionZh),
+      sourceDefinitionEnSha256: learningSenseTextHash(source.definitionEn),
+    };
+    const meaning = {
+      id: binding.learningSenseId,
+      wordId: source.wordId,
+      pos: 'n.',
+      definitionZh: '审核后的测试语义',
+      definitionEn: 'A reviewed synthetic test meaning.',
+      contentVersion: 'task-fixture',
+      sourceBindings: [binding],
+    };
+    const { sourceBindings: _bindings, ...record } = meaning;
+    await db.learningSense.create({
+      data: { ...record, status: 'published', bindingHash: learningSenseBindingHash(meaning) },
+    });
+    await db.senseSourceBinding.create({ data: binding });
+    const bookId = await alternateBook(userId, words);
+    const selected = await request(userId, 'PATCH', '/me/settings', { currentBookId: bookId });
+    expect(selected.statusCode, selected.body).toBe(200);
+    const preview = (await request(userId, 'GET', '/study/plan/preview')).json().preview;
+    expect(preview).toMatchObject({ newPlanned: 2, reviewPlanned: 0 });
+    const home = (await request(userId, 'GET', '/app/home')).json();
+    expect(home).toMatchObject({ plan: { newRemaining: 2 }, learn: { state: 'ready', count: 2 } });
+    const session = (await issue(userId)).session;
+    expect(session.items.map((item: any) => item.wordId)).toEqual(words.slice(2));
+    const atomicItem = await db.sessionItem.findUniqueOrThrow({
+      where: { id: session.items[1].id },
+    });
+    const senses = obj(atomicItem.contentSnapshot).senses as Array<{ definitionZh: string }>;
+    expect(senses[0]!.definitionZh).toBe(meaning.definitionZh);
+
+    const reviewActor = await actor(2, 2);
+    const reviewBook = await alternateBook(reviewActor.userId, words);
+    await request(reviewActor.userId, 'PATCH', '/me/settings', { currentBookId: reviewBook });
+    const first = new Date(Date.now() - 86400000),
+      dueAt = new Date(Date.now() - 60000);
+    await db.studyProgress.createMany({
+      data: words.map((wordId) => ({
+        userId: reviewActor.userId,
+        wordId,
+        firstLearnedAt: first,
+        dueAt,
+        fsrsJson: json({
+          ...freshCard(first),
+          state: 2,
+          stability: 2,
+          reps: 2,
+          last_review: first,
+          due: dueAt,
+        }),
+      })),
+    });
+    const reviewHome = (await request(reviewActor.userId, 'GET', '/app/home')).json();
+    expect(reviewHome).toMatchObject({
+      plan: { newRemaining: 0, reviewRemaining: 2 },
+      review: { state: 'ready', count: 2 },
+      learn: { state: 'review_first', count: 2 },
+    });
+    const reviewPlan = (await request(reviewActor.userId, 'GET', '/study/plan')).json().plan;
+    expect(reviewPlan).toMatchObject({
+      dueNowCount: 2,
+      dueTodayCount: 2,
+      plannedReview: 2,
+      plannedNew: 0,
+    });
+    const reviewGroup = (await issue(reviewActor.userId, { mode: 'review' })).session;
+    expect(reviewGroup.items.map((item: any) => item.wordId)).toEqual(words.slice(2));
+  });
+
+  it('archives the selected private book through the same atomic cancellation path and keeps other-book edits independent', async () => {
+    const { userId } = await actor(3, 2),
+      bookB = await alternateBook(userId);
+    const original = (await issue(userId)).session;
+    const otherArchived = await request(userId, 'PATCH', `/custom-books/${bookB}`, {
+      status: 'archived',
+    });
+    expect(otherArchived.statusCode, otherArchived.body).toBe(200);
+    expect((await db.studySession.findUniqueOrThrow({ where: { id: original.id } })).status).toBe(
+      'in_progress',
+    );
+    const selectedBook = (await db.userSettings.findUniqueOrThrow({ where: { userId } }))
+      .currentBookId!;
+    const archived = await request(userId, 'DELETE', `/custom-books/${selectedBook}`, {});
+    expect(archived.statusCode, archived.body).toBe(200);
+    expect(
+      (await db.userSettings.findUniqueOrThrow({ where: { userId } })).currentBookId,
+    ).toBeNull();
+    expect((await db.studySession.findUniqueOrThrow({ where: { id: original.id } })).status).toBe(
+      'cancelled',
+    );
+    expect(await db.dailyPlanWord.count({ where: { plan: { userId }, firstRatedAt: null } })).toBe(
+      0,
+    );
+  });
 
   it('initializes one settings row and plan when a new user concurrently reads settings, statistics and the daily plan', async () => {
     const { userId } = await actor();

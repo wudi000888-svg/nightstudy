@@ -37,6 +37,7 @@ const state = vi.hoisted(() => {
     refCursor: 0,
     params: new URLSearchParams(),
     remote: {} as Record<string, unknown>,
+    fetching: false,
     batches: {} as Record<string, unknown[]>,
     client: null as QueryClient | null,
     preferences: {
@@ -87,7 +88,7 @@ vi.mock('../AppContext', () => ({
     return {
       data: state.client?.getQueryData([state.scope, _key, path]) ?? state.remote[path],
       isPending: false,
-      isFetching: false,
+      isFetching: state.fetching,
       error: null,
       refetch: state.refetch,
     };
@@ -195,6 +196,7 @@ beforeEach(() => {
   state.infiniteOptions = [];
   state.fetchNextPage.mockReset();
   state.pending = 0;
+  state.fetching = false;
   state.conflicts = [];
   state.navigate.mockReset();
   state.openModule.mockReset();
@@ -729,4 +731,61 @@ it('saves preferences as a revision-free patch through the shared provider and d
   );
   expect(state.savePreferences.mock.calls[0]?.[0]).not.toHaveProperty('revision');
   expect(text(render(PreferencesSettings))).not.toContain('学习偏好已保存');
+});
+
+it('does not reopen cached old task entries while the Home snapshot is refreshing', () => {
+  const summary = homeSummary();
+  summary.learn = homeEntry('resume', 6, 'ended-old-book');
+  state.remote['app/home'] = summary;
+  state.fetching = true;
+  const tree = render(HomePage);
+  const learn = find(
+    tree,
+    (node) => node.type === 'button' && String(node.props['aria-label']).startsWith('Learn，'),
+  );
+  expect(learn.props.disabled).toBe(true);
+  expect(learn.props['aria-busy']).toBe(true);
+  expect(text(learn)).toContain('正在更新');
+  // Exercise the handler too: a retained element cannot navigate even if invoked directly.
+  click(learn);
+  expect(state.navigate).not.toHaveBeenCalled();
+});
+
+it('labels a resumed Home number as the current group, separate from unassigned new-word quota', () => {
+  const summary = homeSummary();
+  summary.learn = homeEntry('resume', 6, 'current-task');
+  summary.plan.newRemaining = 21;
+  state.remote['app/home'] = summary;
+  const tree = render(HomePage);
+  const learn = find(
+    tree,
+    (node) => node.type === 'button' && String(node.props['aria-label']).startsWith('Learn，'),
+  );
+  expect(text(learn)).toContain('继续本组 6 词');
+  expect(text(learn)).not.toContain('21');
+});
+
+it('does not mix old-book Home state into the new-book task dashboard and explains retained conflicts', () => {
+  const oldHome = homeSummary();
+  oldHome.dailyGoalComplete = true;
+  state.remote['app/home'] = oldHome;
+  state.plan = {
+    plan: {
+      ...oldHome.plan,
+      bookId: 'book-after-switch',
+      revision: 9,
+      localDate: oldHome.localDate,
+    },
+    settings: {},
+  };
+  state.slots[0] = true;
+  state.pending = 1;
+  state.conflicts = [{ id: 'old-command', code: 'task_cancelled' }];
+  const tree = render(H5LearningPage);
+  expect(text(tree)).not.toContain('今天的总目标已经完成');
+  expect(text(tree)).toContain('原任务已在切书后结束');
+  expect(text(tree)).toContain('未保存的本地操作需要逐条核对处理');
+  expect(
+    all(tree).some((node) => node.props.to === '/learn' && text(node).includes('处理旧任务')),
+  ).toBe(true);
 });

@@ -144,6 +144,7 @@ export function HomePage() {
   }).format(date);
   const blocked = pending > 0 || !!conflicts?.length;
   const openStudy = (mode: 'learn' | 'review') => {
+    if (user && home.isFetching) return;
     if (!user) {
       navigate(`/auth?next=${encodeURIComponent(`/${mode}?start=1`)}`);
       return;
@@ -189,23 +190,33 @@ export function HomePage() {
             ? '开始学习'
             : blocked
               ? '记录待同步'
-              : entry
-                ? homeEntryText[entry.state]
-                : home.error
-                  ? '重新连接'
-                  : '正在读取…';
+              : home.isFetching
+                ? '正在更新…'
+                : entry
+                  ? homeEntryText[entry.state]
+                  : home.error
+                    ? '重新连接'
+                    : '正在读取…';
           return (
             <button
               type="button"
               key={mode}
               className={`h5-home-study h5-home-${mode}`}
-              disabled={!!user && !summary && !home.error}
+              disabled={!!user && (home.isFetching || (!summary && !home.error))}
+              aria-busy={!!user && home.isFetching}
               aria-label={`${label}，${detail}${entry ? `，${entry.count}词` : ''}`}
               onClick={() => (home.error && !summary ? void home.refetch() : openStudy(mode))}
             >
               <strong>{label}</strong>
               <span className="h5-home-count">{user ? (entry?.count ?? '—') : '—'}</span>
-              <small>{detail}</small>
+              <small>
+                {entry &&
+                ['resume', 'other_task'].includes(entry.state) &&
+                !home.isFetching &&
+                !blocked
+                  ? `继续本组 ${entry.count} 词`
+                  : detail}
+              </small>
             </button>
           );
         })}
@@ -213,7 +224,9 @@ export function HomePage() {
       <div className="h5-home-status" aria-live="polite">
         {blocked
           ? conflicts?.length
-            ? '进度有更新，请先核对'
+            ? conflicts.some((row) => row.code === 'task_cancelled')
+              ? '原任务已结束，未保存操作请到任务页逐条处理'
+              : '进度有更新，请先核对'
             : `${pending} 条记录等待同步`
           : home.error
             ? '暂时无法连接，点击学习按钮重试'
@@ -287,7 +300,7 @@ export function BooksPage() {
       <Heading
         eyebrow="词汇与词组"
         title="选择词书"
-        description="按学习目标选书，再设置每日总词数。换书后，已有学习组可以继续。"
+        description="按学习目标选书，再设置每日总词数。换书会结束原来的未完成任务，保留已学记录与今日完成数。"
         action={
           <div className="action-row">
             <Link className="button ghost" to="/books/mine">

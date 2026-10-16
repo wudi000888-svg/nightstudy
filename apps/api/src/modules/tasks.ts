@@ -16,8 +16,9 @@ import {
   type Db,
 } from './shared.js';
 import { visibleBookWhere } from './book-access.js';
-import { updateLearningPreferences } from './learning-preferences.js';
+import { cancelOpenStudyTasks, updateLearningPreferences } from './learning-preferences.js';
 import { decodeCursor, pageInfo } from './pagination.js';
+import { countEligibleBookItems, findEligibleProgress } from './learning-eligibility.js';
 
 export const eligibleWord = (userId: string): Prisma.WordWhereInput => ({
   status: 'published',
@@ -28,7 +29,11 @@ const openStatuses = ['in_progress', 'paused'];
 export async function lockLearningPreferences(db: Db, userId: string) {
   await settings(db, userId);
   await db.$queryRaw`SELECT "userId" FROM "UserSettings" WHERE "userId"=${userId} FOR UPDATE`;
-  return settings(db, userId);
+  const prefs = await settings(db, userId);
+  await cancelOpenStudyTasks(db, userId, {
+    bookId: prefs.currentBookId ? { not: prefs.currentBookId } : { not: null },
+  });
+  return prefs;
 }
 
 /** Called in a serializable transaction with the settings row lock held. */
@@ -37,6 +42,9 @@ export async function ensureDailyPlan(db: Db, userId: string, now = new Date()) 
   const book = prefs.currentBookId
     ? await db.book.findFirst({ where: { id: prefs.currentBookId, ...visibleBookWhere(userId) } })
     : null;
+  // Repair an explicitly different book left by an older selection path. A null
+  // book on a pure review group is global review, so never infer its old source.
+  await cancelOpenStudyTasks(db, userId, { bookId: book ? { not: book.id } : { not: null } });
   let plan = await db.dailyPlan.findFirst({
     where: { userId, startsAt: { lte: now }, endsAt: { gt: now } },
     orderBy: { startsAt: 'desc' },
@@ -111,7 +119,7 @@ export async function ensureDailyPlan(db: Db, userId: string, now = new Date()) 
       changed = true;
     }
   }
-  // Issued unfinished groups remain a promise across midnight, goal changes and book changes.
+  // Still-valid groups remain a promise across midnight and goal-only changes.
   const outstanding = await db.studySession.findMany({
     where: { userId, status: { in: openStatuses } },
     include: { items: { where: { exerciseDone: false } } },
@@ -148,17 +156,18 @@ export async function ensureDailyPlan(db: Db, userId: string, now = new Date()) 
     (word) => word.firstRatedAt || word.activeSessionId || word.status === 'deferred',
   );
   const slots = Math.max(0, plan.targetTotal - held.length);
-  const candidates = await db.studyProgress.findMany({
-    where: {
+  const candidates = await findEligibleProgress(
+    db,
+    {
       userId,
       firstLearnedAt: { not: null },
       dueAt: { lt: plan.endsAt },
       wordId: { notIn: [...new Set([...held.map((word) => word.wordId), ...blocked])] },
       word: eligibleWord(userId),
     },
-    orderBy: [{ dueAt: 'asc' }, { wordId: 'asc' }],
-    take: slots,
-  });
+    [{ dueAt: 'asc' }, { wordId: 'asc' }],
+    slots,
+  );
   const candidateIds = new Set(candidates.map((progress) => progress.wordId));
   const queued = words.filter(
     (word) => word.status === 'queued' && !word.activeSessionId && !word.firstRatedAt,
@@ -201,44 +210,11 @@ export async function planView(db: Db, userId: string, plan: DailyPlan, now = ne
     firstLearnedAt: { not: null },
     word: eligibleWord(userId),
   };
-  const [
-    dueNowCount,
-    dueTodayCount,
-    overdueCount,
-    unplannedOverdueCount,
-    consolidation,
-    nextDue,
-    spelling,
-    active,
-    availableNew,
-  ] = await Promise.all([
-    db.studyProgress.count({ where: { ...dueWhere, dueAt: { lte: now } } }),
-    db.studyProgress.count({ where: { ...dueWhere, dueAt: { lt: plan.endsAt } } }),
-    db.studyProgress.count({ where: { ...dueWhere, dueAt: { lt: plan.startsAt } } }),
-    db.studyProgress.count({
-      where: {
-        ...dueWhere,
-        dueAt: { lt: plan.startsAt },
-        wordId: { notIn: review.map((word) => word.wordId) },
-      },
-    }),
-    db.studyProgress.findMany({
-      where: {
-        ...dueWhere,
-        wordId: { in: complete.map((word) => word.wordId) },
-        dueAt: { lt: plan.endsAt },
-        OR: [
-          { fsrsJson: { path: ['state'], equals: 1 } },
-          { fsrsJson: { path: ['state'], equals: 3 } },
-        ],
-      },
-      select: { wordId: true },
-    }),
-    db.studyProgress.findFirst({
-      where: { ...dueWhere, dueAt: { gt: now, lt: plan.endsAt } },
-      orderBy: { dueAt: 'asc' },
-      select: { dueAt: true },
-    }),
+  const [dueToday, spelling, active, availableNew] = await Promise.all([
+    findEligibleProgress(db, { ...dueWhere, dueAt: { lt: plan.endsAt } }, [
+      { dueAt: 'asc' },
+      { wordId: 'asc' },
+    ]),
     db.sessionItem.findMany({
       where: {
         session: { userId, status: { in: openStatuses } },
@@ -253,19 +229,29 @@ export async function planView(db: Db, userId: string, plan: DailyPlan, now = ne
       select: { id: true },
     }),
     plan.sourceBookId
-      ? db.bookItem.count({
-          where: {
-            bookId: plan.sourceBookId,
-            wordId: { notIn: words.map((word) => word.wordId) },
-            word: {
-              ...eligibleWord(userId),
-              progress: { none: { userId, firstLearnedAt: { not: null } } },
-              senses: { some: { definitionZh: { not: '' } } },
-            },
+      ? countEligibleBookItems(db, {
+          bookId: plan.sourceBookId,
+          wordId: { notIn: words.map((word) => word.wordId) },
+          word: {
+            ...eligibleWord(userId),
+            progress: { none: { userId, firstLearnedAt: { not: null } } },
           },
         })
       : Promise.resolve(0),
   ]);
+  const completeIds = new Set(complete.map((word) => word.wordId));
+  const reviewIds = new Set(review.map((word) => word.wordId));
+  const dueNowCount = dueToday.filter((progress) => progress.dueAt <= now).length;
+  const dueTodayCount = dueToday.length;
+  const overdueCount = dueToday.filter((progress) => progress.dueAt < plan.startsAt).length;
+  const unplannedOverdueCount = dueToday.filter(
+    (progress) => progress.dueAt < plan.startsAt && !reviewIds.has(progress.wordId),
+  ).length;
+  const consolidation = dueToday.filter(
+    (progress) =>
+      completeIds.has(progress.wordId) && [1, 3].includes(Number(obj(progress.fsrsJson).state)),
+  );
+  const nextDue = dueToday.find((progress) => progress.dueAt > now);
   const occupied = words.length;
   const newRemaining = Math.min(availableNew, Math.max(0, plan.targetTotal - occupied));
   return {
@@ -393,53 +379,52 @@ export async function previewPlan(
     if (previous && previous.endsAt > window.startsAt) window.startsAt = previous.endsAt;
   }
   const words = existing ? await db.dailyPlanWord.findMany({ where: { planId: existing.id } }) : [];
+  const changingBook = bookId !== prefs.currentBookId;
+  const invalidGroups = await db.studySession.findMany({
+    where: {
+      userId,
+      status: { in: openStatuses },
+      ...(changingBook ? {} : { bookId: bookId ? { not: bookId } : { not: null } }),
+    },
+    select: { id: true },
+  });
+  const invalidIds = new Set(invalidGroups.map((group) => group.id));
   const retained = words.filter(
-    (word) => word.firstRatedAt || word.activeSessionId || word.status === 'deferred',
+    (word) =>
+      word.firstRatedAt ||
+      (!changingBook &&
+        !invalidIds.has(word.activeSessionId ?? '') &&
+        (word.activeSessionId || word.status === 'deferred')),
   );
   const where: Prisma.StudyProgressWhereInput = {
     userId,
     firstLearnedAt: { not: null },
     word: eligibleWord(userId),
   };
-  const [
-    dueNowCount,
-    dueTodayCount,
-    overdueCount,
-    remainingReview,
-    remainingOverdue,
-    availableNew,
-  ] = await Promise.all([
-    db.studyProgress.count({ where: { ...where, dueAt: { lte: now } } }),
-    db.studyProgress.count({ where: { ...where, dueAt: { lt: window.endsAt } } }),
-    db.studyProgress.count({ where: { ...where, dueAt: { lt: window.startsAt } } }),
-    db.studyProgress.count({
-      where: {
-        ...where,
-        dueAt: { lt: window.endsAt },
-        wordId: { notIn: retained.map((word) => word.wordId) },
-      },
-    }),
-    db.studyProgress.count({
-      where: {
-        ...where,
-        dueAt: { lt: window.startsAt },
-        wordId: { notIn: retained.map((word) => word.wordId) },
-      },
-    }),
+  const [dueToday, availableNew] = await Promise.all([
+    findEligibleProgress(db, { ...where, dueAt: { lt: window.endsAt } }, [
+      { dueAt: 'asc' },
+      { wordId: 'asc' },
+    ]),
     book
-      ? db.bookItem.count({
-          where: {
-            bookId: book.id,
-            wordId: { notIn: retained.map((word) => word.wordId) },
-            word: {
-              ...eligibleWord(userId),
-              progress: { none: { userId, firstLearnedAt: { not: null } } },
-              senses: { some: { definitionZh: { not: '' } } },
-            },
+      ? countEligibleBookItems(db, {
+          bookId: book.id,
+          wordId: { notIn: retained.map((word) => word.wordId) },
+          word: {
+            ...eligibleWord(userId),
+            progress: { none: { userId, firstLearnedAt: { not: null } } },
           },
         })
       : Promise.resolve(0),
   ]);
+  const retainedIds = new Set(retained.map((word) => word.wordId));
+  const dueNowCount = dueToday.filter((progress) => progress.dueAt <= now).length;
+  const dueTodayCount = dueToday.length;
+  const overdueCount = dueToday.filter((progress) => progress.dueAt < window.startsAt).length;
+  const remainingReview = dueToday.filter((progress) => !retainedIds.has(progress.wordId)).length;
+  const remainingOverdue = dueToday.filter(
+    (progress) => progress.dueAt < window.startsAt && !retainedIds.has(progress.wordId),
+  ).length;
   const target = input.dailyTotalGoal ?? prefs.dailyTotalGoal;
   const slots = Math.max(0, target - retained.length);
   const reservedReview = Math.min(slots, remainingReview);
@@ -539,7 +524,12 @@ export async function registerTaskRoutes(
     return transact(ctx.prisma, async (tx) => {
       await lockLearningPreferences(tx, user.id);
       const old = await getReceipt(tx, user.id, input.commandId, hash);
-      if (old) return { ...obj(old.responseJson), duplicate: true };
+      if (old)
+        return {
+          settings: await settings(tx, user.id),
+          plan: await planView(tx, user.id, await ensureDailyPlan(tx, user.id)),
+          duplicate: true,
+        };
       const book = await tx.book.findFirst({
         where: { id: input.bookId, ...visibleBookWhere(user.id) },
       });
@@ -575,60 +565,64 @@ export async function registerTaskRoutes(
     const query = parse(
       z
         .object({
-          status: z.enum(['active', 'completed', 'all']).default('active'),
+          status: z.enum(['active', 'completed', 'cancelled', 'all']).default('active'),
           limit: z.coerce.number().int().min(1).max(50).default(20),
           cursor: z.string().min(1).max(1200).optional(),
         })
         .strict(),
       req.query,
     );
-    const scope = `tasks:${ctx.siteId}:${user.id}:${query.status}`,
-      cursor = decodeCursor(scope, query.cursor, 'string');
-    let after: { createdAt: Date; id: string } | null = null;
-    if (cursor) {
-      try {
-        const value = z
-          .object({ at: z.string().datetime(), id })
-          .strict()
-          .parse(JSON.parse(cursor));
-        after = { createdAt: new Date(value.at), id: value.id };
-      } catch {
-        throw new HttpError(400, 'invalid_cursor');
+    return transact(ctx.prisma, async (tx) => {
+      await ensureDailyPlan(tx, user.id);
+      const scope = `tasks:${ctx.siteId}:${user.id}:${query.status}`,
+        cursor = decodeCursor(scope, query.cursor, 'string');
+      let after: { createdAt: Date; id: string } | null = null;
+      if (cursor) {
+        try {
+          const value = z
+            .object({ at: z.string().datetime(), id })
+            .strict()
+            .parse(JSON.parse(cursor));
+          after = { createdAt: new Date(value.at), id: value.id };
+        } catch {
+          throw new HttpError(400, 'invalid_cursor');
+        }
       }
-    }
-    const where: Prisma.StudySessionWhereInput = {
-      userId: user.id,
-      ...(query.status === 'active'
-        ? { status: { in: openStatuses } }
-        : query.status === 'completed'
-          ? { status: 'completed' }
-          : {}),
-    };
-    const [rows, total] = await Promise.all([
-      ctx.prisma.studySession.findMany({
-        where: {
-          ...where,
-          ...(after
-            ? {
-                OR: [
-                  { createdAt: { lt: after.createdAt } },
-                  { createdAt: after.createdAt, id: { lt: after.id } },
-                ],
-              }
-            : {}),
-        },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: query.limit + 1,
-      }),
-      ctx.prisma.studySession.count({ where }),
-    ]);
-    const page = pageInfo(rows, query.limit, total, scope, (row) =>
-      JSON.stringify({ at: row.createdAt.toISOString(), id: row.id }),
-    );
-    const items: unknown[] = [];
-    for (const session of page.items)
-      items.push(await viewSession(ctx.prisma, user.id, session.id));
-    return { items, page: page.page };
+      const where: Prisma.StudySessionWhereInput = {
+        userId: user.id,
+        ...(query.status === 'active'
+          ? { status: { in: openStatuses } }
+          : query.status === 'completed'
+            ? { status: 'completed' }
+            : query.status === 'cancelled'
+              ? { status: 'cancelled' }
+              : {}),
+      };
+      const [rows, total] = await Promise.all([
+        tx.studySession.findMany({
+          where: {
+            ...where,
+            ...(after
+              ? {
+                  OR: [
+                    { createdAt: { lt: after.createdAt } },
+                    { createdAt: after.createdAt, id: { lt: after.id } },
+                  ],
+                }
+              : {}),
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: query.limit + 1,
+        }),
+        tx.studySession.count({ where }),
+      ]);
+      const page = pageInfo(rows, query.limit, total, scope, (row) =>
+        JSON.stringify({ at: row.createdAt.toISOString(), id: row.id }),
+      );
+      const items: unknown[] = [];
+      for (const session of page.items) items.push(await viewSession(tx, user.id, session.id));
+      return { items, page: page.page };
+    });
   });
   app.post('/study/tasks/:id/state', async (req) => {
     const ctx = await getContext(req),
@@ -646,7 +640,7 @@ export async function registerTaskRoutes(
       req.body,
     );
     const hash = digest({ operation: 'task-state', id: params.id, ...input });
-    return transact(ctx.prisma, async (tx) => {
+    const outcome = await transact(ctx.prisma, async (tx) => {
       await lockLearningPreferences(tx, user.id);
       const session = await tx.studySession.findFirst({
         where: { id: params.id, userId: user.id },
@@ -659,6 +653,8 @@ export async function registerTaskRoutes(
           plan: await planView(tx, user.id, await ensureDailyPlan(tx, user.id)),
           duplicate: true,
         };
+      if (session.status === 'cancelled')
+        return new HttpError(409, 'task_cancelled', '词书已切换，该任务已结束');
       if (session.revision !== input.expectedSessionRevision)
         throw new HttpError(409, 'session_conflict', '任务已在另一设备更新', {
           session: await viewSession(tx, user.id, session.id),
@@ -718,37 +714,42 @@ export async function registerTaskRoutes(
       });
       return response;
     });
+    // Persist a historical wrong-book cancellation even when this stale action is rejected.
+    if (outcome instanceof HttpError) throw outcome;
+    return outcome;
   });
   app.get('/study/forecast', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx),
       now = new Date();
     return transact(ctx.prisma, async (tx) => {
-      const plan = await ensureDailyPlan(tx, user.id, now),
-        days = [];
+      const plan = await ensureDailyPlan(tx, user.id, now);
+      const windows = [];
       let at = now;
       for (let day = 0; day < 7; day++) {
         const window = day === 0 ? plan : learningDayWindow(at, plan.timeZone);
-        const where: Prisma.StudyProgressWhereInput = {
+        windows.push(window);
+        at = new Date(window.endsAt.getTime() + 1000);
+      }
+      const due = await findEligibleProgress(
+        tx,
+        {
           userId: user.id,
           firstLearnedAt: { not: null },
           word: eligibleWord(user.id),
-        };
-        const [dueUnique, overdueCarry] = await Promise.all([
-          tx.studyProgress.count({
-            where: { ...where, dueAt: { gte: window.startsAt, lt: window.endsAt } },
-          }),
-          tx.studyProgress.count({ where: { ...where, dueAt: { lt: window.startsAt } } }),
-        ]);
-        days.push({
-          localDate: window.localDate,
-          startsAt: window.startsAt.toISOString(),
-          endsAt: window.endsAt.toISOString(),
-          dueUnique,
-          overdueCarry,
-        });
-        at = new Date(window.endsAt.getTime() + 1000);
-      }
+          dueAt: { lt: windows.at(-1)!.endsAt },
+        },
+        [{ dueAt: 'asc' }, { wordId: 'asc' }],
+      );
+      const days = windows.map((window) => ({
+        localDate: window.localDate,
+        startsAt: window.startsAt.toISOString(),
+        endsAt: window.endsAt.toISOString(),
+        dueUnique: due.filter(
+          (progress) => progress.dueAt >= window.startsAt && progress.dueAt < window.endsAt,
+        ).length,
+        overdueCarry: due.filter((progress) => progress.dueAt < window.startsAt).length,
+      }));
       return { days, asOf: now.toISOString(), assumption: 'current_due_dates_no_future_reviews' };
     });
   });

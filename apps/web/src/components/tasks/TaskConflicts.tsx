@@ -48,6 +48,9 @@ export function TaskConflicts({
           <div className="task-history-row" key={row.id}>
             <div>
               <strong>{labels[row.action]}</strong>
+              {row.code === 'task_cancelled' && (
+                <p>原任务已在切换词书后结束。这条本地操作尚未被接受，仍保留供你核对处理。</p>
+              )}
               <small>
                 {taskDate(row.createdAt, true, timeZone)} · {timeZone ?? '设备当地时间'} ·
                 待处理同步冲突
@@ -64,7 +67,7 @@ export function TaskConflicts({
                   }}
                 >
                   <RefreshCw size={14} />
-                  读取服务器任务
+                  {row.code === 'task_cancelled' ? '查看已结束任务' : '读取服务器任务'}
                 </button>
               )}
               <button

@@ -25,6 +25,7 @@ import {
   type Db,
 } from './shared.js';
 import { visibleBookWhere } from './book-access.js';
+import { findEligibleBookItems, findEligibleProgress } from './learning-eligibility.js';
 import { applyCurrentPronunciationPolicy, supplementIssuedWord } from './content-presentation.js';
 import { wordPronunciationCompatible } from './learning-sense-view.js';
 import { applyFamiliarityPolicy, collectionState } from './collection-state.js';
@@ -114,7 +115,7 @@ export function sessionDto(
   return {
     id: session.id,
     bookId: session.bookId,
-    bookTitle: session.book?.title ?? session.plan?.sourceBookTitle ?? null,
+    bookTitle: session.bookId ? (session.book?.title ?? null) : null,
     planId: session.planId ?? null,
     taskKind: session.taskKind ?? 'legacy',
     pausedAt: session.pausedAt?.toISOString() ?? null,
@@ -131,7 +132,9 @@ export function sessionDto(
     cursor: session.cursor,
     step: session.step,
     revision: session.revision,
-    currentItemId: session.status === 'completed' ? null : (items[session.cursor]?.id ?? null),
+    currentItemId: ['in_progress', 'paused'].includes(session.status)
+      ? (items[session.cursor]?.id ?? null)
+      : null,
     items,
   };
 }
@@ -241,13 +244,16 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
   app.get('/study/sessions', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx);
-    const sessions = await ctx.prisma.studySession.findMany({
-      where: { userId: user.id, status: { in: ['in_progress', 'paused'] } },
-      include: sessionInclude,
-      orderBy: { updatedAt: 'desc' },
-      take: 10,
+    return transact(ctx.prisma, async (tx) => {
+      await ensureDailyPlan(tx, user.id);
+      const sessions = await tx.studySession.findMany({
+        where: { userId: user.id, status: { in: ['in_progress', 'paused'] } },
+        include: sessionInclude,
+        orderBy: { updatedAt: 'desc' },
+        take: 10,
+      });
+      return { items: await Promise.all(sessions.map((x) => sessionView(tx, user.id, x))) };
     });
-    return { items: await Promise.all(sessions.map((x) => sessionView(ctx.prisma, user.id, x))) };
   });
   app.post('/study/sessions', async (req) => {
     const ctx = await getContext(req),
@@ -268,11 +274,6 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
     const hash = digest({ action: 'create-study-task', ...input });
     return transact(ctx.prisma, async (tx) => {
       const prefs = await lockLearningPreferences(tx, user.id);
-      if (
-        input.bookId &&
-        !(await tx.book.findFirst({ where: { id: input.bookId, ...visibleBookWhere(user.id) } }))
-      )
-        throw new HttpError(404, 'book_not_found');
       let plan = await ensureDailyPlan(tx, user.id);
       if (input.commandId) {
         const receipt = await getReceipt(tx, user.id, input.commandId, hash);
@@ -286,6 +287,19 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
           return { ...old, session, plan: await planView(tx, user.id, plan), duplicate: true };
         }
       }
+      if (
+        input.bookId &&
+        !(await tx.book.findFirst({ where: { id: input.bookId, ...visibleBookWhere(user.id) } }))
+      )
+        throw new HttpError(404, 'book_not_found');
+      if (input.bookId !== undefined && input.bookId !== plan.sourceBookId)
+        throw new HttpError(409, 'book_selection_changed', '词书已切换，请刷新学习计划', {
+          plan: await planView(tx, user.id, plan),
+        });
+      if (input.expectedPlanRevision !== undefined && input.expectedPlanRevision !== plan.revision)
+        throw new HttpError(409, 'plan_conflict', '每日任务已在另一设备更新', {
+          plan: await planView(tx, user.id, plan),
+        });
       const extra = input.mode === 'extra-review' || input.taskKind === 'extra-review';
       const existing = await tx.studySession.findFirst({
         where: {
@@ -324,10 +338,6 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
           });
         return response;
       }
-      if (input.expectedPlanRevision !== undefined && input.expectedPlanRevision !== plan.revision)
-        throw new HttpError(409, 'plan_conflict', '每日任务已在另一设备更新', {
-          plan: await planView(tx, user.id, plan),
-        });
       if (
         (await tx.studySession.count({
           where: { userId: user.id, status: { in: ['in_progress', 'paused'] } },
@@ -367,24 +377,40 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
             focusSenseId: focus.id,
           });
       };
+      const appendCandidates = async (
+        candidates: Array<{ wordId: string; focusSenseId?: string | null }>,
+        bucket: 'new' | 'review',
+      ) => {
+        if (!candidates.length) return;
+        const words = await tx.word.findMany({
+          where: { id: { in: candidates.map((entry) => entry.wordId) } },
+          include: wordInclude,
+        });
+        const byId = new Map(words.map((word) => [word.id, word]));
+        for (const candidate of candidates) {
+          const word = byId.get(candidate.wordId);
+          if (word) append(word, bucket, candidate.focusSenseId);
+        }
+      };
       if (extra) {
-        const due = await tx.studyProgress.findMany({
-          where: {
+        const due = await findEligibleProgress(
+          tx,
+          {
             userId: user.id,
             firstLearnedAt: { not: null },
             dueAt: { lte: now },
             wordId: { notIn: blocked },
             word: eligibleWord(user.id),
           },
-          include: { word: { include: wordInclude } },
-          orderBy: [{ dueAt: 'asc' }, { wordId: 'asc' }],
-          take: size,
-        });
-        for (const progress of due) append(progress.word, 'review');
+          [{ dueAt: 'asc' }, { wordId: 'asc' }],
+          size,
+        );
+        await appendCandidates(due, 'review');
       } else {
         // Same-day short-term repetitions are real ratings but reuse their single budget word.
-        const repeats = await tx.studyProgress.findMany({
-          where: {
+        const repeats = await findEligibleProgress(
+          tx,
+          {
             userId: user.id,
             dueAt: { lte: now },
             wordId: {
@@ -395,11 +421,10 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
             },
             word: eligibleWord(user.id),
           },
-          include: { word: { include: wordInclude } },
-          orderBy: [{ dueAt: 'asc' }, { wordId: 'asc' }],
-          take: size,
-        });
-        for (const progress of repeats) append(progress.word, 'review');
+          [{ dueAt: 'asc' }, { wordId: 'asc' }],
+          size,
+        );
+        await appendCandidates(repeats, 'review');
         const due = await tx.dailyPlanWord.findMany({
           where: {
             planId: plan.id,
@@ -432,11 +457,11 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
             word: {
               ...eligibleWord(user.id),
               progress: { none: { userId: user.id, firstLearnedAt: { not: null } } },
-              senses: { some: { definitionZh: { not: '' } } },
             },
           };
-          const normal = await tx.bookItem.findMany({
-            where: {
+          const normal = await findEligibleBookItems(
+            tx,
+            {
               AND: [
                 base,
                 {
@@ -448,17 +473,17 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
                 },
               ],
             },
-            include: { word: { include: wordInclude } },
-            orderBy: { ordinal: 'asc' },
-            take: free,
-          });
+            { ordinal: 'asc' },
+            free,
+          );
           const newCount = planned.filter((word) => word.bucket === 'new').length;
           const probeSize = normal.length
             ? Math.floor((newCount + free) / 5) - Math.floor(newCount / 5)
             : 1;
           const known = probeSize
-            ? await tx.bookItem.findMany({
-                where: {
+            ? await findEligibleBookItems(
+                tx,
+                {
                   AND: [
                     base,
                     {
@@ -474,14 +499,12 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
                     },
                   ],
                 },
-                include: { word: { include: wordInclude } },
-                orderBy: { ordinal: 'asc' },
-                take: Math.min(free, probeSize),
-              })
+                { ordinal: 'asc' },
+                Math.min(free, probeSize),
+              )
             : [];
-          for (const entry of normal.slice(0, free - known.length))
-            append(entry.word, 'new', entry.focusSenseId);
-          for (const entry of known) append(entry.word, 'new', entry.focusSenseId);
+          await appendCandidates(normal.slice(0, free - known.length), 'new');
+          await appendCandidates(known, 'new');
         }
       }
       if (!chosen.length) {
@@ -585,13 +608,12 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
     const ctx = await getContext(req),
       user = requireUser(ctx),
       params = parse(z.object({ id }), req.params);
-    return {
-      session: await sessionView(
-        ctx.prisma,
-        user.id,
-        await readSession(ctx.prisma, user.id, params.id),
-      ),
-    };
+    return transact(ctx.prisma, async (tx) => {
+      await ensureDailyPlan(tx, user.id);
+      return {
+        session: await sessionView(tx, user.id, await readSession(tx, user.id, params.id)),
+      };
+    });
   });
   app.post('/study/sessions/:id/commands', async (req) => {
     const ctx = await getContext(req),
@@ -612,7 +634,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
       req.body,
     );
     const hash = digest({ sessionId: params.id, ...input });
-    return transact(ctx.prisma, async (tx) => {
+    const outcome = await transact(ctx.prisma, async (tx) => {
       await lockLearningPreferences(tx, user.id);
       const lock = await tx.$queryRaw<
         { id: string }[]
@@ -644,6 +666,10 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
           duplicate: true,
         };
       }
+      if (session.status === 'cancelled')
+        return new HttpError(409, 'task_cancelled', '词书已切换，该任务已结束', {
+          session: await sessionView(tx, user.id, session),
+        });
       if (session.revision !== input.expectedSessionRevision)
         throw new HttpError(409, 'session_conflict', '学习任务已更新，请确认当前任务', {
           session: await sessionView(tx, user.id, session),
@@ -807,6 +833,9 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
       });
       return response;
     });
+    // Only this terminal rejection commits the settings-lock consistency repair.
+    if (outcome instanceof HttpError) throw outcome;
+    return outcome;
   });
   await registerTaskRoutes(app, getContext, async (db, userId, sessionId) =>
     sessionView(db, userId, await readSession(db, userId, sessionId)),

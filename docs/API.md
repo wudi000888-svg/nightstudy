@@ -190,7 +190,7 @@ attempt 含 id、lessonId/lessonVersion、kind、status、revision、startedAt/c
 | `GET /study/plan/preview`           | 可选bookId/dailyTotalGoal/groupSize/timeZone；只读返回`{preview,settingsRevision}`，不签发任务、不改设置                    |
 | `POST /study/plan/confirm`          | bookId/dailyTotalGoal/groupSize/expectedRevision/commandId，timeZone可选；原子确认书与计划，返回`{plan,settings,duplicate}` |
 | `POST /study/sessions`              | 正式mode=daily或extra-review，commandId、expectedPlanRevision可选，size 1–20可选；返回`{session,plan,reason?,duplicate}`    |
-| `GET /study/tasks`                  | status=active/completed/all，limit默认20、最大50，cursor可选；返回`{items,page:{total,hasMore,nextCursor}}`                 |
+| `GET /study/tasks`                  | status=active/completed/cancelled/all，limit默认20、最大50，cursor可选；返回`{items,page:{total,hasMore,nextCursor}}`       |
 | `GET /study/sessions/:id`           | 本人固定任务，返回`{session}`                                                                                               |
 | `POST /study/tasks/:id/state`       | action=pause/resume/defer、commandId、expectedSessionRevision；defer须含deferUntil                                          |
 | `GET /study/forecast`               | 七个学习日的到期负担；返回days/asOf/assumption                                                                              |
@@ -231,7 +231,9 @@ plan包含id/revision/localDate/timeZone/startsAt/endsAt、goal/bookId/bookTitle
 
 mode=daily为可混合复习与新学的主任务；mode=extra-review为主动额外复习，不增加新学额度。额外复习的真实评分仍计入当日不同词数，允许超过主目标；同词再次评分不重复计unique。旧mode=learn/review和taskKind参数保留兼容，新客户端使用正式mode。服务端同类已有进行中组时返回该固定组，不创建副本；恢复暂停组须显式state/resume。任务列表游标绑定站点、用户与status，不能跨账户或查询复用。
 
-pause保留固定内容、历史与未评分预约；deferUntil须为未来且不超过七天，任务变为paused，词条延后选择，真实FSRS dueAt和已有ReviewLog不修改。resume恢复同一任务并清除延期；同类另一组正在进行时返回409 `another_task_active`。降低目标、换书和跨日都不取消已签发组；昨日已经评分只剩拼写的项不会占新学习日词数，尚未评分的保留组仍按当前计划显示预约。
+pause保留固定内容、历史与未评分预约；deferUntil须为未来且不超过七天，任务变为paused，词条延后选择，真实FSRS dueAt和已有ReviewLog不修改。resume恢复同一任务并清除延期；同类另一组正在进行时返回409 `another_task_active`。仅降低目标或跨日不取消有效组；昨日已经评分只剩拼写的项不会占新学习日词数，尚未评分的保留组仍按当前计划显示预约。
+
+实际切换词书时，所有 in_progress/paused 任务在同一事务中变为 cancelled，revision 增加，延期与当前可操作词清空。未评分预约释放；已接受评分、复习记录、记忆状态和今日 completedUnique 保留，再按新书重排剩余额度。旧任务只读，新的恢复、延期、揭晓、评分或拼写命令返回409 `task_cancelled`。已接受命令原 commandId 的同内容重试仍成功去重，但只返回当前终态，不复活任务。已接受旧计划确认的重试返回当前设置和计划，不重新切回旧书或取消新组。新建请求必须使用当前选书与有效计划版本；旧 URL、旧缓存和迟到回执不能替代当前服务端状态。
 
 没有可立即签发项时session=null，reason可能为planned_reviews_pending（预留的复习稍后到期）、daily_goal_complete、no_new_words或nothing_due。这不代表所有已签发任务或未安排逾期词已经完成，客户端继续展示真实待办。
 

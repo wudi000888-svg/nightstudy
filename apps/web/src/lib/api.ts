@@ -72,6 +72,8 @@ async function performRequest<T>(path: string, init?: RequestInit): Promise<T> {
       progress_conflict: '这个词已有更新，请重新读取学习组。',
       plan_conflict: '今日计划已在其他设备更新，请刷新任务后继续。',
       task_paused: '这组任务已暂停，请先恢复任务。',
+      task_cancelled: '这组任务已结束，请查看切书后重新安排的当前任务。已提交记录保留。',
+      book_selection_changed: '当前词书已切换，请刷新计划后开始新任务。',
       task_already_completed: '这组任务已完成，请读取最新任务状态。',
       another_task_active: '已有一组任务正在进行，请先继续、暂停或完成它。',
       too_many_active_tasks: '未完成任务已达到20组，请先继续并完成已有任务。',

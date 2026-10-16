@@ -272,7 +272,10 @@ suite('PostgreSQL API and isolation', () => {
     const data = response.json();
     expect(data.empty ?? data.curve?.empty).toBe(true);
   });
-  it('deduplicates cross-book tasks, preserves fixed items, and rejects a stale legacy rating', async () => {
+  it('rejects unselected-book tasks, deduplicates selected-book tasks and protects stale memory revisions', async () => {
+    expect((await request('POST', '/api/v2/books/demo-book-daily/select', {})).statusCode).toBe(
+      200,
+    );
     const first = (
       await request('POST', '/api/v2/study/sessions', {
         mode: 'learn',
@@ -280,10 +283,17 @@ suite('PostgreSQL API and isolation', () => {
         size: 2,
       })
     ).json().session;
+    const unselected = await request('POST', '/api/v2/study/sessions', {
+      mode: 'learn',
+      bookId: 'demo-book-cet4',
+      size: 1,
+    });
+    expect(unselected.statusCode, unselected.body).toBe(409);
+    expect(unselected.json().code).toBe('book_selection_changed');
     const recovered = (
       await request('POST', '/api/v2/study/sessions', {
         mode: 'learn',
-        bookId: 'demo-book-cet4',
+        bookId: 'demo-book-daily',
         size: 1,
       })
     ).json().session;
@@ -295,7 +305,7 @@ suite('PostgreSQL API and isolation', () => {
     const legacy = await prisma.studySession.create({
       data: {
         userId,
-        bookId: 'demo-book-cet4',
+        bookId: 'demo-book-daily',
         mode: 'learn',
         taskKind: 'legacy',
         items: {
@@ -689,10 +699,11 @@ suite('PostgreSQL API and isolation', () => {
             .map((word) => ({ userId, wordId: word.id, paused: true })),
         });
       }
-      await prisma.userSettings.update({
-        where: { userId },
-        data: { dailyNewLimit: 100, dailyTotalGoal: 100 },
+      const selection = await request('PATCH', '/api/v2/me/settings', {
+        currentBookId: fixture,
+        dailyTotalGoal: 100,
       });
+      expect(selection.statusCode, selection.body).toBe(200);
       const learned = await request('POST', '/api/v2/study/sessions', {
         bookId: fixture,
         mode: 'learn',
@@ -723,7 +734,12 @@ suite('PostgreSQL API and isolation', () => {
       await prisma.word.deleteMany({ where: { id: { startsWith: fixture } } });
       await prisma.userSettings.update({
         where: { userId },
-        data: { dailyNewLimit: prefs.dailyNewLimit, dailyTotalGoal: prefs.dailyTotalGoal },
+        data: {
+          currentBookId: prefs.currentBookId,
+          dailyNewLimit: prefs.dailyNewLimit,
+          dailyTotalGoal: prefs.dailyTotalGoal,
+          revision: { increment: 1 },
+        },
       });
     }
   }, 60000);
@@ -763,10 +779,11 @@ suite('PostgreSQL API and isolation', () => {
           claims: { create: { userId, wordId: fixtureWords[5]! } },
         },
       });
-      await prisma.userSettings.update({
-        where: { userId },
-        data: { dailyNewLimit: 100, dailyTotalGoal: 100 },
+      const selection = await request('PATCH', '/api/v2/me/settings', {
+        currentBookId: fixture,
+        dailyTotalGoal: 100,
       });
+      expect(selection.statusCode, selection.body).toBe(200);
       const group = await request('POST', '/api/v2/study/sessions', {
         mode: 'learn',
         bookId: fixture,
@@ -813,7 +830,12 @@ suite('PostgreSQL API and isolation', () => {
       await prisma.word.deleteMany({ where: { id: { startsWith: fixture } } });
       await prisma.userSettings.update({
         where: { userId },
-        data: { dailyNewLimit: prefs.dailyNewLimit, dailyTotalGoal: prefs.dailyTotalGoal },
+        data: {
+          currentBookId: prefs.currentBookId,
+          dailyNewLimit: prefs.dailyNewLimit,
+          dailyTotalGoal: prefs.dailyTotalGoal,
+          revision: { increment: 1 },
+        },
       });
     }
   });

@@ -17,7 +17,7 @@ import './mobile-content.css';
 import './h5-home.css';
 
 export function H5LearningPage() {
-  const { user, pending } = useApp();
+  const { user, pending, conflicts } = useApp();
   const active = useScreenActive();
   const [params, setParams] = useSearchParams();
   const preferences = params.get('section') === 'preferences';
@@ -190,25 +190,38 @@ export function H5LearningPage() {
               </button>
               {tasksOpen && (
                 <div id="h5-today-tasks">
-                  {home.data && (
+                  {home.data &&
+                    !home.isFetching &&
+                    home.data.plan.bookId === plan.bookId &&
+                    home.data.plan.revision === plan.revision && (
+                      <div className="h5-task-state-note">
+                        {home.data.dailyGoalComplete ? (
+                          <p>今天的总目标已经完成。去日历看看这一步。</p>
+                        ) : home.data.review.availableAt && home.data.review.state === 'waiting' ? (
+                          <p>
+                            现在暂时不用复习。下次安排：
+                            {taskDate(home.data.review.availableAt, true, home.data.timeZone)}。
+                          </p>
+                        ) : home.data.learn.state === 'review_first' ? (
+                          <p>先完成到期复习，再安排今天的新词。</p>
+                        ) : home.data.learn.state === 'empty' &&
+                          home.data.review.state === 'empty' ? (
+                          <p>现在没有待学词，可以调整词书或查看记忆曲线。</p>
+                        ) : null}
+                        {pending > 0 && <p>{pending} 条记录等待同步，先核对已有任务再继续。</p>}
+                      </div>
+                    )}
+
+                  {conflicts?.some((row) => row.code === 'task_cancelled') && (
                     <div className="h5-task-state-note">
-                      {home.data.dailyGoalComplete ? (
-                        <p>今天的总目标已经完成。去日历看看这一步。</p>
-                      ) : home.data.review.availableAt && home.data.review.state === 'waiting' ? (
-                        <p>
-                          现在暂时不用复习。下次安排：
-                          {taskDate(home.data.review.availableAt, true, home.data.timeZone)}。
-                        </p>
-                      ) : home.data.learn.state === 'review_first' ? (
-                        <p>先完成到期复习，再安排今天的新词。</p>
-                      ) : home.data.learn.state === 'empty' &&
-                        home.data.review.state === 'empty' ? (
-                        <p>现在没有待学词，可以调整词书或查看记忆曲线。</p>
-                      ) : null}
-                      {pending > 0 && <p>{pending} 条记录等待同步，先核对已有任务再继续。</p>}
+                      <p>
+                        原任务已在切书后结束，已保存记录保留。未保存的本地操作需要逐条核对处理。
+                      </p>
+                      <Link className="text-link" to="/learn">
+                        处理旧任务的待同步操作 <ArrowRight size={15} />
+                      </Link>
                     </div>
                   )}
-
                   <TaskOverview plan={plan} pending={pending} compact />
                   <Link className="h5-learning-row" to="/learn">
                     <span>全部任务与同步</span>

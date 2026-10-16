@@ -18,6 +18,8 @@ import {
   type Db,
 } from './shared.js';
 import { decodeCursor, pageInfo } from './pagination.js';
+import { lockLearningPreferences } from './tasks.js';
+import { updateLearningPreferences } from './learning-preferences.js';
 import {
   bookTemplateHeader,
   bookImportLimits,
@@ -596,17 +598,15 @@ export async function registerCustomBooks(app: FastifyInstance, getContext: Cont
       req.body,
     );
     return transact(ctx.prisma, async (tx) => {
+      const prefs = await lockLearningPreferences(tx, user.id);
       if (!(await tx.book.findFirst({ where: { id: params.id, ownerId: user.id } })))
         throw new HttpError(404, 'book_not_found');
       const value = await tx.book.update({
         where: { id: params.id },
         data: { ...input, version: `custom-${Date.now()}` },
       });
-      if (input.status === 'archived')
-        await tx.userSettings.updateMany({
-          where: { userId: user.id, currentBookId: value.id },
-          data: { currentBookId: null, revision: { increment: 1 } },
-        });
+      if (input.status === 'archived' && prefs.currentBookId === value.id)
+        await updateLearningPreferences(tx, user.id, { currentBookId: null });
       return { book: bookDto(value) };
     });
   });
@@ -615,13 +615,12 @@ export async function registerCustomBooks(app: FastifyInstance, getContext: Cont
       user = requireUser(ctx),
       params = parse(z.object({ id }), req.params);
     await transact(ctx.prisma, async (tx) => {
+      const prefs = await lockLearningPreferences(tx, user.id);
       if (!(await tx.book.findFirst({ where: { id: params.id, ownerId: user.id } })))
         throw new HttpError(404, 'book_not_found');
       await tx.book.update({ where: { id: params.id }, data: { status: 'archived' } });
-      await tx.userSettings.updateMany({
-        where: { userId: user.id, currentBookId: params.id },
-        data: { currentBookId: null, revision: { increment: 1 } },
-      });
+      if (prefs.currentBookId === params.id)
+        await updateLearningPreferences(tx, user.id, { currentBookId: null });
     });
     return { archived: true, progressRetained: true, existingSessionsRetainSnapshots: true };
   });

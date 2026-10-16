@@ -274,11 +274,12 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
       where: { id: params.id, ...visibleBookWhere(user.id) },
     });
     if (!book) throw new HttpError(404, 'book_not_found');
-    const value = await ctx.prisma.userSettings.upsert({
-      where: { userId: user.id },
-      create: { userId: user.id, currentBookId: book.id, goal: book.goal },
-      update: { currentBookId: book.id, goal: book.goal, revision: { increment: 1 } },
-    });
+    const value = await transact(ctx.prisma, (tx) =>
+      updateLearningPreferences(tx, user.id, {
+        currentBookId: book.id,
+        goal: book.goal as 'daily',
+      }),
+    );
     return { settings: value };
   });
   app.get('/dictionary', async (req) => searchLookup(await getContext(req), req.query));

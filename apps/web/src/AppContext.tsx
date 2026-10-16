@@ -88,7 +88,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!silent || result.applied || result.pending || result.conflicts)
         setSyncNote(
           result.conflicts
-            ? '有同步冲突，请在今日任务中读取服务器进度并逐条处理。'
+            ? blocked.some((row) => row.code === 'task_cancelled')
+              ? '原任务已在切书后结束，已保存记录保留。未接受的本地操作仍保留，请在今日任务中逐条核对处理。'
+              : '有同步冲突，请在今日任务中读取服务器进度并逐条处理。'
             : result.pending
               ? '仍有暂存操作，稍后可再次重试。'
               : result.applied

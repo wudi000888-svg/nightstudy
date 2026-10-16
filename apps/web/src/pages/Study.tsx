@@ -6,6 +6,12 @@ import { useApp, useRemote } from '../AppContext';
 import { api, ApiError, newId, post } from '../lib/api';
 import { command, flushCommands } from '../lib/outbox';
 import { linkStudySession } from '../lib/study-navigation';
+import {
+  bookChangedEvent,
+  learningGeneration,
+  mergeStudySession,
+  resumableTasks,
+} from '../lib/learning-state';
 import type { CommandResult, Rating, StudySession } from '../lib/types';
 import { Empty, ErrorNotice, Heading, Loading, LoginPrompt, Notice, Panel } from '../components/UI';
 import { StudySessionView } from '../components/study/StudySessionView';
@@ -47,15 +53,17 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
   );
   const forecast = useRemote<TaskForecastResponse>('study-forecast', 'study/forecast', !!user);
   const [historyCursor, setHistoryCursor] = useState('');
+  const [historyStatus, setHistoryStatus] = useState<'completed' | 'cancelled'>('completed');
   const history = useRemote<TaskListResponse>(
     'study-tasks-history',
-    `study/tasks?status=completed&limit=20${historyCursor ? `&cursor=${encodeURIComponent(historyCursor)}` : ''}`,
+    `study/tasks?status=${historyStatus}&limit=20${historyCursor ? `&cursor=${encodeURIComponent(historyCursor)}` : ''}`,
     !!user,
   );
   const [storedSession, setSession] = useState<StudySession | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const lifetime = useRef(0);
+  const selectionGeneration = useRef(learningGeneration(scope));
   const currentScope = useRef(scope);
   currentScope.current = scope;
   const linkLoaded = useRef('');
@@ -69,17 +77,10 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
   const [feedback, setFeedback] = useState<
     (NonNullable<CommandResult['result']> & { position: number }) | undefined
   >();
-  const unfinished = saved.data?.items ?? [];
-  const resumable =
-    mode === 'review'
-      ? unfinished.filter(
-          (value) =>
-            !value.items.some((item) => item.bucket === 'new') &&
-            (value.mode === 'review' ||
-              value.taskKind === 'extra-review' ||
-              value.items.some((item) => item.bucket === 'review')),
-        )
-      : unfinished;
+  const unfinished = (saved.data?.items ?? []).filter((value) =>
+    ['in_progress', 'paused'].includes(value.status),
+  );
+  const resumable = resumableTasks(unfinished, mode, plan.data?.plan.bookId);
   const preferred =
     resumable.find((value) => value.id === plan.data?.plan.activeTaskId) ??
     resumable.find((value) => value.status === 'in_progress') ??
@@ -102,17 +103,23 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
   );
 
   function isCurrent(requestScope: string, requestLife: number) {
-    return currentScope.current === requestScope && lifetime.current === requestLife;
+    return (
+      currentScope.current === requestScope &&
+      lifetime.current === requestLife &&
+      selectionGeneration.current === learningGeneration(requestScope)
+    );
   }
 
   useEffect(() => {
     lifetime.current++;
+    selectionGeneration.current = learningGeneration(scope);
     setSession(null);
     setError(null);
     setReason('');
     setFeedback(undefined);
     setAnswer('');
     setHistoryCursor('');
+    setHistoryStatus('completed');
     if (initialScope.current !== scope) {
       initialScope.current = scope;
       setParams({});
@@ -127,7 +134,50 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     };
   }, [scope]);
 
+  function clearSession() {
+    lifetime.current++;
+    selectionGeneration.current = learningGeneration(scope);
+    setSession(null);
+    setFeedback(undefined);
+    setAnswer('');
+    setError(null);
+    setReason('');
+    linkLoaded.current = '';
+    startCommand.current = null;
+    stateCommand.current = null;
+    busyRef.current = false;
+    setBusy(false);
+  }
+  useEffect(() => {
+    const changed = (event: Event) => {
+      if ((event as CustomEvent<{ scope: string }>).detail.scope !== scope) return;
+      clearSession();
+      setParams({}, { replace: true });
+    };
+    window.addEventListener(bookChangedEvent, changed);
+    return () => window.removeEventListener(bookChangedEvent, changed);
+  }, [scope, setParams]);
+
+  function showTaskError(value: unknown, id: string | undefined, requestLife: number) {
+    setError(value);
+    if (!(value instanceof ApiError) || value.code !== 'task_cancelled' || !id) return;
+    setSession((current) =>
+      current?.id === id ? { ...current, status: 'cancelled', currentItemId: null } : current,
+    );
+    void api<{ session: StudySession }>(`study/sessions/${encodeURIComponent(id)}`)
+      .then(({ session: latest }) => {
+        if (!isCurrent(scope, requestLife)) return;
+        setSession((current) => mergeStudySession(current, latest));
+        setFeedback(undefined);
+        setAnswer('');
+      })
+      .catch(() => {});
+    void client.invalidateQueries({ queryKey: [scope] });
+  }
+
   async function updateTask(target: StudySession, action: 'pause' | 'resume' | 'defer') {
+    if (target.status === 'cancelled')
+      throw new ApiError(409, '这组任务已结束，请查看当前任务。', 'task_cancelled');
     const key = JSON.stringify({
       sessionId: target.id,
       action,
@@ -153,6 +203,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
   }
   async function start(resumeId?: string, extra = false) {
     if (busyRef.current || !user) return;
+    lifetime.current++;
     const requestScope = scope,
       requestLife = lifetime.current;
     busyRef.current = true;
@@ -163,7 +214,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     setAnswer('');
     try {
       if (navigator.onLine) {
-        const flushed = await flushCommands(scope);
+        const flushed = await flushCommands(scope, () => isCurrent(requestScope, requestLife));
         if (flushed.pending)
           throw new Error('仍有学习操作等待同步。请先同步并核对已有任务，再安排或继续。');
         if (flushed.applied) await client.invalidateQueries({ queryKey: [scope] });
@@ -181,6 +232,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
           ? { mode: 'review', taskKind: 'extra-review' }
           : {
               mode: mode === 'review' ? 'review' : 'daily',
+              ...(plan.data?.plan.bookId ? { bookId: plan.data.plan.bookId } : {}),
               ...(plan.data ? { expectedPlanRevision: plan.data.plan.revision } : {}),
             };
         const key = JSON.stringify(body);
@@ -192,22 +244,20 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         startCommand.current = null;
       }
       if (!isCurrent(requestScope, requestLife)) return;
-      setSession(result.session);
+      setSession((current) => (result.session ? mergeStudySession(current, result.session) : null));
       setReason(
         result.reason
           ? (reasons[result.reason] ?? '当前暂无可安排任务，请刷新计划查看真实到期与剩余词数。')
           : '',
       );
-      if (result.session) {
-        linkLoaded.current = `${scope}:${result.session.id}`;
-      }
+      linkLoaded.current = result.session ? `${scope}:${result.session.id}` : '';
       linkStudySession(params, result.session?.id ?? null, (next) =>
         setParams(next, { replace: true }),
       );
       void client.invalidateQueries({ queryKey: [scope] });
     } catch (value) {
       if (isCurrent(requestScope, requestLife)) {
-        setError(value);
+        showTaskError(value, resumeId, requestLife);
         void plan.refetch();
         void saved.refetch();
       }
@@ -219,7 +269,8 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     }
   }
   async function changeState(action: 'pause' | 'resume' | 'defer') {
-    if (!session || busyRef.current || waitingSync) return;
+    if (!session || session.status === 'cancelled' || busyRef.current || waitingSync) return;
+    lifetime.current++;
     const requestScope = scope,
       requestLife = lifetime.current;
     busyRef.current = true;
@@ -228,12 +279,12 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     try {
       const result = await updateTask(session, action);
       if (!isCurrent(requestScope, requestLife)) return;
-      setSession(result.session);
+      setSession((current) => mergeStudySession(current, result.session));
       setFeedback(undefined);
       setAnswer('');
       void client.invalidateQueries({ queryKey: [scope] });
     } catch (value) {
-      if (isCurrent(requestScope, requestLife)) setError(value);
+      if (isCurrent(requestScope, requestLife)) showTaskError(value, session.id, requestLife);
     } finally {
       if (isCurrent(requestScope, requestLife)) {
         busyRef.current = false;
@@ -242,9 +293,10 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
     }
   }
   async function act(action: 'reveal' | 'rate' | 'answer', rating?: Rating, answerValue?: string) {
-    if (!session || busyRef.current || waitingSync || session.status === 'paused') return;
+    if (!session || busyRef.current || waitingSync || session.status !== 'in_progress') return;
     const item = session.items.find((value) => value.id === session.currentItemId);
     if (!item) return;
+    lifetime.current++;
     const requestScope = scope,
       requestLife = lifetime.current;
     busyRef.current = true;
@@ -261,12 +313,13 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         expectedProgressRevision: item.progressRevision,
       });
       if (!isCurrent(requestScope, requestLife)) return;
-      setSession(result.session);
-      if (result.result) setFeedback({ ...result.result, position: item.ordinal + 1 });
+      setSession((current) => mergeStudySession(current, result.session));
+      if (result.session.status === 'cancelled') setFeedback(undefined);
+      else if (result.result) setFeedback({ ...result.result, position: item.ordinal + 1 });
       setAnswer('');
       void client.invalidateQueries({ queryKey: [scope] });
     } catch (value) {
-      if (isCurrent(requestScope, requestLife)) setError(value);
+      if (isCurrent(requestScope, requestLife)) showTaskError(value, session.id, requestLife);
     } finally {
       if (isCurrent(requestScope, requestLife)) {
         busyRef.current = false;
@@ -276,6 +329,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
   }
   async function readCurrent() {
     if (!session || busyRef.current) return;
+    lifetime.current++;
     const requestScope = scope,
       requestLife = lifetime.current;
     setBusy(true);
@@ -284,9 +338,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
       const result = await api<{ session: StudySession }>(`study/sessions/${session.id}`);
       if (isCurrent(requestScope, requestLife)) {
         setSession((current) =>
-          current?.id === result.session.id && current.revision <= result.session.revision
-            ? result.session
-            : current,
+          current?.id === result.session.id ? mergeStudySession(current, result.session) : current,
         );
         if (!pending) setError(null);
         setFeedback(undefined);
@@ -303,6 +355,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
   }
   async function readServerTask(sessionId: string) {
     if (busyRef.current) return;
+    lifetime.current++;
     const requestScope = scope,
       requestLife = lifetime.current;
     setBusy(true);
@@ -312,7 +365,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         `study/sessions/${encodeURIComponent(sessionId)}`,
       );
       if (!isCurrent(requestScope, requestLife)) return;
-      setSession(result.session);
+      setSession((current) => mergeStudySession(current, result.session));
       setFeedback(undefined);
       setAnswer('');
       setError(null);
@@ -331,24 +384,25 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
   useEffect(() => {
     const id = params.get('session');
     if (user && id && linkLoaded.current !== `${scope}:${id}`) {
+      clearSession();
       linkLoaded.current = `${scope}:${id}`;
-      void start(id);
+      void readServerTask(id).catch(() => {});
+    } else if (!id && linkLoaded.current) {
+      clearSession();
     }
   }, [params.get('session'), user?.id, scope]);
   useEffect(() => {
     if (!session?.id || !user) return;
-    const id = session.id,
-      requestScope = scope,
-      requestLife = lifetime.current;
+    const id = session.id;
     const synced = () => {
       if (busyRef.current) return;
+      const requestScope = scope,
+        requestLife = lifetime.current;
       api<{ session: StudySession }>(`study/sessions/${id}`)
         .then((value) => {
           if (isCurrent(requestScope, requestLife) && !busyRef.current) {
             setSession((current) =>
-              current?.id === id && current.revision <= value.session.revision
-                ? value.session
-                : current,
+              current?.id === id ? mergeStudySession(current, value.session) : current,
             );
             setError(null);
             setFeedback(undefined);
@@ -359,13 +413,29 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         });
     };
     window.addEventListener('nightstudy-synced', synced);
-    return () => window.removeEventListener('nightstudy-synced', synced);
+    window.addEventListener('focus', synced);
+    const visible = () => {
+      if (document.visibilityState === 'visible') synced();
+    };
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      window.removeEventListener('nightstudy-synced', synced);
+      window.removeEventListener('focus', synced);
+      document.removeEventListener('visibilitychange', visible);
+    };
   }, [session?.id, user?.id, scope]);
   const shortcutRequested = params.get('start') === '1';
   useQuickStudyStart({
     scope,
     requested: shortcutRequested,
-    ready: !!user && !!plan.data && !!saved.data && !plan.isPending && !saved.isPending,
+    ready:
+      !!user &&
+      !!plan.data &&
+      !!saved.data &&
+      !plan.isPending &&
+      !saved.isPending &&
+      !plan.isFetching &&
+      !saved.isFetching,
     blocked:
       !!session || !!params.get('session') || busy || waitingSync || !!plan.error || !!saved.error,
     resumeId: preferred?.id,
@@ -448,7 +518,11 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
         />
         {waitingSync && (
           <Panel className="task-sync-card">
-            <Notice>有操作等待同步，联网后会继续保存。请先恢复连接并核对这一组。</Notice>
+            <Notice>
+              {conflicts.some((row) => row.code === 'task_cancelled')
+                ? '原任务已在切书后结束，已保存记录保留。未保存的本地操作需要在上方逐条确认处理，才能开始新任务。'
+                : '有操作等待同步，联网后会继续保存。请先恢复连接并核对这一组。'}
+            </Notice>
             <button className="button ghost" disabled={busy} onClick={() => void sync()}>
               同步暂存操作
             </button>
@@ -478,7 +552,14 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
               <TaskOverview
                 plan={activePlan}
                 pending={pending}
-                canContinue={!busy && !waitingSync && !saved.isPending && !saved.error}
+                canContinue={
+                  !busy &&
+                  !waitingSync &&
+                  !plan.isFetching &&
+                  !saved.isFetching &&
+                  !saved.isPending &&
+                  !saved.error
+                }
                 onContinue={() => {
                   if (preferred) void start(preferred.id);
                   else void start();
@@ -504,7 +585,9 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
                   busy ||
                   waitingSync ||
                   plan.isPending ||
+                  plan.isFetching ||
                   saved.isPending ||
+                  saved.isFetching ||
                   !!plan.error ||
                   !!saved.error
                 }
@@ -515,7 +598,9 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
               </button>
               <button
                 className="button ghost"
-                disabled={busy || waitingSync || plan.isPending}
+                disabled={
+                  busy || waitingSync || plan.isPending || plan.isFetching || saved.isFetching
+                }
                 onClick={() => void start(undefined, true)}
               >
                 <RotateCcw size={16} />
@@ -524,7 +609,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
               <Link className="button quiet" to="/books">
                 选择词书与每日计划
               </Link>
-              <Link className="button quiet" to="/me">
+              <Link className="button quiet" to="/learning">
                 调整总目标
               </Link>
             </div>
@@ -588,9 +673,25 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
               <div className="section-heading">
                 <div>
                   <span className="tiny-label">每一点，都有记录</span>
-                  <h2>已完成任务</h2>
+                  <h2>任务记录</h2>
                 </div>
                 <span className="fine-print">按组保存，不等于当天去重词总数</span>
+              </div>
+              <div className="action-row" role="group" aria-label="任务记录状态">
+                {(['completed', 'cancelled'] as const).map((status) => (
+                  <button
+                    type="button"
+                    key={status}
+                    className="button quiet"
+                    aria-pressed={historyStatus === status}
+                    onClick={() => {
+                      setHistoryStatus(status);
+                      setHistoryCursor('');
+                    }}
+                  >
+                    {status === 'completed' ? '已完成' : '换书后结束'}
+                  </button>
+                ))}
               </div>
               <ErrorNotice error={history.error} onRetry={() => void history.refetch()} />
               {history.isPending ? (
@@ -604,6 +705,7 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
                           {value.bookTitle ?? '全部已学词'} · {taskLabel(value)}
                         </strong>
                         <small>
+                          {value.status === 'cancelled' ? '换书后已结束 · ' : '已完成 · '}
                           {taskDate(value.completedAt ?? value.updatedAt, true, value.timeZone)} ·
                           已评价 {value.items.filter((row) => row.rated).length} 词 · 拼写{' '}
                           {value.items.filter((row) => row.exerciseDone).length} 次 ·{' '}
@@ -612,8 +714,8 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
                       </div>
                       <button
                         className="button ghost"
-                        disabled={busy || waitingSync}
-                        onClick={() => void start(value.id)}
+                        disabled={busy}
+                        onClick={() => void readServerTask(value.id).catch(() => {})}
                       >
                         查看记录
                         <ArrowRight size={14} />
@@ -623,7 +725,9 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
                 </div>
               ) : (
                 <p className="fine-print">
-                  还没有已完成的学习组。已安排的学习组会保留在上方，可继续完成巩固与拼写。
+                  {historyStatus === 'completed'
+                    ? '还没有已完成的学习组。当前未完成任务显示在上方。'
+                    : '还没有因切换词书而结束的任务。已提交的学习记录始终保留。'}
                 </p>
               )}
               <div className="pagination-actions">
@@ -657,6 +761,11 @@ export function StudyPage({ mode }: { mode: 'learn' | 'review' }) {
           onState={(action) => void changeState(action)}
           onRead={() => void readCurrent()}
           onBack={dashboard}
+          onTasks={() => {
+            clearSession();
+            setParams({}, { replace: true });
+            void client.invalidateQueries({ queryKey: [scope] });
+          }}
           onNext={() => void start()}
           onFeedbackDone={() => setFeedback(undefined)}
         />

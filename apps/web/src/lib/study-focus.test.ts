@@ -8,7 +8,9 @@ import { studyExamples } from '../components/study/StudyWordDetails';
 import { WordView } from '../components/UI';
 import { WordCardContent } from '../components/WordCards';
 import { WordCardContext } from './word-cards';
-import type { StudySession, Word } from './types';
+import type { Plan, StudySession, Word } from './types';
+import { TaskOverview } from '../components/tasks/TaskOverview';
+import { TaskConflicts } from '../components/tasks/TaskConflicts';
 
 vi.hoisted(() => vi.stubGlobal('window', { __NIGHTSTUDY_CONFIG__: {} }));
 vi.mock('../AppContext', () => ({
@@ -121,6 +123,7 @@ const actions = {
   onState: vi.fn(),
   onRead: vi.fn(),
   onBack: vi.fn(),
+  onTasks: vi.fn(),
   onNext: vi.fn(),
   onFeedbackDone: vi.fn(),
 };
@@ -343,4 +346,84 @@ it('keeps spelling feedback on the real spelling count instead of the completed 
     feedback: { correct: true, correctAnswer: 'water', explanation: '', position: 3 },
   });
   expect(last).toMatch(/aria-label="本组拼写进度"[^>]*aria-valuemax="3"[^>]*aria-valuenow="3"/);
+});
+
+it('keeps a cancelled revealed or spelling task read-only even with a late answer receipt', () => {
+  const markup = view({
+    session: {
+      ...session,
+      status: 'cancelled',
+      phase: 'practice',
+      currentItemId: null,
+      items: session.items.map((item) => ({ ...item, revealed: true })),
+    },
+    feedback: { position: 1, correct: true, correctAnswer: 'water', explanation: 'old feedback' },
+    waitingSync: true,
+  });
+  expect(markup).toContain('这组任务已结束');
+  expect(markup).toContain('今日已完成词数都保留');
+  expect(markup).toContain('查看当前任务');
+  expect(markup).toContain('本地待同步操作仍保留');
+  for (const forbidden of [
+    '看答案',
+    '下一词',
+    '记错了',
+    '恢复任务',
+    '继续今日任务',
+    '暂停这一组',
+    '学习操作',
+    '保密动词浇水义',
+    'old feedback',
+    'correctAnswer',
+  ])
+    expect(markup).not.toContain(forbidden);
+});
+
+it('counts assigned but unrated words in today remaining totals instead of showing only free new slots', () => {
+  const markup = render(
+    React.createElement(TaskOverview, {
+      plan: {
+        localDate: '2026-10-16',
+        dailyTotalGoal: 30,
+        completedUnique: 6,
+        completedNew: 4,
+        completedReview: 2,
+        plannedNew: 12,
+        plannedReview: 10,
+        newRemaining: 3,
+        activeTaskId: 'old-cached-route',
+        pendingConsolidationCount: 2,
+        pendingSpellingCount: 1,
+        unplannedOverdueCount: 0,
+        timeZone: 'Asia/Shanghai',
+      } as Plan,
+    }),
+  );
+  expect(markup).toContain('今日待新学 8 词');
+  expect(markup).toContain('待复习 8 词');
+  expect(markup).toContain('含已安排学习组中的未评价词');
+  expect(markup).not.toContain('session=old-cached-route');
+});
+
+it('explains ended-task conflicts and offers only explicit per-command handling', () => {
+  const markup = render(
+    React.createElement(TaskConflicts, {
+      conflicts: [
+        {
+          id: 'one-local-op',
+          code: 'task_cancelled',
+          sessionId: 'old',
+          createdAt: '2026-10-16T01:00:00Z',
+          action: 'rate',
+        },
+      ],
+      busy: false,
+      onRead: async () => {},
+      onDiscard: async () => {},
+    }),
+  );
+  expect(markup).toContain('原任务已在切换词书后结束');
+  expect(markup).toContain('这条本地操作尚未被接受');
+  expect(markup).toContain('查看已结束任务');
+  expect(markup).toContain('处理这一条');
 });

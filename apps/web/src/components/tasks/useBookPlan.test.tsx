@@ -9,7 +9,7 @@ const state = vi.hoisted(() => {
   return {
     selected: null as Book | null,
     navigate: vi.fn(),
-    invalidate: vi.fn(),
+    accept: vi.fn(),
     active: true,
     refCursor: 0,
     refs: [] as { current: unknown }[],
@@ -31,7 +31,12 @@ vi.mock('../../AppContext', () => ({
   useRemote: () => ({
     data: {
       plan: { assignedUnique: 0 },
-      settings: { dailyTotalGoal: 30, groupSize: 5, timeZone: 'Asia/Shanghai' },
+      settings: {
+        currentBookId: 'book-before',
+        dailyTotalGoal: 30,
+        groupSize: 5,
+        timeZone: 'Asia/Shanghai',
+      },
     },
     isPending: false,
   }),
@@ -42,9 +47,10 @@ vi.mock('react-router-dom', () => ({
 }));
 vi.mock('../../lib/screen-lifecycle', () => ({ useScreenActive: () => state.active }));
 vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries: state.invalidate }),
+  useQueryClient: () => ({ testClient: true }),
 }));
 vi.mock('../../lib/api', () => ({ post: vi.fn() }));
+vi.mock('../../lib/learning-state', () => ({ acceptBookPlan: state.accept }));
 vi.mock('./PlanConfirm', () => ({ PlanConfirm: () => null }));
 beforeEach(() => {
   vi.stubGlobal('React', React);
@@ -53,8 +59,10 @@ beforeEach(() => {
   state.refCursor = 0;
   state.refs = [];
   state.navigate.mockReset();
-  state.invalidate.mockReset().mockResolvedValue(undefined);
-  vi.mocked(post).mockReset().mockResolvedValue({});
+  state.accept.mockReset().mockResolvedValue(true);
+  vi.mocked(post)
+    .mockReset()
+    .mockResolvedValue({ settings: { currentBookId: 'book-rain' }, plan: { revision: 9 } });
 });
 afterAll(() => vi.unstubAllGlobals());
 it('returns to the fixed home only after the server confirms the chosen book and daily target', async () => {
@@ -72,7 +80,17 @@ it('returns to the fixed home only after the server confirms the chosen book and
     expectedRevision: 2,
     commandId: 'confirm-id',
   });
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['test:learner'] });
+  expect(state.accept).toHaveBeenCalledWith(
+    { testClient: true },
+    'test:learner',
+    'book-before',
+    {
+      settings: { currentBookId: 'book-rain' },
+      plan: { revision: 9 },
+    },
+    expect.any(Function),
+  );
+  expect(view.dialog.props.switchingBook).toBe(true);
   expect(state.navigate).toHaveBeenCalledExactlyOnceWith('/');
   expect(state.selected).toBeNull();
 });
@@ -91,7 +109,7 @@ it('keeps the confirmation open and stays in the setup flow on a rejected plan',
 });
 it('settles an accepted plan without taking over navigation after the user left and reopened the screen', async () => {
   let finishRefresh!: () => void;
-  state.invalidate.mockReturnValue(
+  state.accept.mockReturnValue(
     new Promise<void>((resolve) => {
       finishRefresh = resolve;
     }),
@@ -112,6 +130,74 @@ it('settles an accepted plan without taking over navigation after the user left 
   useBookPlan();
   finishRefresh();
   await saving;
-  expect(state.invalidate).toHaveBeenCalledOnce();
+  expect(state.accept).toHaveBeenCalledOnce();
+  expect(state.navigate).not.toHaveBeenCalled();
+});
+
+it('does not close a newer book choice or navigate when an earlier accepted refresh finishes', async () => {
+  let finishRefresh!: (value: boolean) => void;
+  state.accept.mockReturnValue(
+    new Promise<boolean>((resolve) => {
+      finishRefresh = resolve;
+    }),
+  );
+  const view = useBookPlan();
+  const saving = view.dialog.props.onConfirm(
+    { dailyTotalGoal: 30, groupSize: 5, timeZone: 'Asia/Shanghai' },
+    2,
+    'first-confirm',
+  );
+  await Promise.resolve();
+  expect(state.selected).toBeNull();
+  view.choose({ id: 'book-second' } as Book);
+  const stillCurrent = state.accept.mock.calls[0]![4] as () => boolean;
+  expect(stillCurrent()).toBe(false);
+  finishRefresh(true);
+  await saving;
+  expect(state.selected?.id).toBe('book-second');
+  expect(state.navigate).not.toHaveBeenCalled();
+});
+
+it('ignores a delayed earlier response after a newer confirmation starts in the same scope', async () => {
+  let finishOlder!: (value: unknown) => void;
+  vi.mocked(post).mockReturnValueOnce(
+    new Promise((resolve) => {
+      finishOlder = resolve;
+    }),
+  );
+  const view = useBookPlan();
+  const older = view.dialog.props.onConfirm(
+    { dailyTotalGoal: 30, groupSize: 5, timeZone: 'Asia/Shanghai' },
+    2,
+    'first-confirm',
+  );
+  view.choose({ id: 'book-second' } as Book);
+  state.refCursor = 0;
+  const next = useBookPlan();
+  const result = {
+    settings: { currentBookId: 'book-second', revision: 4 },
+    plan: { revision: 10 },
+  };
+  vi.mocked(post).mockResolvedValueOnce(result);
+  await next.dialog.props.onConfirm(
+    { dailyTotalGoal: 30, groupSize: 5, timeZone: 'Asia/Shanghai' },
+    3,
+    'second-confirm',
+  );
+  finishOlder({ settings: { currentBookId: 'book-rain', revision: 3 }, plan: { revision: 9 } });
+  await older;
+  expect(state.accept).toHaveBeenCalledTimes(1);
+  expect(state.accept.mock.calls[0]?.[3]).toBe(result);
+  expect(state.navigate).toHaveBeenCalledExactlyOnceWith('/');
+});
+
+it('does not navigate when the shared cache rejects a stale committed response', async () => {
+  state.accept.mockResolvedValue(false);
+  const view = useBookPlan();
+  await view.dialog.props.onConfirm(
+    { dailyTotalGoal: 30, groupSize: 5, timeZone: 'Asia/Shanghai' },
+    2,
+    'old-confirm',
+  );
   expect(state.navigate).not.toHaveBeenCalled();
 });

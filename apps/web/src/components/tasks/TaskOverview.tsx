@@ -53,12 +53,12 @@ export function TaskOverview({
         </div>
         <h3>
           <span>{plan.completedUnique}</span>
-          <small> / {plan.dailyTotalGoal} 个词已练习</small>
+          <small> / {plan.dailyTotalGoal} 个词已完成评价</small>
         </h3>
         <div
           className="task-daily-progress"
           role="progressbar"
-          aria-label="今日已练习词数"
+          aria-label="今日去重已评价词数"
           aria-valuemin={0}
           aria-valuemax={Math.max(plan.dailyTotalGoal, plan.completedUnique)}
           aria-valuenow={plan.completedUnique}
@@ -83,21 +83,18 @@ export function TaskOverview({
             计划新学 <strong>{plan.plannedNew}</strong>
           </span>
         </div>
+        <p>
+          今日待新学 {Math.max(0, plan.plannedNew - plan.completedNew)} 词 · 待复习{' '}
+          {Math.max(0, plan.plannedReview - plan.completedReview)} 词，含已安排学习组中的未评价词。
+        </p>
         {onContinue ? (
           <button className="text-link" onClick={onContinue} disabled={!canContinue}>
             {plan.activeTaskId ? '继续上次学习' : '查看今日任务'}
             <ArrowRight size={15} />
           </button>
         ) : (
-          <Link
-            className="text-link"
-            to={
-              plan.activeTaskId
-                ? `/learn?session=${encodeURIComponent(plan.activeTaskId)}`
-                : '/learn'
-            }
-          >
-            {plan.activeTaskId ? '继续上次学习' : '查看今日任务'}
+          <Link className="text-link" to="/learn">
+            查看当前任务
             <ArrowRight size={15} />
           </Link>
         )}

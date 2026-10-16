@@ -388,7 +388,7 @@ export interface StudySession {
   bookId: string | null;
   mode: 'learn' | 'review' | 'daily' | 'extra-review';
   phase: 'recall' | 'practice' | 'completed';
-  status: string;
+  status: 'in_progress' | 'paused' | 'completed' | 'cancelled';
   revision: number;
   cursor: number;
   step: string;

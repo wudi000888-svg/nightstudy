@@ -382,11 +382,6 @@ suite('PostgreSQL private wordbooks, validated imports and user isolation', () =
     const created = await request('POST', '/study/sessions', { mode: 'learn', bookId, size: 1 });
     expect(created.statusCode).toBe(200);
     sessionId = created.json().session.id;
-    const archived = await request('DELETE', `/custom-books/${bookId}`, {});
-    expect(archived.statusCode).toBe(200);
-    expect(archived.json().progressRetained).toBe(true);
-    expect((await request('GET', '/study/plan')).json().plan.bookId).toBeNull();
-    expect((await request('GET', `/books/${bookId}`)).statusCode).toBe(404);
     const session = (await request('GET', `/study/sessions/${sessionId}`)).json().session;
     const item = session.items[0];
     const revealed = await request('POST', `/study/sessions/${sessionId}/commands`, {
@@ -407,6 +402,28 @@ suite('PostgreSQL private wordbooks, validated imports and user isolation', () =
     expect(rated.statusCode).toBe(200);
     expect(rated.json().progress.revision).toBe(1);
     expect(await db.studyProgress.count({ where: { userId: userA, wordId: wordIds[0] } })).toBe(1);
+    const original = await db.sessionItem.findMany({ where: { sessionId } });
+    const memory = await db.studyProgress.findMany({ where: { userId: userA } });
+    const logs = await db.reviewLog.findMany({ where: { userId: userA } });
+    const archived = await request('DELETE', `/custom-books/${bookId}`, {});
+    expect(archived.statusCode).toBe(200);
+    expect(archived.json().progressRetained).toBe(true);
+    expect((await request('GET', '/study/plan')).json().plan.bookId).toBeNull();
+    expect((await request('GET', `/books/${bookId}`)).statusCode).toBe(404);
+    const cancelled = (await request('GET', `/study/sessions/${sessionId}`)).json().session;
+    expect(cancelled).toMatchObject({ status: 'cancelled', currentItemId: null });
+    const blocked = await request('POST', `/study/sessions/${sessionId}/commands`, {
+      commandId: randomUUID(),
+      itemId: item.id,
+      action: 'answer',
+      answer: item.word.lemma,
+      expectedSessionRevision: cancelled.revision,
+    });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json().code).toBe('task_cancelled');
+    expect(await db.sessionItem.findMany({ where: { sessionId } })).toEqual(original);
+    expect(await db.studyProgress.findMany({ where: { userId: userA } })).toEqual(memory);
+    expect(await db.reviewLog.findMany({ where: { userId: userA } })).toEqual(logs);
   });
 
   it('rechecks real readiness at confirmation, preserves new failures and never creates an empty book', async () => {

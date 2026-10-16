@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import type { Prisma } from '@prisma/client';
 import { requireUser, type ContextResolver } from '../context.js';
-import { obj, selectLearningSense, transact, type Db } from './shared.js';
+import { obj, transact, type Db } from './shared.js';
 import { eligibleWord, ensureDailyPlan, lockLearningPreferences, planView } from './tasks.js';
+import { findEligibleProgress } from './learning-eligibility.js';
 
 type EntryState =
   'setup' | 'resume' | 'ready' | 'waiting' | 'review_first' | 'other_task' | 'complete' | 'empty';
@@ -106,9 +107,10 @@ export async function appHomeSnapshot(db: Db, userId: string, at?: Date) {
     pending.flatMap((task) => task.items.filter((item) => !item.rated).map((item) => item.wordId)),
   );
   const assigned = new Set(words.filter((word) => word.activeSessionId).map((word) => word.wordId));
-  const [reviewCandidates, nextReview] = await Promise.all([
-    db.studyProgress.findMany({
-      where: {
+  const [reviewCandidates, futureReviews] = await Promise.all([
+    findEligibleProgress(
+      db,
+      {
         userId,
         firstLearnedAt: { not: null },
         wordId: {
@@ -118,22 +120,22 @@ export async function appHomeSnapshot(db: Db, userId: string, at?: Date) {
         dueAt: { lte: now },
         word: eligibleWord(userId),
       },
-      include: { word: { include: { senses: true } } },
-    }),
-    db.studyProgress.findFirst({
-      where: {
+      [{ dueAt: 'asc' }, { wordId: 'asc' }],
+    ),
+    findEligibleProgress(
+      db,
+      {
         userId,
         firstLearnedAt: { not: null },
         dueAt: { gt: now },
         word: eligibleWord(userId),
       },
-      orderBy: [{ dueAt: 'asc' }, { wordId: 'asc' }],
-      select: { dueAt: true },
-    }),
+      [{ dueAt: 'asc' }, { wordId: 'asc' }],
+      1,
+    ),
   ]);
-  const reviewNow = reviewCandidates.filter((progress) =>
-    selectLearningSense(progress.word.senses),
-  ).length;
+  const nextReview = futureReviews[0];
+  const reviewNow = reviewCandidates.length;
   const active = pending.find(
     (task) => task.status === 'in_progress' && task.taskKind !== 'extra-review',
   );

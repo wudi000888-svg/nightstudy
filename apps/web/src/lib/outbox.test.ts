@@ -74,6 +74,37 @@ it('retries an uncertain accepted command with its original id and removes it on
   expect(await conflictingCommands(scope)).toEqual([]);
 });
 
+it('preserves a cancelled-task conflict for explicit handling and never sends the next queued operation', async () => {
+  await queue(scope, 'cancelled-rate', 'rate');
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  await queue(scope, 'later-answer', 'answer');
+  const fetch = vi.fn().mockResolvedValue(reply(409, { code: 'task_cancelled' }));
+  vi.stubGlobal('fetch', fetch);
+  expect(await flushCommands(scope)).toEqual({ applied: 0, pending: 2, conflicts: 1 });
+  expect(await conflictingCommands(scope)).toMatchObject([
+    { id: `${scope}:cancelled-rate`, sessionId: 'task-1', code: 'task_cancelled' },
+  ]);
+  expect(await pendingCommands(scope)).toHaveLength(2);
+  await flushCommands(scope);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  await discardConflictedCommand(scope, `${scope}:cancelled-rate`);
+  expect((await pendingCommands(scope)).map((row) => row.id)).toEqual([`${scope}:later-answer`]);
+});
+
+it('removes only an already-accepted replay after book cancellation without reviving its task', async () => {
+  await queue(scope, 'accepted-before-switch', 'rate');
+  const fetch = vi.fn().mockResolvedValue(
+    reply(200, {
+      duplicate: true,
+      session: { id: 'task-1', status: 'cancelled', currentItemId: null },
+    }),
+  );
+  vi.stubGlobal('fetch', fetch);
+  expect(await flushCommands(scope)).toEqual({ applied: 1, pending: 0, conflicts: 0 });
+  expect(await pendingCommands(scope)).toEqual([]);
+  expect(JSON.parse(fetch.mock.calls[0]![1].body).commandId).toBe('accepted-before-switch');
+});
+
 it('does not label an outage or authentication failure as a discardable conflict', async () => {
   await queue(scope, 'one');
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(503)));

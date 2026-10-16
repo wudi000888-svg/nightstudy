@@ -268,7 +268,7 @@ node scripts/check-learning-senses-install.mjs --single-site default
 | 实际音频事件          | bank双口音句音完成真实HTMLAudio解码与playing，切句/切义产生pause；不以文件存在代替播放事件。                                                        |
 | 原始内容              | Word/Sense/旧候选句/Book/BookItem/原ContentPack全行流式指纹不变，最终包重放0写。                                                                    |
 
-真实浏览器的页面/控制台错误、外链尝试和生产请求均0。公开截图来自匿名隔离页面：[查词列表](media/mobile-lookup-0.11.png)、[河岸义项](media/mobile-sense-0.11.png)。上述为桌面Chromium手机视口；实体iOS/Android、真实软键盘与逐句专家听审仍未验收。源词、来源hash、句库、音频撤回及游标隔离另经独立代理只读审查；发现的版本、缓存与旧快照禁音缺口均已修复并回归。
+上述隔离浏览器的页面/控制台错误、外链尝试和生产请求均0。当前公开截图已换为15.3上线后匿名验收的真实页面：[查词列表](media/mobile-lookup-0.11.png)、[河岸义项](media/mobile-sense-0.11.png)。两轮均为桌面Chromium手机视口；实体iOS/Android、真实软键盘与逐句专家听审仍未验收。源词、来源hash、句库、音频撤回及游标隔离另经独立代理只读审查；发现的版本、缓存与旧快照禁音缺口均已修复并回归。
 
 ### 14.3 完整目录性能
 

@@ -15,6 +15,7 @@ import type { Word, WordbookItem } from './types';
 
 const state = vi.hoisted(() => ({
   scope: 'bookmark-ui:user-a',
+  params: '',
   slots: [] as unknown[],
   cursor: 0,
   refs: [] as { current: unknown }[],
@@ -35,7 +36,8 @@ vi.mock('react', async (importOriginal) => {
     ...actual,
     useState: (initial: unknown) => {
       const index = state.cursor++;
-      if (!(index in state.slots)) state.slots[index] = initial;
+      if (!(index in state.slots))
+        state.slots[index] = typeof initial === 'function' ? initial() : initial;
       return [
         state.slots[index],
         (value: unknown) => {
@@ -54,6 +56,7 @@ vi.mock('react-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-dom')>()),
   createPortal: (node: ReactNode) => node,
 }));
+vi.mock('../components/AppNavigation', () => ({ useAppNavigation: () => ({ goBack: vi.fn() }) }));
 vi.mock('./screen-lifecycle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./screen-lifecycle')>()),
   useScreenActive: () => true,
@@ -70,7 +73,12 @@ vi.mock('../AppContext', () => ({
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
   useLocation: () => ({ key: 'bookmark-test', pathname: '/lookup' }),
-  useSearchParams: () => [new URLSearchParams()],
+  useSearchParams: () => [
+    new URLSearchParams(state.params),
+    (next: URLSearchParams) => {
+      state.params = String(next);
+    },
+  ],
 }));
 vi.mock('@tanstack/react-query', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-query')>()),
@@ -102,7 +110,23 @@ vi.mock('./api', () => ({
 const word: Word = {
   id: 'bookmark-word-water',
   lemma: 'water',
-  senses: [{ id: 'water-noun', pos: 'n.', definitionZh: '水', definitionEn: 'A clear liquid.' }],
+  senses: [
+    {
+      id: 'water-noun',
+      pos: 'n.',
+      definitionZh: '水',
+      definitionEn: 'A clear liquid.',
+      examples: [
+        {
+          id: 'water-noun-usage',
+          learningSenseId: 'water-noun',
+          contextLabel: '饮水',
+          exampleEn: 'She poured water into a cup.',
+          exampleZh: '她把水倒进杯子里。',
+        },
+      ],
+    },
+  ],
 };
 const item = { id: 'saved-water', wordId: word.id, note: '', favorite: true, paused: false };
 const collection = { inWordbook: true, wordbookStatus: 'active' as const, known: null };
@@ -161,6 +185,7 @@ beforeAll(() => {
 });
 beforeEach(() => {
   state.scope = 'bookmark-ui:user-a';
+  state.params = '';
   state.slots = [];
   state.refs = [];
   state.timers.clear();
@@ -311,7 +336,15 @@ it('refreshes the exact card entry when the corresponding wordbook row is remove
 
 it('separates active and consolidated pagination keys and offers re-add rather than an invalid active-only edit', async () => {
   let tree = renderWordbook();
-  expect(state.listOptions.at(-1)?.queryKey).toEqual([state.scope, 'wordbook', 'pages', 'active']);
+  expect(state.listOptions.at(-1)?.queryKey).toEqual([
+    state.scope,
+    'wordbook',
+    'pages',
+    '',
+    'smart',
+    'updated-desc',
+    'active',
+  ]);
   const filter = find(
     tree,
     (element) => element.type === 'button' && element.props.children === '已巩固',
@@ -322,11 +355,19 @@ it('separates active and consolidated pagination keys and offers re-add rather t
   ];
   tree = renderWordbook();
   const options = state.listOptions.at(-1)!;
-  expect(options.queryKey).toEqual([state.scope, 'wordbook', 'pages', 'consolidated']);
+  expect(options.queryKey).toEqual([
+    state.scope,
+    'wordbook',
+    'pages',
+    '',
+    'smart',
+    'updated-desc',
+    'consolidated',
+  ]);
   const signal = new AbortController().signal;
   await options.queryFn({ pageParam: 'scoped-cursor', signal });
   expect(vi.mocked(api)).toHaveBeenLastCalledWith(
-    'wordbook?limit=50&status=consolidated&cursor=scoped-cursor',
+    'wordbook?match=smart&sort=updated-desc&status=consolidated&limit=20&cursor=scoped-cursor',
     { signal },
   );
   expect(elements(tree).some((element) => element.props['aria-label'] === '编辑 water 备注')).toBe(
@@ -344,5 +385,13 @@ it('separates active and consolidated pagination keys and offers re-add rather t
     }),
   );
   renderWordbook();
-  expect(state.listOptions.at(-1)?.queryKey).toEqual([state.scope, 'wordbook', 'pages', 'active']);
+  expect(state.listOptions.at(-1)?.queryKey).toEqual([
+    state.scope,
+    'wordbook',
+    'pages',
+    '',
+    'smart',
+    'updated-desc',
+    'consolidated',
+  ]);
 });

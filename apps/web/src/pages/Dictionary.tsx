@@ -140,14 +140,18 @@ export function DictionaryPage() {
                   ))}
               </div>
             ))}
-            {data.data.word.examples?.map((example) => (
-              <div key={example.id}>
-                <p>{example.exampleEn}</p>
-                <p>{example.exampleZh}</p>
-                <SourceRecord value={example.contentMetadata?.exampleEn} />
-                <SourceRecord value={example.contentMetadata?.exampleZh} />
-              </div>
-            ))}
+            {data.data.word.senses
+              ?.flatMap((sense) =>
+                (sense.examples ?? []).filter((example) => example.learningSenseId === sense.id),
+              )
+              .map((example) => (
+                <div key={example.id}>
+                  <p>{example.exampleEn}</p>
+                  <p>{example.exampleZh}</p>
+                  <SourceRecord value={example.contentMetadata?.exampleEn} />
+                  <SourceRecord value={example.contentMetadata?.exampleZh} />
+                </div>
+              ))}
             {data.data.word.audio?.map((audio) => (
               <p className="muted" key={audio.id}>
                 {audio.accent === 'US' ? '美式' : '英式'} ·{' '}

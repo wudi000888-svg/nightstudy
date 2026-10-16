@@ -9,7 +9,7 @@ import {
   settings,
   wordInclude,
   wordDto,
-  selectLearningSense,
+  selectWordLearningSense,
   progressDto,
   json,
   obj,
@@ -25,7 +25,8 @@ import {
   type Db,
 } from './shared.js';
 import { visibleBookWhere } from './book-access.js';
-import { supplementIssuedWord } from './content-presentation.js';
+import { applyCurrentPronunciationPolicy, supplementIssuedWord } from './content-presentation.js';
+import { wordPronunciationCompatible } from './learning-sense-view.js';
 import { applyFamiliarityPolicy, collectionState } from './collection-state.js';
 import {
   ensureDailyPlan,
@@ -66,9 +67,14 @@ export function sessionDto(
   progress: StudyProgress[] = [],
   deferredUntil: Date | null = null,
   currentWords: ReadonlyMap<string, ReturnType<typeof wordDto>> = new Map(),
+  pronunciationPolicies: ReadonlyMap<string, boolean> = new Map(),
 ) {
   const items = session.items.map((item) => {
-    const snapshot = obj(item.contentSnapshot),
+    const snapshot = applyCurrentPronunciationPolicy(
+        obj(item.contentSnapshot),
+        pronunciationPolicies.get(item.wordId) ??
+          currentWords.get(item.wordId)?.pronunciationCompatible,
+      ),
       question = obj(item.questionJson);
     const latest = progress.find((x) => x.wordId === item.wordId);
     const visible = item.revealed || session.phase === 'practice' || session.status === 'completed';
@@ -98,6 +104,7 @@ export function sessionDto(
             phoneticUs: snapshot.phoneticUs,
             phoneticUk: snapshot.phoneticUk,
             phoneticSource: snapshot.phoneticSource,
+            pronunciationCompatible: snapshot.pronunciationCompatible,
           },
       ...(session.phase === 'practice'
         ? { question: { id: `spelling-${item.id}`, type: 'spelling', prompt: question.prompt } }
@@ -142,7 +149,10 @@ async function sessionView(db: Db, userId: string, session: FullSession) {
       (item) => item.revealed || session.phase === 'practice' || session.status === 'completed',
     )
     .map((item) => item.wordId);
-  const [progress, deferred, currentWords] = await Promise.all([
+  const hiddenIds = session.items
+    .filter((item) => !visibleIds.includes(item.wordId))
+    .map((item) => item.wordId);
+  const [progress, deferred, currentWords, hiddenPolicies] = await Promise.all([
     db.studyProgress.findMany({
       where: { userId, wordId: { in: session.items.map((x) => x.wordId) } },
     }),
@@ -157,12 +167,23 @@ async function sessionView(db: Db, userId: string, session: FullSession) {
           include: wordInclude,
         })
       : Promise.resolve([]),
+    hiddenIds.length
+      ? db.learningSense.findMany({
+          where: { wordId: { in: hiddenIds }, status: { in: ['published', 'held'] } },
+          select: { wordId: true, status: true, contentMetadata: true },
+        })
+      : Promise.resolve([]),
   ]);
   return sessionDto(
     session,
     progress,
     deferred?.deferredUntil ?? null,
     new Map(currentWords.map((word) => [word.id, wordDto(word)])),
+    new Map(
+      hiddenPolicies
+        .filter((sense) => !wordPronunciationCompatible({ learningSenses: [sense] }))
+        .map((sense) => [sense.wordId, false]),
+    ),
   );
 }
 type PendingReservation = {
@@ -338,7 +359,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
         bucket: 'new' | 'review',
         focusSenseId: string | null = null,
       ) => {
-        const focus = selectLearningSense(word.senses, focusSenseId);
+        const focus = selectWordLearningSense(word, focusSenseId);
         if (focus && chosen.length < size && !chosen.some((item) => item.word.id === word.id))
           chosen.push({
             word,

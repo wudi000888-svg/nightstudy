@@ -546,7 +546,10 @@ async function readSite(db, siteId) {
           contentMetadata: true,
         },
       },
-      examples: { select: { id: true, exampleZh: true, exampleEn: true, contentMetadata: true } },
+      examples: {
+        where: { learningSenseId: null },
+        select: { id: true, exampleZh: true, exampleEn: true, contentMetadata: true },
+      },
     },
   });
   const state = await db.siteState.findUniqueOrThrow({
@@ -602,7 +605,8 @@ async function verifyAudio(db, data, verifiedAudioBytes) {
 async function verifyPrebuiltAdditions(db, verifiedAudioBytes, polishedCatalog) {
   const summary = {};
   const pins = ['word-audio-v2.manifest.json', 'sentence-audio.manifest.json'];
-  if (polishedCatalog) pins.push('sentence-audio-v2.manifest.json');
+  if (polishedCatalog)
+    pins.push('sentence-audio-v2.manifest.json', 'sentence-audio-v3.manifest.json');
   const sentenceIdentities = new Set();
   for (const filename of pins) {
     const file = new URL('../data/' + filename, import.meta.url);
@@ -938,7 +942,11 @@ async function readPhrases(db, bundle) {
   const ids = bundle.rows.map((row) => row.sourceWordId);
   const words = await db.word.findMany({
     where: { id: { in: ids } },
-    include: { senses: true, examples: true, audio: { where: { status: 'ready' } } },
+    include: {
+      senses: true,
+      examples: { where: { learningSenseId: null } },
+      audio: { where: { status: 'ready' } },
+    },
   });
   const collocations = await db.wordCollocation.findMany({
     where: { phraseId: { in: ids } },

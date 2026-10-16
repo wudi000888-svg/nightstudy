@@ -436,6 +436,54 @@ suite('PostgreSQL private wordbooks, validated imports and user isolation', () =
     }
   });
 
+  it('rejects newly withdrawn heteronym pronunciation at preview and confirmation without deleting existing assets', async () => {
+    const preview = await upload([lemmas[0]!], `${prefix}-withdrawn-pronunciation`);
+    const id = `${prefix}-withdrawn-meaning`;
+    const beforeAudio = await db.wordAudio.findMany({
+      where: { wordId: wordIds[0]! },
+      orderBy: { accent: 'asc' },
+    });
+    const beforeBookCount = await db.book.count({ where: { ownerId: userA } });
+    await db.learningSense.create({
+      data: {
+        id,
+        wordId: wordIds[0]!,
+        pos: 'n.',
+        definitionZh: '合成测试义项',
+        definitionEn: 'A synthetic policy fixture.',
+        status: 'held',
+        contentVersion: 'test-only',
+        bindingHash: 'a'.repeat(64),
+        contentMetadata: {
+          pronunciation: {
+            wordAudioCompatible: false,
+            reason: 'Original test fixture: pronunciation withdrawn after preview.',
+          },
+        },
+      },
+    });
+    try {
+      const failed = await upload([lemmas[0]!], `${prefix}-withdrawn-after`);
+      expect(failed.items[0]).toMatchObject({
+        status: 'failed',
+        readiness: { phoneticUs: false, phoneticUk: false, audioUs: false, audioUk: false },
+      });
+      const confirmed = await request(
+        'POST',
+        `/custom-books/imports/${preview.import.id}/confirm`,
+        { commandId: randomUUID() },
+      );
+      expect(confirmed.statusCode).toBe(409);
+      expect(confirmed.json().code).toBe('custom_import_no_ready_words');
+      expect(await db.book.count({ where: { ownerId: userA } })).toBe(beforeBookCount);
+      expect(
+        await db.wordAudio.findMany({ where: { wordId: wordIds[0]! }, orderBy: { accent: 'asc' } }),
+      ).toEqual(beforeAudio);
+    } finally {
+      await db.learningSense.delete({ where: { id } });
+    }
+  });
+
   it('enforces authenticated uploads, route-specific size limits, strict templates and preview expiry', async () => {
     expect((await request('POST', '/custom-books/imports', {}, null)).statusCode).toBe(401);
     const malformed = await request('POST', '/custom-books/imports', {

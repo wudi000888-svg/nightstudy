@@ -187,7 +187,9 @@ suite('PostgreSQL complete private wordbook pagination and exact ownership', () 
         seen.push(item.id);
         seenWordIds.push(item.wordId);
         expect(item.word.id).toBe(item.wordId);
-        expect(item.word.senses[0].definitionZh).toBe('生词本分页合成测试词条');
+        expect(item.word.definitionZh).toBe('生词本分页合成测试词条');
+        expect(item.word).not.toHaveProperty('senses');
+        expect(item.word).not.toHaveProperty('examples');
         lastItem = item;
       }
       if (!value.page.hasMore) {
@@ -213,21 +215,25 @@ suite('PostgreSQL complete private wordbook pagination and exact ownership', () 
       favorite: false,
       paused: true,
       note: `${prefix}-note-0`,
-      progress: {
-        wordId: oldest.id,
-        revision: 7,
-        reps: 3,
-        state: 2,
-        dueAt: dueAt.toISOString(),
-        firstLearnedAt: learnedAt.toISOString(),
-      },
+    });
+    expect(lastItem).not.toHaveProperty('progress');
+    expect(
+      await db.studyProgress.findUniqueOrThrow({
+        where: { userId_wordId: { userId: owner, wordId: oldest.id } },
+      }),
+    ).toMatchObject({
+      wordId: oldest.id,
+      revision: 7,
+      fsrsJson: { reps: 3, state: 2 },
+      dueAt,
+      firstLearnedAt: learnedAt,
     });
   });
 
   it('returns an empty private collection and rejects another user or site cursor without leaking rows', async () => {
     const empty = await request('/wordbook', other);
     expect(empty.statusCode).toBe(200);
-    expect(empty.json()).toEqual({
+    expect(empty.json()).toMatchObject({
       items: [],
       page: { total: 0, hasMore: false, nextCursor: null },
     });

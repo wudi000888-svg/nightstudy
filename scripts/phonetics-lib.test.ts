@@ -105,7 +105,8 @@ describe('licensed IPA pack invariants', () => {
       wordHasSiteEdits: false,
     });
     expect(dto.senses[0]?.exampleSource).toBeNull();
-    expect(dto.senses[1]?.exampleSource).toMatchObject({
+    expect(dto.senses[1]?.exampleSource).toBeNull();
+    expect(catalogWordDto(word, [pack], false, true).senses[1]?.exampleSource).toMatchObject({
       kind: 'original-demo',
       reference: 'NightStudy original demo',
     });

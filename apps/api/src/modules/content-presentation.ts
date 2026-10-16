@@ -1,6 +1,3 @@
-import { createHash } from 'node:crypto';
-import type { Sense } from '@prisma/client';
-import { learningDefinitionView } from './learning-definitions.js';
 const obj = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -77,159 +74,81 @@ export function summarySenses<T extends ContentText>(senses: T[], limit = 3): T[
   return senses.filter((sense) => selected.has(sense));
 }
 
-function mergeMissingText(
-  original: Record<string, unknown>,
-  current: Record<string, unknown>,
-  fields: readonly string[],
-  allowed: boolean,
-) {
-  const merged = { ...original };
-  const metadata = { ...obj(original.contentMetadata) };
-  const currentMetadata = obj(current.contentMetadata);
-  let changed = false;
-  for (const field of fields) {
-    if (allowed && !textPresent(original[field]) && textPresent(current[field])) {
-      merged[field] = current[field];
-      if (currentMetadata[field]) metadata[field] = currentMetadata[field];
-      else delete metadata[field];
-      changed = true;
-    } else if (
-      !metadata[field] &&
-      sameText(original[field], current[field]) &&
-      currentMetadata[field]
-    ) {
-      // A provenance label is safe only for the exact visible text it describes.
-      metadata[field] = currentMetadata[field];
-      changed = true;
-    }
-  }
-  if (Object.keys(metadata).length) {
-    if (!metadata.packId && currentMetadata.packId) metadata.packId = currentMetadata.packId;
-    merged.contentMetadata = metadata;
-  }
-  return { merged, changed };
-}
-function compatibleMeaning(original: Record<string, unknown>, current: Record<string, unknown>) {
-  for (const field of [...definitionFields, 'pos']) {
-    if (textPresent(original[field]) && !sameText(original[field], current[field])) return false;
-  }
-  return true;
-}
-function compatibleExample(original: Record<string, unknown>, current: Record<string, unknown>) {
-  return exampleFields.every(
-    (field) => !textPresent(original[field]) || sameText(original[field], current[field]),
-  );
+/** Current media withdrawal is a display policy, never a mutation of issued questions. */
+export function applyCurrentPronunciationPolicy(
+  snapshot: Record<string, unknown>,
+  compatible: boolean | undefined,
+): Record<string, unknown> {
+  if (compatible !== false && snapshot.pronunciationCompatible !== false) return snapshot;
+  return {
+    ...snapshot,
+    pronunciationCompatible: false,
+    phonetic: '',
+    phoneticUs: '',
+    phoneticUk: '',
+    phoneticSource: '',
+    phonetics: [],
+    audio: [],
+  };
 }
 
-/** Presentation only: never edits issued snapshots, questions, identity or accepted review history. */
+/** Only augment a signed meaning's display when its exact identity and evidence still match. */
 export function supplementIssuedWord(
   snapshot: Record<string, unknown>,
   current: Record<string, unknown>,
   wordId: string,
 ): Record<string, unknown> {
-  if (
-    current.id !== wordId ||
-    current.status !== 'published' ||
-    (textPresent(snapshot.id) && snapshot.id !== wordId)
-  )
+  if (current.id !== wordId || current.status !== 'published' || snapshot.id !== wordId)
     return snapshot;
-  const exclusions = Array.isArray(current.learningExclusions)
-    ? current.learningExclusions.map(obj)
-    : [];
-  const existingSenses = (Array.isArray(snapshot.senses) ? snapshot.senses.map(obj) : []).filter(
-    (sense) =>
-      !exclusions.some((exclusion) => {
-        const field = exclusion.field;
-        return (
-          exclusion.id === sense.id &&
-          exclusion.excludeFromLearning === true &&
-          (field === 'definitionZh' || field === 'definitionEn') &&
-          typeof sense[field] === 'string' &&
-          createHash('sha256').update(sense[field], 'utf8').digest('hex') ===
-            exclusion.sourceTextSha256
-        );
-      }),
+  const stored = Array.isArray(snapshot.senses) ? snapshot.senses.map(obj) : [];
+  const fresh = new Map(
+    (Array.isArray(current.senses) ? current.senses.map(obj) : [])
+      .filter((sense) => textPresent(sense.id))
+      .map((sense) => [sense.id, sense]),
   );
-  const currentSenses = Array.isArray(current.senses) ? current.senses.map(obj) : [];
-  const currentById = new Map(
-    currentSenses.filter((sense) => textPresent(sense.id)).map((sense) => [sense.id, sense]),
-  );
-  const usedSenseIds = new Set(existingSenses.map((sense) => sense.id));
   let supplemented = false;
-  const senses = existingSenses.map((stored) => {
-    const original = learningDefinitionView(stored as unknown as Sense) as unknown as Record<
-      string,
-      unknown
-    >;
-    supplemented ||= original !== stored;
-    const fresh = currentById.get(original.id);
-    if (!fresh) return original;
-    const definitions = mergeMissingText(
-      original,
-      fresh,
-      definitionFields,
-      compatibleMeaning(original, fresh),
+  const senses = stored.map((original) => {
+    const live = fresh.get(original.id);
+    if (
+      !live ||
+      original.kind !== 'learning' ||
+      live.kind !== 'learning' ||
+      !textPresent(original.bindingHash) ||
+      original.bindingHash !== live.bindingHash ||
+      !textPresent(original.contentVersion) ||
+      original.contentVersion !== live.contentVersion ||
+      ![...definitionFields, 'pos'].every((field) => sameText(original[field], live[field]))
+    )
+      return original;
+    const examples = Array.isArray(original.examples) ? original.examples.map(obj) : [];
+    const used = new Set(examples.map((example) => example.id));
+    const extra = (Array.isArray(live.examples) ? live.examples.map(obj) : []).filter(
+      (example) =>
+        textPresent(example.id) &&
+        !used.has(example.id) &&
+        example.learningSenseId === original.id &&
+        example.contentVersion === original.contentVersion &&
+        exampleFields.every((field) => textPresent(example[field])),
     );
-    const examples = mergeMissingText(
-      definitions.merged,
-      fresh,
-      exampleFields,
-      compatibleMeaning(original, fresh) && compatibleExample(original, fresh),
-    );
-    supplemented ||= definitions.changed || examples.changed;
-    if (!textPresent(original.pos) && textPresent(fresh.pos)) {
-      examples.merged.pos = fresh.pos;
-      supplemented = true;
-    }
-    return examples.merged;
+    if (!extra.length) return original;
+    supplemented = true;
+    return { ...original, examples: [...examples, ...extra] };
   });
-  for (const sense of currentSenses)
-    if (!usedSenseIds.has(sense.id)) {
-      senses.push(sense);
-      usedSenseIds.add(sense.id);
-      supplemented = true;
-    }
-  const existingExamples = Array.isArray(snapshot.examples) ? snapshot.examples.map(obj) : [];
-  const currentExamples = Array.isArray(current.examples) ? current.examples.map(obj) : [];
-  const examplesById = new Map(
-    currentExamples
-      .filter((example) => textPresent(example.id))
-      .map((example) => [example.id, example]),
-  );
-  const usedExampleIds = new Set(existingExamples.map((example) => example.id));
-  const examples = existingExamples.map((original) => {
-    const fresh = examplesById.get(original.id);
-    if (!fresh) return original;
-    const result = mergeMissingText(
-      original,
-      fresh,
-      exampleFields,
-      compatibleExample(original, fresh),
-    );
-    supplemented ||= result.changed;
-    return result.merged;
-  });
-  for (const example of currentExamples)
-    if (!usedExampleIds.has(example.id)) {
-      examples.push(example);
-      usedExampleIds.add(example.id);
-      supplemented = true;
-    }
   const oldWarnings = mergeLexicalWarnings(snapshot.lexicalWarnings);
   const lexicalWarnings = mergeLexicalWarnings(oldWarnings, current.lexicalWarnings);
   supplemented ||= lexicalWarnings.length !== oldWarnings.length;
   return {
-    ...snapshot,
-    ...(current.dictionaryName ? { dictionaryName: current.dictionaryName } : {}),
-    ...(current.entryKind ? { entryKind: current.entryKind } : {}),
-    ...(Array.isArray(current.collocations) && !Array.isArray(snapshot.collocations)
-      ? { collocations: current.collocations }
-      : {}),
+    ...applyCurrentPronunciationPolicy(
+      snapshot,
+      current.pronunciationCompatible as boolean | undefined,
+    ),
     senses,
-    examples,
     lexicalWarnings,
     senseCount: senses.length,
-    contentCoverage: contentCoverage(senses, examples),
+    contentCoverage: contentCoverage(
+      senses,
+      senses.flatMap((sense) => (Array.isArray(sense.examples) ? sense.examples.map(obj) : [])),
+    ),
     contentView: {
       snapshotVersion: typeof snapshot.contentVersion === 'string' ? snapshot.contentVersion : null,
       currentVersion: typeof current.contentVersion === 'string' ? current.contentVersion : null,

@@ -36,6 +36,7 @@ const packSource = z
       'word-audio-v2',
       'sentence-audio-v1',
       'sentence-audio-v2',
+      'sentence-audio-v3',
     ]),
     status: z.literal('ready'),
     source: pinnedSource,
@@ -62,6 +63,7 @@ const builtPack = z
       'word-audio-v2',
       'sentence-audio-v1',
       'sentence-audio-v2',
+      'sentence-audio-v3',
     ]),
     status: z.literal('ready'),
     sourceManifestSha256: z.string(),
@@ -427,6 +429,7 @@ async function main() {
     'word-audio-v2.manifest.json',
     'sentence-audio.manifest.json',
     'sentence-audio-v2.manifest.json',
+    'sentence-audio-v3.manifest.json',
   ]) {
     const source = packSource.parse(
       JSON.parse(await fs.readFile(path.join('data', filename), 'utf8')),

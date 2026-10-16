@@ -17,6 +17,7 @@ import {
   type Db,
 } from './shared.js';
 import { decodeCursor, pageInfo } from './pagination.js';
+import { verifiedLearningSenses, type AtomicLearningSense } from './learning-sense-view.js';
 
 const listInput = z
   .object({
@@ -106,12 +107,34 @@ const sentenceDto = (row: LibrarySentence) => ({
   createdAt: row.createdAt.toISOString(),
 });
 type SentenceSourceType = 'word-example' | 'sense';
+const validBoundSource = (source: {
+  wordId: string;
+  contentVersion: string;
+  learningSense: Omit<AtomicLearningSense, 'examples'> | null;
+}) =>
+  source.learningSense !== null &&
+  source.contentVersion === source.learningSense.contentVersion &&
+  verifiedLearningSenses({
+    id: source.wordId,
+    learningSenses: [{ ...source.learningSense, examples: [] }],
+  }).length === 1;
 type SentenceSource = {
   id: string;
   wordId: string;
   exampleEn: string;
   exampleZh: string;
   contentMetadata: Prisma.JsonValue;
+  learningSenseId?: string | null;
+  contextLabel?: string;
+  contentVersion?: string;
+  learningSense?: {
+    id: string;
+    pos: string;
+    definitionZh: string;
+    definitionEn: string;
+    contentVersion: string;
+    bindingHash: string;
+  } | null;
   word: { sourceRef: string; contentVersion: string };
 };
 function sentenceSnapshot(sourceType: SentenceSourceType, source: SentenceSource) {
@@ -120,6 +143,21 @@ function sentenceSnapshot(sourceType: SentenceSourceType, source: SentenceSource
     sourceWordId: source.wordId,
     sourceRef: source.word.sourceRef,
     contentVersion: source.word.contentVersion,
+    ...(source.learningSense
+      ? {
+          learningSenseId: source.learningSenseId,
+          contextLabel: source.contextLabel,
+          exampleContentVersion: source.contentVersion,
+          meaning: {
+            id: source.learningSense.id,
+            pos: source.learningSense.pos,
+            definitionZh: source.learningSense.definitionZh,
+            definitionEn: source.learningSense.definitionEn,
+            contentVersion: source.learningSense.contentVersion,
+            bindingHash: source.learningSense.bindingHash,
+          },
+        }
+      : {}),
   };
   return {
     metadata,
@@ -324,26 +362,28 @@ export async function registerLearningLibrary(app: FastifyInstance, getContext: 
           sourceRef: true,
           contentVersion: true,
           examples: {
-            where: { exampleEn: { not: '' }, exampleZh: { not: '' } },
+            where: {
+              status: 'published',
+              learningSense: { status: 'published' },
+              exampleEn: { not: '' },
+              exampleZh: { not: '' },
+            },
             orderBy: [{ ordinal: 'asc' }, { id: 'asc' }],
             take: sentenceSourceLimit + 1,
-          },
-          senses: {
-            where: { exampleEn: { not: '' }, exampleZh: { not: '' } },
-            orderBy: [{ ordinal: 'asc' }, { id: 'asc' }],
-            take: sentenceSourceLimit + 1,
+            include: {
+              learningSense: { include: { sourceBindings: { include: { sourceSense: true } } } },
+            },
           },
         },
       });
       if (!word) throw new HttpError(404, 'word_not_found');
       // Never silently omit identities and incorrectly label an existing favorite as unsaved.
-      if (word.examples.length + word.senses.length > sentenceSourceLimit)
+      if (word.examples.length > sentenceSourceLimit)
         throw new HttpError(413, 'sentence_sources_limit', '该词例句数量超过单次状态查询上限');
       const sources = [
-        ...word.examples.map((source) => ({ sourceType: 'word-example' as const, source })),
-        ...word.senses
-          .filter(learningSense)
-          .map((source) => ({ sourceType: 'sense' as const, source })),
+        ...word.examples
+          .filter(validBoundSource)
+          .map((source) => ({ sourceType: 'word-example' as const, source })),
       ]
         .filter(({ source }) => source.exampleEn.trim() && source.exampleZh.trim())
         .map(({ sourceType, source }) => ({
@@ -383,7 +423,7 @@ export async function registerLearningLibrary(app: FastifyInstance, getContext: 
       input = parse(
         z
           .object({
-            sourceType: z.enum(['word-example', 'sense']),
+            sourceType: z.literal('word-example'),
             sourceId: id,
             wordId: id.optional(),
           })
@@ -392,26 +432,25 @@ export async function registerLearningLibrary(app: FastifyInstance, getContext: 
       );
     return transact(ctx.prisma, async (tx) => {
       await lockLibraryUser(tx, user.id);
-      const sense =
-        input.sourceType === 'sense'
-          ? await tx.sense.findFirst({
-              where: { id: input.sourceId, word: { status: 'published' } },
-              include: { word: { select: { id: true, sourceRef: true, contentVersion: true } } },
-            })
-          : null;
-      const source =
-        input.sourceType === 'word-example'
-          ? await tx.wordExample.findFirst({
-              where: { id: input.sourceId, word: { status: 'published' } },
-              include: { word: { select: { id: true, sourceRef: true, contentVersion: true } } },
-            })
-          : sense;
+      const source = await tx.wordExample.findFirst({
+        where: {
+          id: input.sourceId,
+          status: 'published',
+          learningSense: { status: 'published' },
+          word: { status: 'published' },
+        },
+        include: {
+          word: { select: { id: true, sourceRef: true, contentVersion: true } },
+          learningSense: { include: { sourceBindings: { include: { sourceSense: true } } } },
+        },
+      });
       if (
         !source ||
         (input.wordId && source.wordId !== input.wordId) ||
         !source.exampleEn.trim() ||
         !source.exampleZh.trim() ||
-        (sense && !learningSense(sense))
+        !source.learningSenseId ||
+        !validBoundSource(source)
       )
         throw new HttpError(404, 'sentence_source_not_found', '例句不存在或当前不可收藏');
       const { metadata, sourceHash } = sentenceSnapshot(input.sourceType, source);

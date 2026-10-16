@@ -32,6 +32,15 @@ const word: Word = {
       definitionEn: 'Water is a clear liquid. Café is unchanged.',
       exampleEn: 'Drink water beside the window.',
       exampleZh: '在 window 旁喝水。',
+      examples: [
+        {
+          id: 'sense-example-1',
+          learningSenseId: 'sense-1',
+          contextLabel: '饮水',
+          exampleEn: 'Drink water beside the window.',
+          exampleZh: '在 window 旁喝水。',
+        },
+      ],
     },
   ],
   examples: [
@@ -121,21 +130,22 @@ it('keeps text plain when interaction is explicitly disabled or no card context 
   );
 });
 
-it('renders bilingual definitions and independent word examples with only English columns interactive', () => {
+it('renders the selected bilingual meaning and only its own context with English interaction', () => {
   const markup = render(h(WordView, { word }));
-  expect(markup).toContain('中英释义对照');
-  expect(markup).toContain('class="meaning-zh"');
-  expect(markup).toContain('class="meaning-en"');
-  expect(markup).toContain('class="example-en"');
-  expect(markup).toContain('class="example-zh"');
-  expect(markup).toContain('中文 water 释义');
-  expect(markup).toContain('在 window 旁喝水。');
+  for (const text of [
+    '中英释义对照',
+    'class="meaning-zh"',
+    'class="meaning-en"',
+    'class="example-en"',
+    'class="example-zh"',
+    '中文 water 释义',
+    '在 window 旁喝水。',
+    '饮水',
+  ])
+    expect(markup).toContain(text);
+  expect(markup).not.toContain('河流运送水。');
   expect(markup).not.toContain('查词 中文');
   expect(markup).not.toContain('查词 Café');
-  const usageStart = markup.indexOf('aria-label="单词用法例句"');
-  expect(usageStart).toBeGreaterThan(markup.indexOf('中英释义对照'));
-  expect(markup.slice(usageStart)).toContain('河流运送水。');
-  expect(markup.slice(0, usageStart)).not.toContain('河流运送水。');
   expect(markup).toContain('class="word-token"');
 });
 
@@ -145,7 +155,7 @@ it('word-card content cannot trigger another card even within an active outer co
   expect(markup).not.toContain('aria-haspopup="dialog"');
   expect(markup).toContain('Water is a clear liquid. Café is unchanged.');
   expect(markup).toContain('Drink water beside the window.');
-  expect(markup).toContain('The river carries water.');
+  expect(markup).not.toContain('The river carries water.');
   expect((markup.match(/class="audio-button pronunciation-speaker"/g) ?? []).length).toBe(2);
   expect(cardActions.openWord).not.toHaveBeenCalled();
 });
@@ -160,7 +170,7 @@ it('shows a real definition empty state even when the optional senses field is a
   expect(hidden).not.toContain('word-example-empty');
 });
 
-it('renders actual single-language content without inventing a paired translation or empty cells', () => {
+it('retains a single-language definition without treating an unbound sentence as its context', () => {
   const markup = render(
     h(WordView, {
       word: {
@@ -170,20 +180,18 @@ it('renders actual single-language content without inventing a paired translatio
             id: 'missing-zh',
             definitionZh: '',
             definitionEn: 'Actual definition',
-            exampleEn: 'Actual sentence.',
+            exampleEn: 'Unreviewed sentence.',
           },
         ],
         examples: [{ id: 'partial', exampleEn: 'A real independent example.', exampleZh: '' }],
       },
     }),
   );
-  expect(markup).not.toContain('暂无中文释义。');
-  expect(markup).not.toContain('暂无中文译文。');
-  expect(markup).not.toContain('word-example-empty');
-  expect(markup).toContain('aria-label="英文例句"');
   expect(markup).toContain('Actual');
-  expect(markup).toContain('independent');
-  expect(markup).not.toContain('中英例句对照');
+  expect(markup).toContain('本义项暂无例句。');
+  expect(markup).not.toContain('Unreviewed sentence');
+  expect(markup).not.toContain('independent');
+  expect(markup).not.toContain('中英释义对照');
 });
 
 it('keeps model and review metadata out of learning definitions without inventing missing text', () => {
@@ -270,7 +278,7 @@ it('keeps actual word-level examples plain and hides their generation metadata',
   expect(markup).not.toContain('class="word-token"');
 });
 
-it('keeps the focused meaning expanded while preserving other complete meanings in closed details', () => {
+it('selects the requested meaning while offering a compact directory for other meanings', () => {
   const value: Word = {
     ...word,
     senses: [
@@ -280,13 +288,13 @@ it('keeps the focused meaning expanded while preserving other complete meanings 
     ],
   };
   const markup = render(h(WordView, { word: value, focusSenseId: 'focus' }));
-  const firstCollapsed = markup.indexOf('<details class="sense sense-collapsed"');
-  expect(markup.indexOf('当前重点释义')).toBeLessThan(firstCollapsed);
-  expect((markup.match(/<details class="sense sense-collapsed"/g) ?? []).length).toBe(2);
-  expect(markup).not.toMatch(/<details class="sense sense-collapsed"[^>]* open/);
-  expect(markup).toContain('Other');
-  expect(markup).toContain('Third');
-  expect(render(h(WordView, { word: value, hideMeanings: true }))).not.toContain('sense-collapsed');
+  expect(markup).toContain('aria-label="选择词义"');
+  expect(markup).toContain('aria-pressed="true"');
+  expect(markup).toContain('Focused');
+  expect(markup).not.toContain('Other full');
+  expect(markup).not.toContain('Third full');
+  expect(markup).toContain('第三释义');
+  expect(render(h(WordView, { word: value, hideMeanings: true }))).not.toContain('选择词义');
 });
 
 it('keeps source quality notes outside learning while retaining actual meanings', () => {
@@ -410,69 +418,65 @@ it('keeps correction and historical model metadata out of the learning surface',
   expect(markup).not.toContain('word-token');
 });
 
-it('places independent bilingual examples directly after the focused meaning and before other meanings', () => {
+it('keeps examples inside the selected meaning instead of sharing word-level candidates', () => {
   const value: Word = {
     ...word,
     senses: [
       { id: 'other', definitionZh: '后续义项', definitionEn: 'Another meaning.' },
-      { id: 'focus', definitionZh: '重点义项', definitionEn: 'Focused meaning.' },
-      { id: 'last', definitionZh: '最后义项', definitionEn: 'Last meaning.' },
+      {
+        id: 'focus',
+        definitionZh: '重点义项',
+        definitionEn: 'Focused meaning.',
+        examples: [
+          {
+            id: 'bound',
+            learningSenseId: 'focus',
+            contextLabel: '真实场景',
+            exampleEn: 'This is the focused example.',
+            exampleZh: '这是重点义项例句。',
+          },
+        ],
+      },
     ],
   };
   const markup = render(h(WordView, { word: value, focusSenseId: 'focus' }));
-  const focus = markup.indexOf('重点义项');
-  const examples = markup.indexOf('aria-label="单词用法例句"');
-  const collapsed = markup.indexOf('<details class="sense sense-collapsed"');
-  expect(focus).toBeGreaterThan(0);
-  expect(examples).toBeGreaterThan(focus);
-  expect(collapsed).toBeGreaterThan(examples);
-  expect(markup.indexOf('河流运送水。')).toBeLessThan(collapsed);
-  expect(markup).not.toContain('word-example-empty');
-  const cardMarkup = render(h(WordCardContent, { word: value }));
-  expect(cardMarkup).not.toContain('word-token');
-  expect(render(h(WordView, { word: value, hideMeanings: true }))).not.toContain('单词用法例句');
+  expect(markup).toContain('这是重点义项例句。');
+  expect(markup).toContain('真实场景');
+  expect(markup).not.toContain('河流运送水。');
+  expect(markup).not.toContain('Another');
+  expect(render(h(WordView, { word: value, hideMeanings: true }))).not.toContain('例句');
 });
 
-it('omits an empty example section while retaining actual sense examples', () => {
+it('states a meaning-specific gap until a bilingual example is actually bound', () => {
   const empty: Word = {
     ...word,
-    senses: [
-      { id: 'one', definitionZh: '第一义项', definitionEn: 'First meaning.' },
-      { id: 'two', definitionZh: '第二义项', definitionEn: 'Second meaning.' },
-    ],
-    examples: [],
+    senses: [{ id: 'one', definitionZh: '第一义项', definitionEn: 'First meaning.' }],
+    examples: word.examples,
   };
-  const markup = render(h(WordView, { word: empty }));
-  expect(markup).not.toContain('word-example-empty');
-  expect(markup).not.toContain('暂无中英对照例句。');
-  const withSenseExample = render(
+  expect(render(h(WordView, { word: empty }))).toContain('本义项暂无例句。');
+  const prepared = render(
     h(WordView, {
       word: {
         ...empty,
         senses: [
           {
             ...empty.senses![0]!,
-            exampleEn: 'A real sense sentence.',
-            exampleZh: '义项例句译文。',
-            exampleSource: {
-              kind: 'original-demo',
-              reference: 'test sense source',
-              packId: null,
-              license: 'MIT',
-              sourceUrl: null,
-              wordHasSiteEdits: false,
-              siteEditVersion: null,
-            },
+            examples: [
+              {
+                id: 'prepared',
+                learningSenseId: 'one',
+                exampleEn: 'A real sense sentence.',
+                exampleZh: '义项例句译文。',
+              },
+            ],
           },
-          empty.senses![1]!,
         ],
       },
     }),
   );
-  expect(withSenseExample).toContain('义项例句译文。');
-  expect(withSenseExample).not.toContain('例句来源 · test sense source · MIT');
-  expect(withSenseExample).not.toContain('word-example-empty');
-  expect(withSenseExample).not.toContain('单词用法例句');
+  expect(prepared).toContain('义项例句译文。');
+  expect(prepared).not.toContain('本义项暂无例句。');
+  expect(prepared).not.toContain('河流运送水。');
 });
 
 it('keeps all meanings, examples and provenance hidden until the study reveal', () => {
@@ -498,41 +502,22 @@ it('keeps all meanings, examples and provenance hidden until the study reveal', 
   expect(markup).toContain('water');
 });
 
-it('keeps independent English meanings collapsed after examples without inventing a translation pairing', () => {
+it('keeps independent dictionary meanings selectable without pairing them by shared POS', () => {
   const value: Word = {
     ...word,
     senses: [
-      { id: 'verb', pos: 'v.', definitionZh: '', definitionEn: 'To supply plants with liquid.' },
-      { id: 'noun', pos: 'n.', definitionZh: '', definitionEn: 'A transparent natural liquid.' },
       { id: 'focus', pos: 'n.', definitionZh: '水；水域' },
-      { id: 'other-chinese', pos: 'v.', definitionZh: '给植物浇水' },
-      {
-        id: 'non-native',
-        pos: 'n.',
-        definitionZh: '',
-        definitionEn: 'A translated definition.',
-        contentMetadata: { definitionEn: { kind: 'machine-translation', sourceLanguage: 'zh' } },
-      },
+      { id: 'native', pos: 'n.', definitionZh: '', definitionEn: 'An independent explanation.' },
     ],
   };
   const markup = render(h(WordView, { word: value, focusSenseId: 'focus' }));
-  const section = markup.indexOf('aria-label="英文解释"');
-  const exampleSection = markup.indexOf('aria-label="单词用法例句"');
-  const native = markup.slice(section, markup.indexOf('</details>', section));
-  expect(section).toBeGreaterThan(exampleSection);
-  expect(markup).toContain('<details class="word-english-explanations"');
-  expect(markup).not.toContain('<details class="word-english-explanations" open');
-  expect(native.indexOf('transparent')).toBeLessThan(native.indexOf('supply'));
-  expect(native).toContain('<span class="sense-pos">n.</span>');
-  expect(native).toContain('<span class="sense-pos">v.</span>');
-  expect(native).not.toContain('中英释义对照');
-  expect(native).not.toContain('translated');
-  expect(markup).not.toContain('暂无英文释义');
-  expect(render(h(WordCardContent, { word: value }))).not.toContain('word-token');
-  const hidden = render(h(WordView, { word: value, hideMeanings: true }));
-  expect(hidden).not.toContain('英文解释');
-  expect(hidden).not.toContain('transparent');
-  expect(hidden).not.toContain('水；水域');
+  const body = markup.slice(markup.indexOf('class="study-meaning-copy"'));
+  expect(body).toContain('水；水域');
+  expect(body).not.toContain('independent');
+  expect(body).not.toContain('中英释义对照');
+  const selected = render(h(WordView, { word: value, focusSenseId: 'native', interactive: false }));
+  expect(selected).toContain('An independent explanation.');
+  expect(selected).not.toContain('中英释义对照');
 });
 
 it('keeps complete long bilingual meanings behind a readable preview and preserves sentence context', () => {
@@ -549,6 +534,14 @@ it('keeps complete long bilingual meanings behind a readable preview and preserv
         definitionEn: english,
         exampleEn: 'The rain has stopped.',
         exampleZh: '雨已经停了。',
+        examples: [
+          {
+            id: 'rain-stopped',
+            learningSenseId: 'long',
+            exampleEn: 'The rain has stopped.',
+            exampleZh: '雨已经停了。',
+          },
+        ],
       },
     ],
     examples: [],
@@ -566,11 +559,23 @@ it('keeps complete long bilingual meanings behind a readable preview and preserv
   expect(definitionPreview('雨'.repeat(200), 'zh-CN')).toBe('雨'.repeat(72) + '…');
 });
 
-it('opens both example languages in study while leaving unrelated English meanings out of the primary meaning', () => {
+it('opens the current bilingual context in study without importing another meaning', () => {
   const value: Word = {
     ...word,
     senses: [
-      { id: 'focus', pos: 'n.', definitionZh: '水；水域' },
+      {
+        id: 'focus',
+        pos: 'n.',
+        definitionZh: '水；水域',
+        examples: [
+          {
+            id: 'own',
+            learningSenseId: 'focus',
+            exampleEn: 'The river carries water.',
+            exampleZh: '河流运送水。',
+          },
+        ],
+      },
       {
         id: 'native',
         pos: 'n.',
@@ -580,15 +585,11 @@ it('opens both example languages in study while leaving unrelated English meanin
     ],
   };
   const markup = render(h(WordView, { word: value, presentation: 'study', interactive: false }));
-  const context = markup.indexOf('<details class="study-context-card" open="">');
-  const independent = markup.indexOf('<details class="study-independent-english"');
-  expect(context).toBeGreaterThan(0);
-  expect(independent).toBeGreaterThan(context);
-  expect(markup).not.toContain('<details class="study-independent-english" open');
+  expect(markup).toContain('<details class="study-context-card" open="">');
   expect(markup).toContain('The river carries water.');
   expect(markup).toContain('河流运送水。');
-  expect(markup.slice(0, context)).not.toContain('independent dictionary');
-  expect(markup.slice(0, context)).not.toContain('中英释义对照');
+  expect(markup).not.toContain('independent dictionary');
+  expect(markup).not.toContain('中英释义对照');
 });
 
 it('renders only real collocations and keeps them plain in cards and absent before reveal', () => {
@@ -672,38 +673,48 @@ it('uses a filled saved star with an immediate functional hover and keyboard hin
   expect(consolidated).not.toContain('加入生词本');
 });
 
-it('keeps unrelated native English senses folded even after the primary definition is bilingual', () => {
+it('uses raw dictionary definitions only when no prepared learning meanings exist', () => {
   const value: Word = {
     ...word,
-    senses: [
-      ...word.senses!,
+    dictionarySenses: [
+      { id: 'raw', pos: 'v.', definitionZh: '', definitionEn: 'To supply plants with liquid.' },
+    ],
+  };
+  expect(render(h(WordView, { word: value }))).not.toContain('supply');
+  const raw = render(h(WordView, { word: { ...value, senses: [] }, interactive: false }));
+  expect(raw).toContain('To supply plants with liquid.');
+  expect(raw).toContain('本义项暂无例句。');
+  expect(raw).not.toContain('在 window 旁喝水。');
+});
+
+it('offers raw dictionary explanations beside prepared meanings only in reading mode', () => {
+  const value: Word = {
+    ...word,
+    senses: [{ ...word.senses![0]!, kind: 'learning' }],
+    dictionarySenses: [
       {
-        id: 'independent-verb',
+        id: 'raw-other',
         pos: 'v.',
-        definitionZh: '',
+        definitionZh: '浇水',
         definitionEn: 'To supply plants with liquid.',
       },
     ],
   };
-  const markup = render(h(WordView, { word: value }));
-  const section = markup.indexOf('<details class="word-english-explanations"');
-  expect(section).toBeGreaterThan(markup.indexOf('aria-label="单词用法例句"'));
-  expect(markup.slice(section)).toContain('supply');
-  expect(markup.slice(0, section)).not.toContain('supply');
-  expect(markup).not.toContain('<details class="word-english-explanations" open');
+  expect(render(h(WordView, { word: value }))).toContain('更多词典释义');
+  expect(render(h(WordCardContent, { word: value }))).toContain('更多词典释义');
+  expect(render(h(WordView, { word: value, presentation: 'study' }))).not.toContain('更多词典释义');
+  expect(render(h(WordView, { word: value, hideMeanings: true }))).not.toContain('更多词典释义');
+  expect(render(h(WordView, { word: { ...value, senses: [] } }))).not.toContain('更多词典释义');
 });
 
-it('shows a sentence once when the primary sense and word-level list contain the identical bilingual pair', () => {
-  const example = {
-    id: 'duplicate-1',
-    exampleEn: word.senses![0]!.exampleEn!,
-    exampleZh: word.senses![0]!.exampleZh!,
-  };
+it('deduplicates bound bilingual examples without reintroducing duplicate word-level candidates', () => {
+  const example = word.senses![0]!.examples![0]!;
   const value: Word = {
     ...word,
-    examples: [example, { ...example, id: 'duplicate-2' }, ...word.examples!],
+    senses: [{ ...word.senses![0]!, examples: [example, { ...example, id: 'same-pair' }] }],
+    examples: [example, ...word.examples!],
   };
   const markup = render(h(WordView, { word: value }));
   expect(markup.split('在 window 旁喝水。').length - 1).toBe(1);
-  expect(markup).toContain('河流运送水。');
+  expect(markup).not.toContain('河流运送水。');
 });

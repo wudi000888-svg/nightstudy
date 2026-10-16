@@ -230,17 +230,19 @@ suite('PostgreSQL bilingual catalog and read-only issued word supplementation', 
     await db.$disconnect();
     fs.rmSync(webRoot, { recursive: true, force: true });
   }, 60000);
-  it('keeps independent language senses visible in catalog summaries and excludes derived bilingual pack counts', async () => {
+  it('keeps one precise summary meaning, preserves source details, and excludes derived pack counts', async () => {
     const summary = await request('GET', `/dictionary?q=${lemma}`, undefined, null);
     expect(summary.statusCode).toBe(200);
     const word = summary.json().items.find((item: { id: string }) => item.id === wordId);
-    expect(word.senses).toHaveLength(3);
-    expect(word.senses.some((sense: { definitionEn: string }) => sense.definitionEn)).toBe(true);
-    expect(word.contentCoverage).toMatchObject({
-      definitionZh: true,
-      definitionEn: true,
-      bilingualSenseCount: 0,
-    });
+    expect(word.definitionZh).toBe('原始合成中文义一');
+    expect(word.definitionEn).toBe('');
+    expect(word).not.toHaveProperty('senses');
+    expect(word).not.toHaveProperty('contentCoverage');
+    const sourceDetail = (await request('GET', `/words/${wordId}`, undefined, null)).json().word;
+    expect(sourceDetail.senses).toHaveLength(4);
+    expect(sourceDetail.senses.some((sense: { definitionEn: string }) => sense.definitionEn)).toBe(
+      true,
+    );
     const before = (await request('GET', '/dictionary/stats', undefined, null)).json()
       .declaredEntryCount;
     await db.contentPack.create({
@@ -314,23 +316,19 @@ suite('PostgreSQL bilingual catalog and read-only issued word supplementation', 
     expect(revealed.statusCode, revealed.body).toBe(200);
     session = revealed.json().session;
     expect(session.items[0].focusSenseId).toBe(firstSense);
+    // An issued dictionary meaning cannot acquire newly classified meanings or unbound usages.
     expect(session.items[0].word.senses[0]).toMatchObject({
       id: firstSense,
       definitionZh: '原始合成中文义一',
-      definitionEn: 'A synthetic translation of original Chinese meaning one.',
-      exampleEn: 'Original English test usage.',
-      exampleZh: '原英文测试用例的合成译文。',
-      contentMetadata: { definitionEn: translated },
+      definitionEn: '',
+      examples: [],
     });
     expect(
       session.items[0].word.senses.some((sense: { id: string }) => sense.id === newSense),
-    ).toBe(true);
-    expect(session.items[0].word.examples[0]).toMatchObject({
-      id: `${wordId}-usage-pair`,
-      contentMetadata: { exampleEn: corpus },
-    });
+    ).toBe(false);
+    expect(session.items[0].word).not.toHaveProperty('examples');
     expect(session.items[0].word.contentView).toMatchObject({
-      supplemented: true,
+      supplemented: false,
       snapshotVersion: 'original-fixture-v1',
     });
     const read = await request('GET', `/study/sessions/${session.id}`);
@@ -382,10 +380,12 @@ suite('PostgreSQL bilingual catalog and read-only issued word supplementation', 
     const saved = (await request('GET', '/wordbook'))
       .json()
       .items.find((item: { wordId: string }) => item.wordId === wordId);
-    expect(saved.word.contentCoverage).toMatchObject({
-      bilingualSenseCount: 1,
-      bilingualExampleCount: 2,
-    });
+    expect(saved.word.definitionZh).toBe('原始合成中文义一');
+    expect(saved.word.definitionEn).toBe(
+      'A synthetic translation of original Chinese meaning one.',
+    );
+    expect(saved.word).not.toHaveProperty('contentCoverage');
+    expect(saved.word).not.toHaveProperty('examples');
   });
   it('never mixes changed live meanings or draft supplementation into older revealed snapshots', async () => {
     for (const id of [conflictId, draftId]) {
@@ -428,8 +428,7 @@ suite('PostgreSQL bilingual catalog and read-only issued word supplementation', 
       expect(result.json().session.items[0].word.senses[0]).toMatchObject({
         definitionZh: '旧合成中文义',
         definitionEn: '',
-        exampleEn: 'Original preserved test sentence.',
-        exampleZh: '',
+        examples: [],
       });
       expect(result.body).not.toContain('Changed unrelated meaning.');
       expect(result.body).not.toContain('更改后的例句。');
@@ -464,9 +463,7 @@ suite('PostgreSQL bilingual catalog and read-only issued word supplementation', 
     expect(sense.contentMetadata.definitionEn).not.toHaveProperty('model');
     expect(sense.contentMetadata.definitionEn).not.toHaveProperty('license');
     const result = await request('GET', `/study/sessions/${issuedId}`);
-    expect(result.json().session.items[0].word.senses[0].definitionEn).toBe(
-      'Administrator-authored synthetic English meaning.',
-    );
+    expect(result.json().session.items[0].word.senses[0].definitionEn).toBe('');
     const stored = await db.sessionItem.findUniqueOrThrow({ where: { id: original.id } });
     expect(stored.contentSnapshot).toEqual(original.contentSnapshot);
     expect(stored.questionJson).toEqual(original.questionJson);

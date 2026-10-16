@@ -45,7 +45,7 @@ describe('independent source-bound usage guidance without rewriting original dat
     const saved = structuredClone(issued);
     const current = { id: 'word', status: 'published', senses: [learningDefinitionView(raw)] };
     const view = supplementIssuedWord(issued, current, 'word');
-    expect((view.senses as Sense[])[0]!.definitionZh).not.toContain('守财奴');
+    expect((view.senses as Sense[])[0]!.definitionZh).toBe(raw.definitionZh);
     expect(issued).toEqual(saved);
   });
 });

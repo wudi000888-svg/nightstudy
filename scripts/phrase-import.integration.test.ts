@@ -432,6 +432,10 @@ it.runIf(!!databaseUrl)(
             'phrase-example-' +
             hash(row.sourceWordId + '\0' + input.exampleEn + '\0' + input.exampleZh),
           wordId: row.sourceWordId,
+          learningSenseId: null,
+          contextLabel: '',
+          status: 'candidate',
+          contentVersion: '',
           ...input,
           ordinal: -1,
         });

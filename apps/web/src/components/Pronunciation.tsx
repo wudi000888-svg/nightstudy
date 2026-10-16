@@ -7,6 +7,7 @@ import type { Word, WordAudio } from '../lib/types';
 import { usePackedAudio } from './usePackedAudio';
 import { useScreenActive } from '../lib/screen-lifecycle';
 interface PronunciationInfo {
+  pronunciationCompatible?: boolean;
   audio: WordAudio[];
   phonetics?: { ipa: string; region: string }[];
 }
@@ -15,11 +16,12 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
     screenActive = useScreenActive();
   const { preferences, loaded } = useLearningPreferences();
   const preferred = preferences.accent === 'uk' ? 'UK' : 'US';
+  const wordCompatible = word.pronunciationCompatible !== false;
   const validAudio = (entry: WordAudio) =>
     entry.status === 'ready' &&
     ['US', 'UK'].includes(entry.accent) &&
     entry.url === `/api/v2/pronunciation/${encodeURIComponent(word.id)}/audio/${entry.accent}`;
-  const embedded = (word.audio ?? []).filter(validAudio);
+  const embedded = wordCompatible ? (word.audio ?? []).filter(validAudio) : [];
   // Public word/detail/session DTOs already carry ready audio and typed IPA.
   // Only incomplete DTOs need the separate pronunciation request.
   const complete =
@@ -29,11 +31,13 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
   const pronunciation = useRemote<{ pronunciation: PronunciationInfo }>(
     'pronunciation',
     `pronunciation/${encodeURIComponent(word.id)}`,
-    !!word.id && !complete,
+    !!word.id && wordCompatible && !complete,
   );
-  const info = complete ? undefined : pronunciation.data?.pronunciation;
-  const entries = info ? info.audio.filter(validAudio) : embedded;
-  const player = usePackedAudio(`${scope}:${word.id}`);
+  const compatible =
+    wordCompatible && pronunciation.data?.pronunciation.pronunciationCompatible !== false;
+  const info = complete || !compatible ? undefined : pronunciation.data?.pronunciation;
+  const entries = !compatible ? [] : info ? info.audio.filter(validAudio) : embedded;
+  const player = usePackedAudio(`${scope}:${word.id}:${compatible ? 'ready' : 'blocked'}`);
   const [selection, setSelection] = useState('');
   const attempted = useRef('');
   const accents: ('US' | 'UK')[] = preferred === 'UK' ? ['UK', 'US'] : ['US', 'UK'];
@@ -79,9 +83,10 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
         {accents.map((accent) => {
           const entry = entries.find((value) => value.accent === accent),
             name = accent === 'US' ? '美式' : '英式';
-          const active = player.playing && selection === accent;
-          const pending = !entry && ((!info && !pronunciation.error) || !!pronunciation.isFetching);
-          const failed = !entry && !!pronunciation.error && !pending;
+          const active = compatible && player.playing && selection === accent;
+          const pending =
+            compatible && !entry && ((!info && !pronunciation.error) || !!pronunciation.isFetching);
+          const failed = compatible && !entry && !!pronunciation.error && !pending;
           const label = active
             ? `停止${name}发音`
             : entry
@@ -92,8 +97,9 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
                   ? `重新读取${name}发音`
                   : `暂无${name}发音`;
           const ipa =
-            info?.phonetics?.find((value) => value.region === accent)?.ipa ||
-            (accent === 'US' ? word.phoneticUs : word.phoneticUk);
+            compatible &&
+            (info?.phonetics?.find((value) => value.region === accent)?.ipa ||
+              (accent === 'US' ? word.phoneticUs : word.phoneticUk));
           return (
             <div className="pronunciation-row" key={accent}>
               <span className="icon-action-hint">

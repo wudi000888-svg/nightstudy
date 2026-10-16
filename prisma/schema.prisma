@@ -244,6 +244,7 @@ model Word {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   senses           Sense[]
+  learningSenses   LearningSense[]
   examples         WordExample[]
   bookItems        BookItem[]
   userWords        UserWord[]
@@ -274,11 +275,51 @@ model Sense {
   exampleZh       String @default("")
   ordinal         Int    @default(0)
   contentMetadata Json   @default("{}")
+  learningBindings SenseSourceBinding[]
 
+  @@unique([id, wordId])
   @@index([wordId, ordinal])
 }
 
-// Word-level usage examples are independent of dictionary sense alignment.
+// Curated atomic meanings are distinct from immutable source dictionary rows.
+model LearningSense {
+  id              String @id
+  wordId          String
+  word            Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  pos             String
+  definitionZh    String
+  definitionEn    String
+  ordinal         Int @default(0)
+  status          String @default("candidate")
+  contentVersion  String
+  bindingHash     String
+  contentMetadata Json @default("{}")
+  sourceBindings  SenseSourceBinding[]
+  examples        WordExample[]
+
+  @@unique([id, wordId])
+  @@unique([id, wordId, contentVersion])
+  @@index([wordId, status, ordinal, id])
+}
+
+model SenseSourceBinding {
+  id                       String @id
+  wordId                   String
+  learningSenseId          String
+  learningSense            LearningSense @relation(fields: [learningSenseId, wordId], references: [id, wordId], onDelete: Restrict)
+  sourceSenseId            String
+  sourceSense              Sense @relation(fields: [sourceSenseId, wordId], references: [id, wordId], onDelete: Restrict)
+  relation                 String
+  sourcePosSha256          String
+  sourceDefinitionZhSha256 String
+  sourceDefinitionEnSha256 String
+  contentMetadata          Json @default("{}")
+
+  @@unique([learningSenseId, sourceSenseId])
+  @@index([sourceSenseId, wordId])
+}
+
+// Unbound historical word-level usages remain candidates, never reused as a meaning's examples.
 model WordExample {
   id              String @id
   wordId          String
@@ -287,8 +328,19 @@ model WordExample {
   exampleZh       String
   contentMetadata Json   @default("{}")
   ordinal         Int    @default(0)
+  learningSenseId String?
+  learningSense   LearningSense? @relation(fields: [learningSenseId, wordId, contentVersion], references: [id, wordId, contentVersion], onDelete: Restrict, onUpdate: Restrict)
+  contextLabel    String @default("")
+  status          String @default("candidate")
+  contentVersion  String @default("")
 
   @@index([wordId, ordinal])
+  @@index([learningSenseId, status, ordinal, id])
+}
+
+model LookupRevision {
+  scope    String @id
+  revision BigInt @default(0)
 }
 
 model Book {

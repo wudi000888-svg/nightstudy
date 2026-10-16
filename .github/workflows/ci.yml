@@ -80,7 +80,10 @@ jobs:
           python3 scripts/tatoeba-direct-source.test.py
           python3 scripts/manythings-source.test.py
           python3 scripts/phrase-compile.test.py
+          python3 scripts/learning-senses-compile.test.py
+          python3 scripts/learning-senses-audio.test.py
           node scripts/check-audio-install.mjs --self-test
+          node scripts/check-learning-senses-install.mjs --self-test
       - name: Validate Compose descriptors
         run: |
           cp .env.example .env
@@ -119,6 +122,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:5198/api/v2/dictionary/stats > /tmp/nightstudy-catalog.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-catalog.json','utf8'));if(!j.installedDictionary||j.declaredEntryCount!==770611)process.exit(1)"
           docker compose exec -T app node scripts/check-audio-install.mjs --bilingual-baseline /app/.local/content/bilingual-before.json
+          docker compose exec -T app node scripts/check-learning-senses-install.mjs --single-site default --audio
           umask 077
           docker compose run --rm --no-deps --entrypoint node init scripts/export-admin-credentials.mjs > /tmp/nightstudy-ci-admin.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-ci-admin.json','utf8'));const c=j.credentials[0];if(j.credentials.length!==1||c.username!=='admin'||c.password.length<32)process.exit(1);const r=await fetch('http://127.0.0.1:5198/api/auth/sign-in/username',{method:'POST',headers:{'Content-Type':'application/json',Origin:'http://127.0.0.1:5198'},body:JSON.stringify({username:c.username,password:c.password})});if(r.status!==200)process.exit(1)"

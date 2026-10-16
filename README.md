@@ -15,6 +15,12 @@
 
 **当前发布：[0.10.0-alpha.3](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.10.0-alpha.3)。** 补齐18本内置词书的成对释义、词性和双语例句，扩充静态英美句音，精修小屏阅读、词卡和音频反馈，并优化书架查询。已通过完整 CI 和 Compose 冷安装，并完成本机及 VPS 升级、公开 HTTP 与移动页面验收。发行镜像与实际覆盖见 [0.10交付记录](https://github.com/wudi000888-svg/nightstudy/blob/main/docs/CONTENT_BILINGUAL_POLISH_010.md)。
 
+**0.11 改造正在验收：** 查词支持智能、前缀、包含、精确匹配及显式错拼建议，公共查词与本人生词本独立，服务端全局排序和签名游标保证分页条件。原子学习义项各自绑定不同语境的双语例句；首包为35词、98义、196句和392条英美成品句音，其余18,732个内置词仍待逐义审核，不能把旧词级例句当作每个意思的配句。源码实现、内容边界和验证记录见 [查词与义项改造](docs/LOOKUP_SENSES_011.md)。
+
+<img src="docs/media/mobile-lookup-0.11.png" alt="包含匹配与服务端排序" width="260"> <img src="docs/media/mobile-sense-0.11.png" alt="河岸义项及对应双语语境" width="260">
+
+0.11 本机隔离构建的匿名真实接口页面：查词列表与 bank 河岸义项。
+
 保留单屏H5首页、独立页面栈、Learn / Review、雨夜动态和管理员自定义壁纸，支持主屏幕安装与用户确认的安全更新。早期交付及来源说明见 [0.9记录](docs/CONTENT_AUDIO_PERFORMANCE_09.md)、[开放内容与代码复用](docs/OPEN_CONTENT_REUSE.md) 和 [雨夜外观](docs/RAIN_NIGHT_UI.md)。
 
 每日目标按复习与新学的不同词总数计算，先复习，再分配新词。释义和例句支持英文点词卡；美式、英式各一个发音入口，星星和固定按钮有明确提示。词书支持标准 TXT、DOCX、PDF 导入，提供 [TXT](docs/templates/nightstudy-wordbook-template.txt)、[Word](docs/templates/nightstudy-wordbook-template.docx)、[PDF](docs/templates/nightstudy-wordbook-template.pdf) 模板。学习正文保持简洁，词典名称可以查看，来源与许可集中在独立说明。
@@ -64,7 +70,7 @@ Docker Compose首次安装可使用脚本生成私有配置并启动。已有 `.
 bash scripts/install.sh
 ```
 
-默认访问 `http://127.0.0.1:5198`。新站用户名为admin，密码为本站随机值；脚本将初始凭据从仅init挂载的私密卷导出到服务器 `.local/admin/credentials.json`（目录0700、文件0600），只由部署者读取和保管。文件不会通过Web下载，不放入Git。它记录创建时的初始密码，之后改密不会更新此明文记录。既有管理员继续使用原登录方式；`ADMIN_BOOTSTRAP=manual` 保留初始化口令/setup流程。`init` 负责迁移、种子、首次管理员与完整内容安装，PG/内容缓存/音频缓存/私密凭据分别持久化。当前源码的默认完整配置准备源词典、IPA、考试词书、词组，并依次安装 v1、v2 双语文本包及所锁定的成品音包；公开 Release 仍按对应版本的内容清单安装。安装和运行不下载语音模型或执行即时合成。`CONTENT_PACK=demo` 可显式选40词最小体验。完整变量、凭据备份、HTTPS与多站见 [部署文档](docs/DEPLOYMENT.md)。不要对需保留数据的安装使用 `down --volumes`。
+默认访问 `http://127.0.0.1:5198`。新站用户名为admin，密码为本站随机值；脚本将初始凭据从仅init挂载的私密卷导出到服务器 `.local/admin/credentials.json`（目录0700、文件0600），只由部署者读取和保管。文件不会通过Web下载，不放入Git。它记录创建时的初始密码，之后改密不会更新此明文记录。既有管理员继续使用原登录方式；`ADMIN_BOOTSTRAP=manual` 保留初始化口令/setup流程。`init` 负责迁移、种子、首次管理员与完整内容安装，PG/内容缓存/音频缓存/私密凭据分别持久化。当前源码的默认完整配置准备源词典、IPA、考试词书、词组、v1/v2双语文本、原子义项首包，以及词音和三代句音成品；公开 Release 按对应版本清单安装。升级已有站点先备份并审阅增量步骤，不用重新seed替代升级。安装和运行不下载语音模型或执行即时合成。`CONTENT_PACK=demo` 可显式选40词最小体验。完整变量、凭据备份、HTTPS与多站见 [部署文档](docs/DEPLOYMENT.md)。不要对需保留数据的安装使用 `down --volumes`。
 
 Native 开发使用 Node 24、pnpm 11.25.0 和 Python 3.11 以上，并自行准备可访问的 PG 数据库。成品音包只需 Python 标准库进行受限解包，无需语音模型或推理依赖；Python 不在 PATH 中时可设置私有 `.env` 的 `AUDIO_PYTHON` 为解释器路径。在 `.env` 填入真实 DATABASE_URL 与两个随机密钥后：
 

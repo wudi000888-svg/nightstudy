@@ -1,0 +1,807 @@
+{
+  "editorialPolicy": {
+    "decision": "publish",
+    "reviewer": "Codex",
+    "expertCertified": false,
+    "method": "Direct bilingual authorship and explicit sense-by-sense editorial review; no expert certification."
+  },
+  "pronunciationPolicies": {
+    "record": {
+      "wordAudioCompatible": false,
+      "reason": "record 的名词与动词重音不同；现有 Word 级音标和音频未绑定词性及义项，不能据此证明适用于本学习义项。"
+    },
+    "present": {
+      "wordAudioCompatible": false,
+      "reason": "present 的名词、形容词与动词存在重音区别；现有 Word 级音标和音频没有义项证据，保持不可用直至独立核对。"
+    },
+    "address": {
+      "wordAudioCompatible": false,
+      "reason": "address 的名词与动词在美式等用法中可能有不同重音；现有 Word 级音标和音频未绑定词性及义项，不能据此选用。"
+    }
+  },
+  "sourceSelectors": {
+    "book-n": {
+      "pos": "n.",
+      "definitionZh": "书, 书籍, 帐簿, 名册, 工作簿",
+      "definitionEn": "A written or printed volume; books collectively; an account book; a register of names; a workbook.",
+      "relation": "narrower",
+      "reason": "混合名词源行取供阅读的书这一核心含义，不混账簿名册。"
+    },
+    "book-v": {
+      "pos": "v.",
+      "definitionZh": "登记, 预订",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "取预先安排保留服务的预订义，与登记处罚等未选义项分开。"
+    },
+    "match-n": {
+      "pos": "n.",
+      "definitionZh": "比赛, 火柴, 对手",
+      "definitionEn": "a contest; a small stick for lighting a fire; an opponent",
+      "relation": "narrower",
+      "reason": "比赛和火柴没有可互换语义；从混合名词源行分别建立义项。"
+    },
+    "match-v": {
+      "pos": "vt.",
+      "definitionZh": "使相配, 使比赛, 与...竞争",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "本义取使相配与相互搭配，不混比赛对抗，明确动词关系。"
+    },
+    "fair-n": {
+      "pos": "n.",
+      "definitionZh": "展览会, 市集, 美好的事物",
+      "definitionEn": "An exhibition or market; something beautiful or pleasing.",
+      "relation": "narrower",
+      "reason": "取集中展示和交易的展会市集义，排除模糊美好事物。"
+    },
+    "fair-adj": {
+      "pos": "a.",
+      "definitionZh": "公平的, 按规则进行的, 不好不坏的, 晴朗的, 美丽的",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "取平等合理对待的公平义，区别天气和中等程度。"
+    },
+    "record-n": {
+      "pos": "n.",
+      "definitionZh": "记录, 履历, 档案, 审判记录, 最高纪录, 唱片",
+      "definitionEn": "a written or stored account; a personal history; an archive; an official court account; the highest achievement; a disc for recorded sound",
+      "relation": "narrower",
+      "reason": "从混合名词源行分别拆保存信息的记录和最高成绩纪录。"
+    },
+    "record-v": {
+      "pos": "vt.",
+      "definitionZh": "记录, 记载, 标明, 将...录音",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "取用设备录制声音这一动作，与文字记录和名词成绩区分。"
+    },
+    "present-n": {
+      "pos": "n.",
+      "definitionZh": "现在, 礼品, 瞄准",
+      "definitionEn": "the current time; a gift; the act or position of aiming a weapon",
+      "relation": "narrower",
+      "reason": "取礼物这一可数名词含义，不把当前时间和瞄准并入。"
+    },
+    "present-adj": {
+      "pos": "a.",
+      "definitionZh": "现在的, 出席的",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "分别限制为当下时间与人在场，两个形容词含义不可互配例句。"
+    },
+    "mean-v": {
+      "pos": "vt.",
+      "definitionZh": "意谓, 想要, 意欲, 预定",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "取表示意义与有意做事两个动词含义，明确不同句法与语境。"
+    },
+    "mean-adj": {
+      "pos": "a.",
+      "definitionZh": "低劣的, 卑贱的, 简陋的, 吝啬的, 惭愧的, 平均的, 中间的, 普通的",
+      "definitionEn": "inferior or lowly; humble; stingy; ashamed; average; intermediate; ordinary",
+      "relation": "narrower",
+      "reason": "仅取吝啬这一对钱财的态度，不把数学平均或出身低微混入。"
+    },
+    "spring-n": {
+      "pos": "n.",
+      "definitionZh": "春天, 弹簧, 跳跃, 弹性, 活力, 泉, 源泉",
+      "definitionEn": "The season after winter; an elastic mechanical coil; a leap; resilience or energy; a natural water source or origin.",
+      "relation": "narrower",
+      "reason": "混合名词行中的季节、机械弹簧和自然泉水各自独立，不共享用法句。"
+    },
+    "apply-vt": {
+      "pos": "vt.",
+      "definitionZh": "涂, 应用",
+      "definitionEn": "To spread a substance onto a surface; to put something to use.",
+      "relation": "narrower",
+      "reason": "取把物质涂在表面与使用知识方法两个含义，不机械按逗号配对。"
+    },
+    "apply-vi": {
+      "pos": "vi.",
+      "definitionZh": "申请, 适用",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "取正式申请机会或资格的含义，区别规则适用。"
+    },
+    "bear-n": {
+      "pos": "n.",
+      "definitionZh": "熊",
+      "definitionEn": "A large, heavily built mammal with thick fur and strong claws.",
+      "relation": "exact",
+      "reason": "源中英均指熊这一动物，不与动词忍受或承担混合。"
+    },
+    "bear-v": {
+      "pos": "vt.",
+      "definitionZh": "忍受, 支承, 产生, 怀有, 通过卖空使跌价",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "仅取承受不愉快经历的忍受义，不扩展成支撑或金融卖空。"
+    },
+    "address-n": {
+      "pos": "n.",
+      "definitionZh": "住址, 演说, 举止, 灵巧, 求爱",
+      "definitionEn": "A place of residence; a formal speech; manner or bearing; skill or dexterity; courtship.",
+      "relation": "narrower",
+      "reason": "混合名词行中的地址与正式演讲分开；不借公共例句猜测其他义。"
+    },
+    "address-v": {
+      "pos": "vt.",
+      "definitionZh": "发表(演说或讲话), 对付, 写地址",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "取对问题着手处理的对付义，独立于写地址和正式讲话。"
+    }
+  },
+  "meanings": [
+    {
+      "lemma": "book",
+      "key": "reading-volume",
+      "pos": "n.",
+      "definitionZh": "书；由书页或电子页面组成的阅读作品",
+      "definitionEn": "A written or printed work made up of pages, also available in electronic form.",
+      "ordinal": 0,
+      "sourceKeys": ["book-n"],
+      "semanticRationale": "可阅读作品与预订服务动作不同；图书借阅和作者创作分别示例。",
+      "examples": [
+        {
+          "context": "图书馆借阅",
+          "en": "I borrowed a book about ocean life from the library.",
+          "zh": "我从图书馆借了一本介绍海洋生物的书。",
+          "semanticRationale": "a book为阅读作品，借阅地点与主题完整对应中文。"
+        },
+        {
+          "context": "作者创作",
+          "en": "Her first book describes her childhood in a mountain village.",
+          "zh": "她的第一本书描写了她在山村度过的童年。",
+          "semanticRationale": "创作内容而非借阅行为，仍为阅读作品名词而非预订。"
+        }
+      ]
+    },
+    {
+      "lemma": "book",
+      "key": "reserve-service",
+      "pos": "v.",
+      "definitionZh": "预订；提前保留座位、住处或服务",
+      "definitionEn": "To arrange in advance to have a seat, room, or service kept for you.",
+      "ordinal": 1,
+      "sourceKeys": ["book-v"],
+      "semanticRationale": "服务预先保留这一动词义，与名词书籍分离；餐饮和住宿分别示例。",
+      "examples": [
+        {
+          "context": "餐厅订位",
+          "en": "We should book a table for six before the restaurant gets busy.",
+          "zh": "餐厅忙起来之前，我们应该预订一张六人桌。",
+          "semanticRationale": "book a table是预留座位，for six为人数而非时间。"
+        },
+        {
+          "context": "住宿安排",
+          "en": "You can book a room online without paying immediately.",
+          "zh": "你可以在线预订房间，不必立即付款。",
+          "semanticRationale": "预留住宿与餐桌场景不同，未把book理解成阅读材料。"
+        }
+      ]
+    },
+    {
+      "lemma": "match",
+      "key": "sport-contest",
+      "pos": "n.",
+      "definitionZh": "比赛；双方或两队之间的体育竞赛",
+      "definitionEn": "A sporting contest between two people or teams.",
+      "ordinal": 0,
+      "sourceKeys": ["match-n"],
+      "semanticRationale": "体育比赛这一名词与点火工具分开，观赛和赛程取消分别示例。",
+      "examples": [
+        {
+          "context": "观看比赛",
+          "en": "Thousands of fans watched the final match on a large screen.",
+          "zh": "成千上万的球迷在大屏幕上观看了决赛。",
+          "semanticRationale": "fans及final明确体育竞赛，非火柴或使相配的动词。"
+        },
+        {
+          "context": "赛程调整",
+          "en": "The tennis match was postponed because the court was flooded.",
+          "zh": "由于球场积水，这场网球比赛被推迟了。",
+          "semanticRationale": "tennis和court为赛事语境，延期原因与观看方式不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "match",
+      "key": "fire-lighting-stick",
+      "pos": "n.",
+      "definitionZh": "火柴；摩擦后能够燃烧的细小木棒",
+      "definitionEn": "A small stick with a treated end that lights when struck against a rough surface.",
+      "ordinal": 1,
+      "sourceKeys": ["match-n"],
+      "semanticRationale": "点火物的可数名词与比赛无关；应急点灯和户外防潮分别示例。",
+      "examples": [
+        {
+          "context": "应急照明",
+          "en": "He struck a match and lit the oil lamp.",
+          "zh": "他划了一根火柴，点亮了油灯。",
+          "semanticRationale": "struck和lit说明点火工具，不对应体育竞赛。"
+        },
+        {
+          "context": "户外防潮",
+          "en": "Keep each match dry so that you can start a fire later.",
+          "zh": "让每根火柴都保持干燥，方便之后生火。",
+          "semanticRationale": "dry及start fire强调携带保存点火工具，与即时点灯不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "match",
+      "key": "go-well-together",
+      "pos": "v.",
+      "definitionZh": "相配；在颜色、样式等方面协调",
+      "definitionEn": "To look suitable together because of a similar or compatible colour or style.",
+      "ordinal": 2,
+      "sourceKeys": ["match-v"],
+      "semanticRationale": "搭配协调而非比赛或火柴；服装与室内陈设形成两种设计语境。",
+      "examples": [
+        {
+          "context": "服装搭配",
+          "en": "These shoes match the colour of your jacket.",
+          "zh": "这双鞋和你夹克的颜色很搭。",
+          "semanticRationale": "colour和服饰宾语明确相配关系，非与某人比赛。"
+        },
+        {
+          "context": "室内陈设",
+          "en": "The curtains should match the rest of the room.",
+          "zh": "窗帘应当与房间的其他陈设相协调。",
+          "semanticRationale": "窗帘和整体房间的风格配合，与单件服装配色不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "fair",
+      "key": "just-impartial",
+      "pos": "adj.",
+      "definitionZh": "公平的；合理且不偏袒的",
+      "definitionEn": "Treating people equally and without an unfair advantage or prejudice.",
+      "ordinal": 0,
+      "sourceKeys": ["fair-adj"],
+      "semanticRationale": "对待方式公平这一属性与天气晴朗及展会名词分开。",
+      "examples": [
+        {
+          "context": "比赛规则",
+          "en": "The referee made sure that both teams had a fair chance.",
+          "zh": "裁判确保两支队伍都有公平的机会。",
+          "semanticRationale": "双方机会平等体现公平，未混中等水平或天气。"
+        },
+        {
+          "context": "工作报酬",
+          "en": "Workers deserve fair pay for the hours they put in.",
+          "zh": "劳动者应当为付出的工时获得合理的报酬。",
+          "semanticRationale": "fair pay体现公正合理待遇，劳动报酬与比赛判罚不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "fair",
+      "key": "exhibition-market",
+      "pos": "n.",
+      "definitionZh": "展会；集中展示、销售商品或交流信息的活动",
+      "definitionEn": "An organised event where people display goods, sell things, or exchange information.",
+      "ordinal": 1,
+      "sourceKeys": ["fair-n"],
+      "semanticRationale": "活动名词独立于公平形容词，求职和图书销售属于不同展会场景。",
+      "examples": [
+        {
+          "context": "求职交流",
+          "en": "Several local companies will attend the careers fair on Friday.",
+          "zh": "几家当地公司将参加周五的招聘会。",
+          "semanticRationale": "careers fair为有组织展会活动，不是公平机会的形容词。"
+        },
+        {
+          "context": "图书展销",
+          "en": "We found several rare novels at the book fair.",
+          "zh": "我们在书展上找到了几本罕见的小说。",
+          "semanticRationale": "book fair为交易展销活动，与企业招聘交流不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "record",
+      "key": "stored-account",
+      "pos": "n.",
+      "definitionZh": "记录；保存下来供日后查阅的信息",
+      "definitionEn": "A written or stored account of facts or events that can be consulted later.",
+      "ordinal": 0,
+      "sourceKeys": ["record-n"],
+      "semanticRationale": "保存事实的信息名词与最高成绩纪录和录制动作区分。",
+      "examples": [
+        {
+          "context": "医疗档案",
+          "en": "The doctor checked the patient's record before changing the treatment.",
+          "zh": "调整治疗方案前，医生查看了病人的记录。",
+          "semanticRationale": "patient record供查阅病例，非最高成就或音频录制。"
+        },
+        {
+          "context": "家庭开支",
+          "en": "Keep a record of everything you spend during the trip.",
+          "zh": "旅行期间，把每一笔支出都记录下来。",
+          "semanticRationale": "a record of spending为费用信息保存，与医疗历史场景不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "record",
+      "key": "best-achievement",
+      "pos": "n.",
+      "definitionZh": "纪录；在某项活动中达到的最好成绩",
+      "definitionEn": "The best or highest achievement reached in a particular activity.",
+      "ordinal": 1,
+      "sourceKeys": ["record-n"],
+      "semanticRationale": "最高成就名词单独成义；体育速度和工厂产量体现两个活动领域，均为取得的最好成绩。",
+      "examples": [
+        {
+          "context": "游泳竞赛",
+          "en": "She broke the national record in the hundred metres freestyle.",
+          "zh": "她打破了百米自由泳全国纪录。",
+          "semanticRationale": "broke national record明确最好成绩，不是普通书面记载。"
+        },
+        {
+          "context": "工厂产量",
+          "en": "The factory set a record for the number of bicycles made in one day.",
+          "zh": "这家工厂创下了单日自行车产量纪录。",
+          "semanticRationale": "工厂单日产量纪录属于活动取得的最高成绩，与游泳速度是不同实质语境。"
+        }
+      ]
+    },
+    {
+      "lemma": "record",
+      "key": "capture-audio",
+      "pos": "vt.",
+      "definitionZh": "录音；用设备保存声音",
+      "definitionEn": "To use equipment to capture sound so that it can be heard again later.",
+      "ordinal": 2,
+      "sourceKeys": ["record-v"],
+      "semanticRationale": "用设备录制声音这一及物动作，区别名词记录和成绩。",
+      "examples": [
+        {
+          "context": "采访留存",
+          "en": "May I record our interview so that I can quote you accurately?",
+          "zh": "我可以给这次采访录音，以便准确引用你的话吗？",
+          "semanticRationale": "征求录音许可和引用声音表明保存音频，非书写记事。"
+        },
+        {
+          "context": "音乐创作",
+          "en": "The band will record its new song in a studio next week.",
+          "zh": "乐队下周将在录音棚录制新歌。",
+          "semanticRationale": "studio及song明确声音录制，与记者访谈场景不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "present",
+      "key": "gift",
+      "pos": "n.",
+      "definitionZh": "礼物；赠送给他人的物品",
+      "definitionEn": "Something given to another person, especially to mark a special occasion.",
+      "ordinal": 0,
+      "sourceKeys": ["present-n"],
+      "semanticRationale": "礼物这一可数名词与现在及在场两个形容词含义分开。",
+      "examples": [
+        {
+          "context": "生日礼物",
+          "en": "He wrapped the birthday present in blue paper.",
+          "zh": "他用蓝色纸包好了生日礼物。",
+          "semanticRationale": "wrapped和birthday使present为赠送的物品，非时间。"
+        },
+        {
+          "context": "感谢心意",
+          "en": "The class bought a small present to thank their retiring teacher.",
+          "zh": "全班买了一份小礼物，感谢即将退休的老师。",
+          "semanticRationale": "购买物品表达谢意，与生日包装场景不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "present",
+      "key": "in-attendance",
+      "pos": "adj.",
+      "definitionZh": "在场的；出席某处或某项活动的",
+      "definitionEn": "Being at a particular place or event.",
+      "ordinal": 1,
+      "sourceKeys": ["present-adj"],
+      "semanticRationale": "人的在场状态与当前时间分开；会议和紧急演练各一例。",
+      "examples": [
+        {
+          "context": "会议点名",
+          "en": "All members must be present when the vote takes place.",
+          "zh": "投票时，所有成员都必须在场。",
+          "semanticRationale": "members be present为出席状态，不是赠送礼物。"
+        },
+        {
+          "context": "安全演练",
+          "en": "The teacher checked that every child was present after the fire drill.",
+          "zh": "消防演练结束后，老师确认了每个孩子都在场。",
+          "semanticRationale": "演练后的人员清点与会议投票出席是不同场景。"
+        }
+      ]
+    },
+    {
+      "lemma": "present",
+      "key": "current-now",
+      "pos": "adj.",
+      "definitionZh": "当前的；现在存在或适用的",
+      "definitionEn": "Existing or happening now, rather than in the past or future.",
+      "ordinal": 2,
+      "sourceKeys": ["present-adj"],
+      "semanticRationale": "时间当前这一形容词与人员出席状态不可混同，工作及研究场景分开。",
+      "examples": [
+        {
+          "context": "职业规划",
+          "en": "She plans to stay in her present job until next summer.",
+          "zh": "她打算在目前的工作岗位上做到明年夏天。",
+          "semanticRationale": "present job为当前工作，不表示工作本人出席。"
+        },
+        {
+          "context": "研究限制",
+          "en": "The present study focuses on how children learn new words.",
+          "zh": "本项研究关注儿童如何学习新词。",
+          "semanticRationale": "present study指当前这项研究，与职业选择是不同情境。"
+        }
+      ]
+    },
+    {
+      "lemma": "mean",
+      "key": "signify",
+      "pos": "vt.",
+      "definitionZh": "表示；具有某种意思或含义",
+      "definitionEn": "To express or have a particular meaning.",
+      "ordinal": 0,
+      "sourceKeys": ["mean-v"],
+      "semanticRationale": "符号或词语所表示的含义与有意做某事区分。",
+      "examples": [
+        {
+          "context": "理解词语",
+          "en": "What does this word mean in the final sentence?",
+          "zh": "这个词在最后一句中是什么意思？",
+          "semanticRationale": "word为意义承载者，问句明确解释含义而非行为意图。"
+        },
+        {
+          "context": "识别标志",
+          "en": "A red circle on this map does not mean that the road is closed.",
+          "zh": "这张地图上的红圈并不表示道路封闭。",
+          "semanticRationale": "地图符号传达的信息与词汇解释不同，但都属于表示含义。"
+        }
+      ]
+    },
+    {
+      "lemma": "mean",
+      "key": "intend",
+      "pos": "vt.",
+      "definitionZh": "打算；有意做某事",
+      "definitionEn": "To intend to do something or intend a particular result.",
+      "ordinal": 1,
+      "sourceKeys": ["mean-v"],
+      "semanticRationale": "人的行为意图与词义表示分开，两句分别道歉解释及计划行动。",
+      "examples": [
+        {
+          "context": "解释失误",
+          "en": "I did not mean to wake you when I closed the door.",
+          "zh": "我关门时并不是故意想吵醒你。",
+          "semanticRationale": "mean to wake表达行为意图，否定范围与中文相同。"
+        },
+        {
+          "context": "行动计划",
+          "en": "We mean to finish the repairs before the rainy season starts.",
+          "zh": "我们打算在雨季开始前完成维修。",
+          "semanticRationale": "mean to finish表达计划意图，与解释无意吵醒别人不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "mean",
+      "key": "unwilling-to-spend",
+      "pos": "adj.",
+      "definitionZh": "吝啬的；不愿花钱或与人分享的",
+      "definitionEn": "Unwilling to spend money or share things with other people.",
+      "ordinal": 2,
+      "sourceKeys": ["mean-adj"],
+      "semanticRationale": "限定钱财分享方面的吝啬，不泛指任何刻薄或数学平均。",
+      "examples": [
+        {
+          "context": "支付小费",
+          "en": "He is too mean to leave a tip even after excellent service.",
+          "zh": "即使服务很好，他也吝啬得不肯给小费。",
+          "semanticRationale": "to leave a tip明确不愿花钱，非数值平均或意思。"
+        },
+        {
+          "context": "共同筹款",
+          "en": "Do not be mean when everyone is contributing to the farewell gift.",
+          "zh": "大家都在为告别礼物出钱时，别太吝啬。",
+          "semanticRationale": "共同出钱情境限定分享钱财，与服务小费不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "spring",
+      "key": "season",
+      "pos": "n.",
+      "definitionZh": "春天；冬季之后、夏季之前的季节",
+      "definitionEn": "The season between winter and summer, when plants begin to grow.",
+      "ordinal": 0,
+      "sourceKeys": ["spring-n"],
+      "semanticRationale": "季节名词与弹簧和泉水分离；植物生长及学期安排分别示例。",
+      "examples": [
+        {
+          "context": "花园生长",
+          "en": "In spring, the garden fills with flowers and young leaves.",
+          "zh": "春天，花园里开满鲜花，长满嫩叶。",
+          "semanticRationale": "in spring及植物萌发明确季节，而非水源或机械部件。"
+        },
+        {
+          "context": "学校日程",
+          "en": "The school concert is held every spring before the final exams.",
+          "zh": "学校音乐会每年春天举行，时间在期末考试之前。",
+          "semanticRationale": "every spring为年度季节日程，与自然生长观察不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "spring",
+      "key": "elastic-coil",
+      "pos": "n.",
+      "definitionZh": "弹簧；受力后能恢复原状的弹性部件",
+      "definitionEn": "An elastic device, often made of coiled metal, that returns to its shape after being pressed or stretched.",
+      "ordinal": 1,
+      "sourceKeys": ["spring-n"],
+      "semanticRationale": "机械弹性装置独立于季节和水源；修理及动作原理分别展示。",
+      "examples": [
+        {
+          "context": "修理门锁",
+          "en": "A broken spring inside the lock stopped the handle from returning.",
+          "zh": "锁内的一根弹簧断了，导致把手无法回位。",
+          "semanticRationale": "inside lock及返回动作明确机械弹性部件，不是季节。"
+        },
+        {
+          "context": "玩具原理",
+          "en": "Press the spring down and the toy jumps when you release it.",
+          "zh": "把弹簧压下去，一松手玩具就会跳起来。",
+          "semanticRationale": "压缩释放原理与门锁维修属于不同学习语境。"
+        }
+      ]
+    },
+    {
+      "lemma": "spring",
+      "key": "natural-water-source",
+      "pos": "n.",
+      "definitionZh": "泉；地下水自然流出地面的地方",
+      "definitionEn": "A place where water flows naturally out of the ground.",
+      "ordinal": 2,
+      "sourceKeys": ["spring-n"],
+      "semanticRationale": "自然地下水出口的地理义与季节和弹簧不同。",
+      "examples": [
+        {
+          "context": "山间补水",
+          "en": "The walkers filled their bottles at a clear spring beside the path.",
+          "zh": "徒步者在小路旁一处清澈的泉水边装满了水瓶。",
+          "semanticRationale": "水瓶与clear spring明确可取水的泉，不指春季。"
+        },
+        {
+          "context": "村庄水源",
+          "en": "A spring on the hillside supplies water to the village all year.",
+          "zh": "山坡上的一处泉眼全年为村庄供水。",
+          "semanticRationale": "持续供水的自然出口与徒步临时补给场景不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "apply",
+      "key": "request-formally",
+      "pos": "vi.",
+      "definitionZh": "申请；正式请求获得职位、机会或资格",
+      "definitionEn": "To make a formal request for a job, opportunity, or permission.",
+      "ordinal": 0,
+      "sourceKeys": ["apply-vi"],
+      "semanticRationale": "申请动作与涂抹物质、应用知识分开；求职和奖学金两种流程。",
+      "examples": [
+        {
+          "context": "求职申请",
+          "en": "You can apply for the post by sending your CV to the school.",
+          "zh": "你可以把简历发给学校，申请这个职位。",
+          "semanticRationale": "apply for post明确正式求职，不是把某方法投入使用。"
+        },
+        {
+          "context": "奖学金申请",
+          "en": "Students must apply for the scholarship before the end of April.",
+          "zh": "学生必须在四月底之前申请这项奖学金。",
+          "semanticRationale": "申请资助资格与学校求职是不同正式流程。"
+        }
+      ]
+    },
+    {
+      "lemma": "apply",
+      "key": "spread-substance",
+      "pos": "vt.",
+      "definitionZh": "涂抹；把某种物质铺到表面上",
+      "definitionEn": "To spread a substance over a surface.",
+      "ordinal": 1,
+      "sourceKeys": ["apply-vt"],
+      "semanticRationale": "物理涂抹动作独立于申请和运用；身体护理与墙面施工两个场景。",
+      "examples": [
+        {
+          "context": "防晒护理",
+          "en": "Apply sunscreen to exposed skin before going outside.",
+          "zh": "出门前，在裸露的皮肤上涂上防晒霜。",
+          "semanticRationale": "sunscreen及skin是物质与表面，明确涂抹动作。"
+        },
+        {
+          "context": "墙面装修",
+          "en": "Use a wide brush to apply the first coat of paint evenly.",
+          "zh": "用宽刷子均匀地涂上第一层油漆。",
+          "semanticRationale": "paint和brush限定物理涂层，与皮肤防晒不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "apply",
+      "key": "put-knowledge-to-use",
+      "pos": "vt.",
+      "definitionZh": "应用；把知识或方法用于实际情境",
+      "definitionEn": "To put knowledge, a rule, or a method to practical use.",
+      "ordinal": 2,
+      "sourceKeys": ["apply-vt"],
+      "semanticRationale": "抽象知识方法的使用区别于涂抹物质，课程与紧急救助分别示例。",
+      "examples": [
+        {
+          "context": "课堂实践",
+          "en": "The workshop shows students how to apply theory to real design problems.",
+          "zh": "这次工作坊教学生如何把理论应用于实际设计问题。",
+          "semanticRationale": "theory to problems标出知识实践，不是职位申请。"
+        },
+        {
+          "context": "急救训练",
+          "en": "Nurses must be ready to apply their training in an emergency.",
+          "zh": "护士必须随时准备在紧急情况下运用所学技能。",
+          "semanticRationale": "运用训练所得处理紧急情况，与设计课程实践不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "bear",
+      "key": "large-mammal",
+      "pos": "n.",
+      "definitionZh": "熊；体型粗壮、长有厚毛和利爪的哺乳动物",
+      "definitionEn": "A large mammal with a strong body, thick fur, and powerful claws.",
+      "ordinal": 0,
+      "sourceKeys": ["bear-n"],
+      "semanticRationale": "动物名词与承受的动词同形不同义；野外观察与保护管理分别示例。",
+      "examples": [
+        {
+          "context": "野外观察",
+          "en": "A brown bear was searching for food near the river.",
+          "zh": "一只棕熊正在河边寻找食物。",
+          "semanticRationale": "brown bear作为动物主语，觅食行为排除动词忍受。"
+        },
+        {
+          "context": "野生动物保护",
+          "en": "The injured bear was released after several weeks of treatment.",
+          "zh": "这只受伤的熊接受了几周治疗后被放归野外。",
+          "semanticRationale": "救治与放归构成保护场景，区别一般野外觅食观察。"
+        }
+      ]
+    },
+    {
+      "lemma": "bear",
+      "key": "endure-unpleasantness",
+      "pos": "vt.",
+      "definitionZh": "忍受；承受痛苦或不愉快的情况",
+      "definitionEn": "To endure pain or an unpleasant situation.",
+      "ordinal": 1,
+      "sourceKeys": ["bear-v"],
+      "semanticRationale": "只取承受不适的心理身体动作，不把动物名词或结构支撑混入。",
+      "examples": [
+        {
+          "context": "忍受噪声",
+          "en": "I cannot bear the noise from the building work next door.",
+          "zh": "我受不了隔壁施工的噪声。",
+          "semanticRationale": "cannot bear接噪声表示无法忍受，非携带动物或承重。"
+        },
+        {
+          "context": "等待消息",
+          "en": "She could hardly bear the long wait for news of her son.",
+          "zh": "漫长地等待儿子的消息，让她几乎难以承受。",
+          "semanticRationale": "等待不确定消息的焦虑与物理噪声刺激是不同经历。"
+        }
+      ]
+    },
+    {
+      "lemma": "address",
+      "key": "location-details",
+      "pos": "n.",
+      "definitionZh": "地址；标明某人居住或收件地点的信息",
+      "definitionEn": "Details that identify where a person lives or where mail can be delivered.",
+      "ordinal": 0,
+      "sourceKeys": ["address-n"],
+      "semanticRationale": "收件地点信息与演讲及着手处理分开；网购和搬家分别示例。",
+      "examples": [
+        {
+          "context": "包裹配送",
+          "en": "Check the delivery address before confirming your order.",
+          "zh": "确认订单前，请核对收货地址。",
+          "semanticRationale": "delivery address对应配送位置，不是面向听众的讲话。"
+        },
+        {
+          "context": "搬家通知",
+          "en": "Please let the bank know if your home address changes.",
+          "zh": "如果你的家庭住址变了，请通知银行。",
+          "semanticRationale": "home address随搬家变更，与电商下单核对不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "address",
+      "key": "formal-speech",
+      "pos": "n.",
+      "definitionZh": "正式演讲；面向听众发表的讲话",
+      "definitionEn": "A formal speech delivered to an audience.",
+      "ordinal": 1,
+      "sourceKeys": ["address-n"],
+      "semanticRationale": "正式讲话的可数名词与住址完全不同；毕业典礼和学术会议分别示例。",
+      "examples": [
+        {
+          "context": "毕业典礼",
+          "en": "The principal gave a short address at the graduation ceremony.",
+          "zh": "校长在毕业典礼上作了简短讲话。",
+          "semanticRationale": "gave address at ceremony为正式讲话，非写收件地址。"
+        },
+        {
+          "context": "学术会议",
+          "en": "Her opening address focused on the need for international cooperation.",
+          "zh": "她的开幕致辞重点谈到了国际合作的必要性。",
+          "semanticRationale": "opening address及讲话主题明确演说，与毕业典礼祝辞场景不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "address",
+      "key": "deal-with-problem",
+      "pos": "vt.",
+      "definitionZh": "处理；着手应对问题或需求",
+      "definitionEn": "To give attention to a problem or need and take action to deal with it.",
+      "ordinal": 2,
+      "sourceKeys": ["address-v"],
+      "semanticRationale": "对问题采取行动这一动词含义区别发表讲话或书写住址。",
+      "examples": [
+        {
+          "context": "公共交通",
+          "en": "The council must address the shortage of buses in rural areas.",
+          "zh": "地方议会必须着手解决乡村地区公交车不足的问题。",
+          "semanticRationale": "shortage为问题宾语，address为处理而非写地址。"
+        },
+        {
+          "context": "顾客反馈",
+          "en": "The manager promised to address our concerns about food safety.",
+          "zh": "经理承诺处理我们对食品安全的担忧。",
+          "semanticRationale": "回应并处理顾客担忧与公共交通资源不足是不同场景。"
+        }
+      ]
+    }
+  ]
+}

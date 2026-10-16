@@ -19,6 +19,8 @@ const state = vi.hoisted(() => {
     effectCursor: 0,
     effectSlots: [] as { deps?: readonly unknown[]; cleanup?: () => void }[],
     rejectAudio: false,
+    remoteEnabled: undefined as boolean | undefined,
+    remoteCompatible: undefined as boolean | undefined,
   };
 });
 vi.mock('react', async (original) => {
@@ -88,7 +90,14 @@ const audio: WordAudio[] = (['US', 'UK'] as const).map((accent) => ({
 }));
 vi.mock('../AppContext', () => ({
   useApp: () => ({ user: { id: 'audio-test-user' }, scope: 'audio-test:user' }),
-  useRemote: () => ({ data: { pronunciation: { audio } }, isPending: false, error: null }),
+  useRemote: (_key: string, _path: string, enabled: boolean) => {
+    state.remoteEnabled = enabled;
+    return {
+      data: { pronunciation: { audio, pronunciationCompatible: state.remoteCompatible } },
+      isPending: false,
+      error: null,
+    };
+  },
 }));
 const instances: FakeAudio[] = [];
 class FakeAudio {
@@ -112,12 +121,12 @@ function elements(node: ReactNode): Element[] {
     return Array.isArray(node) ? node.flatMap(elements) : [];
   return [node, ...elements(node.props.children as ReactNode)];
 }
-function render(autoPlay = true) {
+function render(autoPlay = true, value: Word = word) {
   state.cursor = 0;
   state.refCursor = 0;
   state.effects = [];
   state.effectCursor = 0;
-  return AudioButton({ word, autoPlay });
+  return AudioButton({ word: value, autoPlay });
 }
 function runAutomaticEffect() {
   for (const effect of state.effects) effect();
@@ -138,6 +147,8 @@ beforeEach(() => {
   state.effectSlots = [];
   state.effectCursor = 0;
   state.rejectAudio = false;
+  state.remoteEnabled = undefined;
+  state.remoteCompatible = undefined;
   instances.length = 0;
   vi.stubGlobal('React', React);
   vi.stubGlobal('Audio', FakeAudio);
@@ -152,6 +163,61 @@ afterAll(() => {
   stopApplicationAudio();
   expect(globalThis.fetch).not.toHaveBeenCalled();
   vi.unstubAllGlobals();
+});
+
+it('blocks incompatible word-level audio and cached metadata without starting another request', () => {
+  state.autoPlay = true;
+  const tree = render(true, { ...word, audio, pronunciationCompatible: false });
+  runAutomaticEffect();
+  expect(state.remoteEnabled).toBe(false);
+  expect(instances).toHaveLength(0);
+  const buttons = elements(tree).filter((item) => item.type === 'button');
+  expect(buttons).toHaveLength(2);
+  expect(buttons.every((item) => item.props.disabled === true)).toBe(true);
+  expect(buttons.every((item) => String(item.props['aria-label']).startsWith('暂无'))).toBe(true);
+  const ipa = elements(tree).filter((item) => item.props.className === 'pronunciation-ipa');
+  expect(ipa.map((item) => item.props.children)).toEqual(['暂无音标', '暂无音标']);
+});
+
+it('stops a playing word recording when its pronunciation compatibility is revoked', () => {
+  state.autoPlay = true;
+  render();
+  runAutomaticEffect();
+  expect(instances).toHaveLength(1);
+  render(true, { ...word, pronunciationCompatible: false });
+  runAutomaticEffect();
+  expect(instances[0]!.pause).toHaveBeenCalled();
+  expect(instances).toHaveLength(1);
+});
+
+it('honours a negative pronunciation response over stale embedded audio and IPA', () => {
+  state.remoteCompatible = false;
+  state.autoPlay = true;
+  for (const value of [word, { ...word, audio }]) {
+    const tree = render(true, value);
+    runAutomaticEffect();
+    const buttons = elements(tree).filter((item) => item.type === 'button');
+    expect(buttons.every((item) => item.props.disabled === true)).toBe(true);
+    expect(buttons.every((item) => String(item.props['aria-label']).startsWith('暂无'))).toBe(true);
+    expect(
+      elements(tree)
+        .filter((item) => item.props.className === 'pronunciation-ipa')
+        .map((item) => item.props.children),
+    ).toEqual(['暂无音标', '暂无音标']);
+  }
+  expect(instances).toHaveLength(0);
+});
+
+it('stops the current recording when pronunciation metadata changes to incompatible', () => {
+  state.autoPlay = true;
+  render();
+  runAutomaticEffect();
+  expect(instances).toHaveLength(1);
+  state.remoteCompatible = false;
+  render();
+  runAutomaticEffect();
+  expect(instances[0]!.pause).toHaveBeenCalled();
+  expect(instances).toHaveLength(1);
 });
 
 it('orders exactly two independently labelled audio buttons by the saved accent', () => {

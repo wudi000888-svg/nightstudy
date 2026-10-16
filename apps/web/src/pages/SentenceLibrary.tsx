@@ -5,6 +5,7 @@ import { Plus, Quote, Search, Trash2 } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
 import { api, post } from '../lib/api';
 import type { Word } from '../lib/types';
+import type { DictionaryBrief } from '../lib/lookup-state';
 import type { SavedSentence, SentencePage } from '../lib/mobile-content-types';
 import { Dialog, Empty, ErrorNotice, Loading, LoginPrompt, Notice } from '../components/UI';
 import { InteractiveEnglish } from '../components/InteractiveEnglish';
@@ -50,7 +51,7 @@ export function SentencesPage() {
     `words/${encodeURIComponent(wordId)}`,
     !!user && !!wordId,
   );
-  const found = useRemote<{ items: Word[] }>(
+  const found = useRemote<{ items: DictionaryBrief[] }>(
     'sentence-source-search',
     `dictionary?q=${encodeURIComponent(findQuery)}&limit=10`,
     !!user && !!findQuery,
@@ -68,27 +69,23 @@ export function SentencesPage() {
     getNextPageParam: (last) =>
       last.page.hasMore ? (last.page.nextCursor ?? undefined) : undefined,
   });
-  const examples = [
-    ...(word.data?.word.examples ?? []).map((item) => ({
-      ...item,
-      sourceType: 'word-example' as const,
-    })),
-    ...(word.data?.word.senses ?? [])
-      .filter((item) => item.exampleEn && item.exampleZh)
-      .map((item) => ({
-        id: item.id,
-        exampleEn: item.exampleEn!,
-        exampleZh: item.exampleZh!,
-        sourceType: 'sense' as const,
-      })),
-  ].filter(
-    (item, index, all) =>
-      !!item.exampleEn &&
-      !!item.exampleZh &&
-      all.findIndex(
-        (other) => other.exampleEn === item.exampleEn && other.exampleZh === item.exampleZh,
-      ) === index,
-  );
+  const examples = (word.data?.word.senses ?? [])
+    .flatMap((sense) =>
+      (sense.examples ?? [])
+        .filter((item) => item.learningSenseId === sense.id)
+        .map((item) => ({
+          ...item,
+          pos: sense.pos,
+          meaning: sense.definitionZh,
+          sourceType: 'word-example' as const,
+        })),
+    )
+    .filter(
+      (item, index, all) =>
+        !!item.exampleEn &&
+        !!item.exampleZh &&
+        all.findIndex((other) => other.id === item.id) === index,
+    );
   const rows = list.data?.pages.flatMap((page) => page.items) ?? [];
   async function mutate(id: string, action: () => Promise<unknown>, message: string) {
     if (saving.current) return;
@@ -192,6 +189,10 @@ export function SentencesPage() {
               {examples.length ? (
                 examples.map((item) => (
                   <div className="mobile-source-example" key={`${item.sourceType}:${item.id}`}>
+                    <small className="mobile-caption">
+                      {item.pos} {item.meaning}
+                      {item.contextLabel ? ` · ${item.contextLabel}` : ''}
+                    </small>
                     <p lang="en">
                       <InteractiveEnglish text={item.exampleEn} />
                     </p>

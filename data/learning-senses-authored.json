@@ -1,0 +1,1264 @@
+{
+  "editorialPolicy": {
+    "decision": "publish",
+    "reviewer": "Codex",
+    "expertCertified": false,
+    "method": "Direct bilingual authorship and explicit sense-by-sense editorial review; no expert certification."
+  },
+  "sourceSelectors": {
+    "bank-n": {
+      "pos": "n.",
+      "definitionZh": "银行, 堤, 岸",
+      "definitionEn": "a financial institution; an embankment; the edge of a river or other body of water",
+      "relation": "narrower",
+      "reason": "混合源行同时含金融和地理义；本批分别限定，绝不按整行共享句子。"
+    },
+    "charge-n": {
+      "pos": "n.",
+      "definitionZh": "指控, 费用, 冲锋, 电荷, 炸药, 主管, 被托管人, 命令",
+      "definitionEn": "An accusation; a fee; a rush or attack; electric charge; an explosive load; supervision or a person entrusted to someone's care; an order.",
+      "relation": "narrower",
+      "reason": "混合名词源行明确列出本义；单独拆出费用、指控、冲锋和电荷。"
+    },
+    "charge-vt": {
+      "pos": "vt.",
+      "definitionZh": "控诉, 加罪于, 使充满, 使充电, 使承担",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "及物动词混合行明确含使充电和控诉，分别限定相应论元与语境。"
+    },
+    "charge-vi": {
+      "pos": "vi.",
+      "definitionZh": "冲锋, 要价, 收费",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "从混合不及物用法中仅取收费义，不混入冲锋或电学用法。"
+    },
+    "claim-n": {
+      "pos": "n.",
+      "definitionZh": "要求, 要求权, 断言, 权利",
+      "definitionEn": "A demand; an entitlement to make a demand; an assertion; a right.",
+      "relation": "narrower",
+      "reason": "从混合源释义分别限定为事实断言及正式索赔请求，保留区别。"
+    },
+    "claim-vt": {
+      "pos": "vt.",
+      "definitionZh": "要求, 认领, 主张",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "及物动词源行明确含认领与主张，本批按不同宾语含义拆分。"
+    },
+    "claim-vi": {
+      "pos": "vi.",
+      "definitionZh": "提出要求, 主张, 断言",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "源行包含断言义；限定为声称某事属实，句中带完整从句。"
+    },
+    "light-n": {
+      "pos": "n.",
+      "definitionZh": "光, 光亮, 灯, 日光, 发光体, 光源, 杰出人物, 火花, 眼光",
+      "definitionEn": "Visible illumination or brightness; a lamp, daylight, or another source of illumination; a distinguished person; a spark or flame; perception or understanding.",
+      "relation": "narrower",
+      "reason": "名词混合行明确含光与灯，拆分不可数照明与可数照明器具。"
+    },
+    "light-adj": {
+      "pos": "a.",
+      "definitionZh": "轻的, 少量的, 轻微的, 轻快的, 轻浮的, 明亮的, 淡色的, 容易的",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "形容词源行混合重量、强度、颜色等含义；每义只保留一个属性。"
+    },
+    "light-vt": {
+      "pos": "vt.",
+      "definitionZh": "点燃, 照亮",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "及物动词行含点燃与照亮，按动作对象和结果分开制作例句。"
+    },
+    "water-n": {
+      "pos": "n.",
+      "definitionZh": "水, 雨水, 海水, 水位, 水面, 流水",
+      "definitionEn": "The familiar liquid essential to life; rainwater, seawater or flowing water; the level or surface of a body of water.",
+      "relation": "narrower",
+      "reason": "混合名词行含水及水位等概念，本批仅取水这种液体这一义。"
+    },
+    "water-vt": {
+      "pos": "vt.",
+      "definitionZh": "给...浇水, 供以水, 注入水, 使湿",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "源动词明确含浇水，本批限定给植物或土壤供水，不混入流泪。"
+    },
+    "water-vi": {
+      "pos": "vi.",
+      "definitionZh": "流泪, 流口水, 加水",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "不及物源行含眼睛流泪与流口水，本批仅取眼睛因刺激流泪。"
+    },
+    "run-vi": {
+      "pos": "vi.",
+      "definitionZh": "跑, 奔跑, 跑步, 赛跑, 竞赛, 行驶, 运转, 进行, 蔓延",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "不及物混合源行列出奔跑与运转，两种主体和动作含义分开。"
+    },
+    "run-vt": {
+      "pos": "vt.",
+      "definitionZh": "使跑, 参赛, 追究, 驾驶, 开动, 管理, 经营, 使流出, 运行",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "及物源行含管理经营，本义限定负责组织日常运作而非身体奔跑。"
+    },
+    "run-n": {
+      "pos": "n.",
+      "definitionZh": "跑, 赛跑, 奔跑, 奔跑的路程, 趋向, 流出, 运转时间, 连续",
+      "definitionEn": "An act or race of running; a distance covered; a tendency; an outflow; a period of operation; an uninterrupted sequence.",
+      "relation": "narrower",
+      "reason": "混合名词行中的跑步活动单独呈现，不借用动词管理或机器例句。"
+    },
+    "set-vt": {
+      "pos": "vt.",
+      "definitionZh": "放, 安置, 放置, 设定, 使凝结, 点燃, 确定, 点缀, 使就位, 树立, 分配, 调整",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "混合及物源行含放置及设定，分别限定空间放置和选择设定值。"
+    },
+    "set-vi": {
+      "pos": "vi.",
+      "definitionZh": "日落, 凝固, 定型, 搁住, 结果, 适合",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "从混合不及物源行分别选择太阳落山和材料凝固，避免互配语境。"
+    },
+    "set-n": {
+      "pos": "n.",
+      "definitionZh": "",
+      "definitionEn": "a group of things of the same kind that belong together and are so used",
+      "relation": "exact",
+      "reason": "源英文明确指配套使用的一组同类物品，原创中文定义与之对应。"
+    },
+    "take-off": {
+      "pos": "v. phr.",
+      "definitionZh": "拿掉, 取消, 脱下, 领走, 减去, 复制, 起飞, 离开, 岔开",
+      "definitionEn": "To remove, cancel, take away, deduct, copy, depart, leave the ground, or divert.",
+      "relation": "narrower",
+      "reason": "短语源行混合多义；本批仅拆明示的脱下与起飞，保留短语身份。"
+    },
+    "look-up": {
+      "pos": "phr. v.",
+      "definitionZh": "抬头看；仰望；好转；查找；拜访。",
+      "definitionEn": "to look upward; to gaze up; to improve; to search for information; to visit",
+      "relation": "narrower",
+      "reason": "经校对的短语源行仍为多义，本批分开查阅、抬头和形势好转。"
+    },
+    "break-down": {
+      "pos": "v. phr.",
+      "definitionZh": "毁掉, 制服, 压倒, 倒塌, 垮掉, 分解",
+      "definitionEn": "to destroy; to subdue; to overwhelm; to collapse; to fall apart; to decompose",
+      "relation": "narrower",
+      "reason": "从混合短语源行选择分解成分这一含义，明确对象为复杂整体。"
+    },
+    "break-down-fail": {
+      "pos": "",
+      "definitionZh": "[化] 发生故障",
+      "definitionEn": "[Chemistry] to malfunction; to fail",
+      "relation": "corrected-from",
+      "reason": "源行将常见机器故障义误限化学语域；原创定义取消不恰当的领域限定，保留纠错关系。"
+    },
+    "turn-down": {
+      "pos": "v. phr.",
+      "definitionZh": "拒绝",
+      "definitionEn": "To refuse or reject something.",
+      "relation": "exact",
+      "reason": "源行明确为拒绝义；本批不借此源行增添缺少依据的调低音量义。"
+    },
+    "get-over": {
+      "pos": "v. phr.",
+      "definitionZh": "爬过, 克服, 熬过, 恢复, 原谅",
+      "definitionEn": "to climb over; to overcome; to survive; to recover from; to forgive",
+      "relation": "narrower",
+      "reason": "混合短语源行含恢复和克服，分别限定疾病康复与克服障碍。"
+    },
+    "in-charge-of": {
+      "pos": "prep. phr.",
+      "definitionZh": "负责；管理；主管；掌管；看管。",
+      "definitionEn": "responsible for; managing, supervising, controlling, or looking after",
+      "relation": "narrower",
+      "reason": "取负责管理这一共同核心义，不混入被管理者含义；保持独立词组。"
+    },
+    "by-accident": {
+      "pos": "adv. phr.",
+      "definitionZh": "偶然",
+      "definitionEn": "accidentally; without intention",
+      "relation": "narrower",
+      "reason": "源行偶然与无意范围较宽，本义限定无意而非有计划地发生。"
+    },
+    "system-n": {
+      "pos": "n.",
+      "definitionZh": "系统, 体系, 制度, 方式, 秩序, 分类原则",
+      "definitionEn": "A set of connected parts; an organized framework, institution, or method; order; a principle of classification.",
+      "relation": "narrower",
+      "reason": "混合名词源行包含连接部件系统与规则制度，按物理构成和组织规则分开。"
+    }
+  },
+  "meanings": [
+    {
+      "lemma": "bank",
+      "key": "financial-institution",
+      "pos": "n.",
+      "definitionZh": "银行；提供存款、贷款等服务的金融机构",
+      "definitionEn": "A financial institution that keeps money and provides services such as loans.",
+      "ordinal": 0,
+      "sourceKeys": ["bank-n"],
+      "semanticRationale": "银行机构义与河岸地理义不可互换；账户和贷款两个场景均以机构为主体。",
+      "examples": [
+        {
+          "context": "开立账户",
+          "en": "She opened a savings account at the bank near her office.",
+          "zh": "她在办公室附近的银行开了一个储蓄账户。",
+          "semanticRationale": "储蓄账户只能对应金融机构；中文完整保留地点与开户动作。"
+        },
+        {
+          "context": "申请贷款",
+          "en": "The bank approved a loan for the family's first home.",
+          "zh": "银行批准了这家人购买第一套住房的贷款。",
+          "semanticRationale": "审批住房贷款是金融机构行为，与开户场景不同且无河岸歧义。"
+        }
+      ]
+    },
+    {
+      "lemma": "bank",
+      "key": "river-edge",
+      "pos": "n.",
+      "definitionZh": "河岸；河流或湖泊边缘的陆地",
+      "definitionEn": "The land along the edge of a river or lake.",
+      "ordinal": 1,
+      "sourceKeys": ["bank-n"],
+      "semanticRationale": "限定水体边缘陆地；散步和洪水侵蚀两个场景均清楚指地理位置。",
+      "examples": [
+        {
+          "context": "河边散步",
+          "en": "We sat on the river bank and watched the ducks swim past.",
+          "zh": "我们坐在河岸上，看着鸭子从面前游过。",
+          "semanticRationale": "river及鸭子游过明确标出河岸义，中文未错误译成银行。"
+        },
+        {
+          "context": "洪水侵蚀",
+          "en": "Heavy rain washed away part of the bank beside the bridge.",
+          "zh": "暴雨冲走了桥边的一部分河岸。",
+          "semanticRationale": "冲蚀的是水边陆地；灾害场景与休闲观察场景有实质区别。"
+        }
+      ]
+    },
+    {
+      "lemma": "charge",
+      "key": "service-fee",
+      "pos": "n.",
+      "definitionZh": "费用；为商品或服务收取的钱",
+      "definitionEn": "An amount of money asked for goods or a service.",
+      "ordinal": 0,
+      "sourceKeys": ["charge-n"],
+      "semanticRationale": "仅为名词费用，不混入法律指控、冲锋和手机充电。",
+      "examples": [
+        {
+          "context": "停车收费",
+          "en": "There is a small charge for parking behind the station.",
+          "zh": "在车站后面停车需要支付少量费用。",
+          "semanticRationale": "small及停车服务使charge明确为费用，介词for所指服务翻译对应。"
+        },
+        {
+          "context": "商品配送",
+          "en": "The delivery charge is included in the price shown online.",
+          "zh": "配送费用已包含在网上显示的价格中。",
+          "semanticRationale": "delivery charge为配送费用，消费价格场景与停车服务不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "charge",
+      "key": "formal-accusation",
+      "pos": "n.",
+      "definitionZh": "指控；对违法或不当行为的正式指责",
+      "definitionEn": "A formal accusation that someone has done something illegal or wrong.",
+      "ordinal": 1,
+      "sourceKeys": ["charge-n"],
+      "semanticRationale": "明确法律指控名词；审理及撤销是不同法律情境，无电学或费用含义。",
+      "examples": [
+        {
+          "context": "法庭审理",
+          "en": "The court will hear the theft charge next month.",
+          "zh": "法院将于下个月审理这项盗窃指控。",
+          "semanticRationale": "theft与court使charge指刑事指控，不将名词错配成充电动作。"
+        },
+        {
+          "context": "证据不足",
+          "en": "The charge was dropped because the witness could not identify him.",
+          "zh": "由于证人无法指认他，这项指控被撤销了。",
+          "semanticRationale": "dropped charge及证人识别说明撤销指控，英中因果关系一致。"
+        }
+      ]
+    },
+    {
+      "lemma": "charge",
+      "key": "electric-property",
+      "pos": "n.",
+      "definitionZh": "电荷；使物体产生电相互作用的一种物理属性",
+      "definitionEn": "A physical property that causes an object to exert or experience an electric force.",
+      "ordinal": 2,
+      "sourceKeys": ["charge-n"],
+      "semanticRationale": "本义为电荷名词而非充电动词；静电及基本粒子体现两个应用场景。",
+      "examples": [
+        {
+          "context": "静电实验",
+          "en": "Rubbing the balloon gives it an electric charge.",
+          "zh": "摩擦气球会使它带上电荷。",
+          "semanticRationale": "electric及摩擦气球明确静电荷，未混同服务费用。"
+        },
+        {
+          "context": "基本粒子",
+          "en": "An electron has a negative charge.",
+          "zh": "电子带负电荷。",
+          "semanticRationale": "negative与electron构成明确物理概念，中文准确对应负电荷。"
+        }
+      ]
+    },
+    {
+      "lemma": "charge",
+      "key": "rush-attack",
+      "pos": "n.",
+      "definitionZh": "冲锋；向前猛烈冲去的行动",
+      "definitionEn": "A sudden forceful rush towards someone or something.",
+      "ordinal": 3,
+      "sourceKeys": ["charge-n"],
+      "semanticRationale": "限定为向前猛冲的可数行动；历史战斗及运动构成两个语境。",
+      "examples": [
+        {
+          "context": "历史战斗",
+          "en": "The cavalry began a charge across the open field.",
+          "zh": "骑兵开始穿过开阔的田野发起冲锋。",
+          "semanticRationale": "cavalry和穿越田野明确冲锋动作，charge为名词而非法律指控。"
+        },
+        {
+          "context": "橄榄球进攻",
+          "en": "His powerful charge carried the ball close to the try line.",
+          "zh": "他有力的冲刺带球逼近了达阵线。",
+          "semanticRationale": "球场向前猛冲体现同一核心含义，运动与战争语境不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "charge",
+      "key": "replenish-battery",
+      "pos": "vt.",
+      "definitionZh": "给电池或设备充电",
+      "definitionEn": "To put electrical energy into a battery or an electrical device.",
+      "ordinal": 4,
+      "sourceKeys": ["charge-vt"],
+      "semanticRationale": "电能进入电池的及物动作单独成义，不配给费用等名词。",
+      "examples": [
+        {
+          "context": "手机准备",
+          "en": "Please charge your phone before we leave for the airport.",
+          "zh": "我们去机场之前，请给手机充好电。",
+          "semanticRationale": "phone作直接宾语，charge为充电动作，时间从句译文对应。"
+        },
+        {
+          "context": "电动车出行",
+          "en": "Drivers can charge their cars while they shop at this supermarket.",
+          "zh": "司机可以在这家超市购物时给汽车充电。",
+          "semanticRationale": "给汽车补电与手机出行准备不同，均明确为设备充电。"
+        }
+      ]
+    },
+    {
+      "lemma": "charge",
+      "key": "ask-price",
+      "pos": "v.",
+      "definitionZh": "收费；要求支付某个价格",
+      "definitionEn": "To ask someone to pay a particular price for goods or a service.",
+      "ordinal": 5,
+      "sourceKeys": ["charge-vi"],
+      "semanticRationale": "限定商家定价行为，区别名词费用；句子中金额和按时计费均清楚。",
+      "examples": [
+        {
+          "context": "维修定价",
+          "en": "How much do you charge to repair a bicycle tyre?",
+          "zh": "修补自行车轮胎你收多少钱？",
+          "semanticRationale": "问维修价格体现动词收费，不是电池充电或名词费用。"
+        },
+        {
+          "context": "课程计费",
+          "en": "Some tutors charge by the hour rather than by the lesson.",
+          "zh": "有些家教按小时收费，而不是按课次收费。",
+          "semanticRationale": "by the hour体现收费计价方式，与具体维修报价不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "claim",
+      "key": "assert-true",
+      "pos": "v.",
+      "definitionZh": "声称；断言某事属实",
+      "definitionEn": "To state that something is true, especially when it has not been proved.",
+      "ordinal": 0,
+      "sourceKeys": ["claim-vi"],
+      "semanticRationale": "陈述真假尚未证实的信息，与认领物品和申请赔偿不同。",
+      "examples": [
+        {
+          "context": "产品宣传",
+          "en": "The manufacturers claim that the new battery lasts twice as long.",
+          "zh": "制造商声称，这款新电池的续航时间是原来的两倍。",
+          "semanticRationale": "that从句表达宣传断言，未把claim理解成索取或认领。"
+        },
+        {
+          "context": "历史发现",
+          "en": "Two teams claim to have discovered the ancient settlement first.",
+          "zh": "两个团队都声称自己最先发现了这处古代聚落。",
+          "semanticRationale": "claim to have done为声称先前发现，考古争议不同于产品宣传。"
+        }
+      ]
+    },
+    {
+      "lemma": "claim",
+      "key": "collect-belonging",
+      "pos": "vt.",
+      "definitionZh": "认领；领取属于自己的物品",
+      "definitionEn": "To collect something that belongs to you or that you have a right to receive.",
+      "ordinal": 1,
+      "sourceKeys": ["claim-vt"],
+      "semanticRationale": "直接宾语为失物或赢得的奖品，表现领取而非声称事实。",
+      "examples": [
+        {
+          "context": "失物招领",
+          "en": "You can claim your lost umbrella at the station office.",
+          "zh": "你可以到车站办公室认领丢失的雨伞。",
+          "semanticRationale": "lost umbrella及地点使claim为认领，中文保留所属关系。"
+        },
+        {
+          "context": "领取奖品",
+          "en": "Winners must claim their prizes before the end of the month.",
+          "zh": "获奖者必须在月底之前领取奖品。",
+          "semanticRationale": "prizes为应得物品；领取奖励与找回失物是不同真实场景。"
+        }
+      ]
+    },
+    {
+      "lemma": "claim",
+      "key": "compensation-request",
+      "pos": "n.",
+      "definitionZh": "索赔请求；要求赔偿损失的正式申请",
+      "definitionEn": "A formal request for money to compensate for damage, loss, or injury.",
+      "ordinal": 2,
+      "sourceKeys": ["claim-n"],
+      "semanticRationale": "从要求权这一源义限定正式赔偿申请；保险与运输损坏分为两场景。",
+      "examples": [
+        {
+          "context": "房屋保险",
+          "en": "She filed a claim after the storm damaged her roof.",
+          "zh": "暴风雨损坏屋顶后，她提出了索赔申请。",
+          "semanticRationale": "filed及财产受损使claim为索赔名词，译文不泛译为声称。"
+        },
+        {
+          "context": "行李损坏",
+          "en": "Keep the receipt if you want to make a claim for the broken suitcase.",
+          "zh": "如果你想就损坏的行李箱索赔，请保留收据。",
+          "semanticRationale": "make a claim for损坏物强调索赔申请，与房屋保险情景不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "claim",
+      "key": "statement-unproven",
+      "pos": "n.",
+      "definitionZh": "断言；声称为真的说法",
+      "definitionEn": "A statement that something is true, although it may need evidence.",
+      "ordinal": 3,
+      "sourceKeys": ["claim-n"],
+      "semanticRationale": "作为陈述内容的名词，与领取动作或金钱索赔分开。",
+      "examples": [
+        {
+          "context": "科学证据",
+          "en": "The researchers found no evidence to support that claim.",
+          "zh": "研究人员没有找到支持那一说法的证据。",
+          "semanticRationale": "support和evidence指验证断言，不指法律赔偿申请。"
+        },
+        {
+          "context": "旅游广告",
+          "en": "The hotel's claim to be the oldest in town is difficult to verify.",
+          "zh": "这家酒店自称是镇上最古老的酒店，但这一说法难以核实。",
+          "semanticRationale": "名词所有格及to be说明具体说法，中文未误译认领。"
+        }
+      ]
+    },
+    {
+      "lemma": "light",
+      "key": "visible-illumination",
+      "pos": "n.",
+      "definitionZh": "光；使物体可见的亮度或照明",
+      "definitionEn": "The brightness that makes things visible.",
+      "ordinal": 0,
+      "sourceKeys": ["light-n"],
+      "semanticRationale": "不可数的光与可数的灯分离；建筑采光与摄影两种场景。",
+      "examples": [
+        {
+          "context": "房间采光",
+          "en": "The large windows let plenty of natural light into the room.",
+          "zh": "大窗户让充足的自然光照进房间。",
+          "semanticRationale": "natural light为光线而非灯具，译文保留数量与进入方向。"
+        },
+        {
+          "context": "摄影条件",
+          "en": "The photographer waited for softer light before taking the portrait.",
+          "zh": "摄影师等光线柔和一些后才拍摄肖像。",
+          "semanticRationale": "softer修饰照明性质，摄影与室内采光有不同情境。"
+        }
+      ]
+    },
+    {
+      "lemma": "light",
+      "key": "lamp-device",
+      "pos": "n.",
+      "definitionZh": "灯；提供照明的装置",
+      "definitionEn": "A device that produces illumination.",
+      "ordinal": 1,
+      "sourceKeys": ["light-n"],
+      "semanticRationale": "可开关或可安装的灯具，与抽象光线和形容词重量不同。",
+      "examples": [
+        {
+          "context": "睡前关灯",
+          "en": "Please switch off the kitchen light before you go to bed.",
+          "zh": "睡觉前请关掉厨房的灯。",
+          "semanticRationale": "switch off及特定房间使light指灯具，未当作形容词。"
+        },
+        {
+          "context": "道路设施",
+          "en": "A new light was installed at the entrance to the tunnel.",
+          "zh": "隧道入口安装了一盏新灯。",
+          "semanticRationale": "a及installed使其为可数照明装置，安装场景区别家庭关灯。"
+        }
+      ]
+    },
+    {
+      "lemma": "light",
+      "key": "low-weight",
+      "pos": "adj.",
+      "definitionZh": "轻的；重量小的",
+      "definitionEn": "Having little weight or less weight than expected.",
+      "ordinal": 2,
+      "sourceKeys": ["light-adj"],
+      "semanticRationale": "只描述重量，不混同浅色、亮度或轻微程度。",
+      "examples": [
+        {
+          "context": "徒步装备",
+          "en": "This light backpack is comfortable enough for a long hike.",
+          "zh": "这个轻便的背包适合长途徒步，背起来很舒服。",
+          "semanticRationale": "背包装备重量由light修饰，中文轻便保留重量属性。"
+        },
+        {
+          "context": "搬运家具",
+          "en": "The chair is so light that one person can carry it upstairs.",
+          "zh": "这把椅子很轻，一个人就能把它搬上楼。",
+          "semanticRationale": "搬运能力明确重量小，与徒步背包装备是不同场景。"
+        }
+      ]
+    },
+    {
+      "lemma": "light",
+      "key": "pale-colour",
+      "pos": "adj.",
+      "definitionZh": "浅色的；颜色不深的",
+      "definitionEn": "Pale rather than dark in colour.",
+      "ordinal": 3,
+      "sourceKeys": ["light-adj"],
+      "semanticRationale": "颜色深浅单独成义；衣物搭配和装修均是颜色属性。",
+      "examples": [
+        {
+          "context": "衣物搭配",
+          "en": "She wore a light blue scarf with her dark coat.",
+          "zh": "她戴了一条浅蓝色围巾，搭配深色外套。",
+          "semanticRationale": "light blue对照dark，明确浅色而非围巾重量。"
+        },
+        {
+          "context": "房间装修",
+          "en": "Choose a light colour to make the small room feel brighter.",
+          "zh": "选一种浅色，让小房间显得明亮一些。",
+          "semanticRationale": "colour为直接被修饰名词，装修与服饰场景不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "light",
+      "key": "low-intensity",
+      "pos": "adj.",
+      "definitionZh": "轻微的；强度小的",
+      "definitionEn": "Small in amount, force, or intensity.",
+      "ordinal": 4,
+      "sourceKeys": ["light-adj"],
+      "semanticRationale": "强度或数量较小，与物理重量和色彩分离。",
+      "examples": [
+        {
+          "context": "天气变化",
+          "en": "A light rain began as we reached the village.",
+          "zh": "我们到达村庄时，下起了小雨。",
+          "semanticRationale": "rain表降雨强度，未把light误译成颜色浅或重量轻。"
+        },
+        {
+          "context": "恢复锻炼",
+          "en": "The coach suggested light exercise on the day after the race.",
+          "zh": "教练建议比赛后的第二天做些轻度运动。",
+          "semanticRationale": "exercise指活动强度，运动恢复与天气不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "light",
+      "key": "ignite",
+      "pos": "vt.",
+      "definitionZh": "点燃；使开始燃烧",
+      "definitionEn": "To make something start burning.",
+      "ordinal": 5,
+      "sourceKeys": ["light-vt"],
+      "semanticRationale": "点燃可燃物的动作不同于照亮物体；烛光与野营分开。",
+      "examples": [
+        {
+          "context": "停电照明",
+          "en": "They used a match to light a candle during the power cut.",
+          "zh": "停电时，他们用火柴点燃了一根蜡烛。",
+          "semanticRationale": "match和candle显示点燃动作，不只是照明状态。"
+        },
+        {
+          "context": "野营生火",
+          "en": "Only light a campfire in the designated safe area.",
+          "zh": "只在指定的安全区域内点燃篝火。",
+          "semanticRationale": "campfire为燃烧对象，安全区域场景与室内停电不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "water",
+      "key": "life-liquid",
+      "pos": "n.",
+      "definitionZh": "水；生命所必需的常见透明液体",
+      "definitionEn": "The common clear liquid that people, animals, and plants need to live.",
+      "ordinal": 0,
+      "sourceKeys": ["water-n"],
+      "semanticRationale": "只取液体名词核心义，不混入眼睛流泪或浇植物的动作。",
+      "examples": [
+        {
+          "context": "饮水准备",
+          "en": "Fill your bottle with clean water before the walk.",
+          "zh": "出发步行前，把水瓶装满干净的水。",
+          "semanticRationale": "装入水瓶的是液体，中文clean与before含义完整。"
+        },
+        {
+          "context": "烹饪准备",
+          "en": "Bring the water to the boil before adding the pasta.",
+          "zh": "先把水烧开，再放入意大利面。",
+          "semanticRationale": "boil及烹饪过程明确水液体，与随身饮水不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "water",
+      "key": "irrigate-plants",
+      "pos": "vt.",
+      "definitionZh": "给植物浇水；向土壤供水",
+      "definitionEn": "To pour or supply water onto plants or soil so that plants can grow.",
+      "ordinal": 1,
+      "sourceKeys": ["water-vt"],
+      "semanticRationale": "及物动作对象为植物或土壤，不能给水名词复用同一个句子。",
+      "examples": [
+        {
+          "context": "阳台种植",
+          "en": "Remember to water the tomatoes on the balcony every morning.",
+          "zh": "记得每天早上给阳台上的番茄浇水。",
+          "semanticRationale": "water后直接接tomatoes为动词浇水，不是名词水。"
+        },
+        {
+          "context": "校园花园",
+          "en": "Volunteers take turns to water the school garden during the holidays.",
+          "zh": "假期里，志愿者轮流给学校花园浇水。",
+          "semanticRationale": "轮流维护园艺的行动与家庭阳台种植构成不同场景。"
+        }
+      ]
+    },
+    {
+      "lemma": "water",
+      "key": "eyes-produce-tears",
+      "pos": "vi.",
+      "definitionZh": "眼睛流泪；因刺激而分泌泪水",
+      "definitionEn": "For the eyes to produce tears, often because they are irritated.",
+      "ordinal": 2,
+      "sourceKeys": ["water-vi"],
+      "semanticRationale": "限定以眼睛为主语的不及物流泪，区别园艺及口水。",
+      "examples": [
+        {
+          "context": "切洋葱",
+          "en": "My eyes always water when I chop onions.",
+          "zh": "我切洋葱时，眼睛总会流泪。",
+          "semanticRationale": "eyes作主语，洋葱刺激明确泪水用法而不是浇水。"
+        },
+        {
+          "context": "寒风刺激",
+          "en": "The cold wind made his eyes water as he waited for the bus.",
+          "zh": "等公交车时，寒风吹得他的眼睛直流泪。",
+          "semanticRationale": "使役made接water原形，风刺激与厨房刺激是不同场景。"
+        }
+      ]
+    },
+    {
+      "lemma": "run",
+      "key": "move-on-foot-fast",
+      "pos": "vi.",
+      "definitionZh": "跑；用双腿快速前进",
+      "definitionEn": "To move quickly on foot, with both feet briefly off the ground during each stride.",
+      "ordinal": 0,
+      "sourceKeys": ["run-vi"],
+      "semanticRationale": "人的身体奔跑，与经营机构和机器运行不同；赶车和运动各一例。",
+      "examples": [
+        {
+          "context": "赶公交车",
+          "en": "We had to run to catch the last bus home.",
+          "zh": "我们只好跑着去赶回家的末班公交车。",
+          "semanticRationale": "to catch bus标出人为快速移动，没有经营或运转含义。"
+        },
+        {
+          "context": "锻炼习惯",
+          "en": "I prefer to run in the park before it gets crowded.",
+          "zh": "我喜欢趁公园还没拥挤起来时去跑步。",
+          "semanticRationale": "公园锻炼与紧急赶车不同，两个语境都明确身体动作。"
+        }
+      ]
+    },
+    {
+      "lemma": "run",
+      "key": "machine-operate",
+      "pos": "vi.",
+      "definitionZh": "机器或程序运转；正常工作",
+      "definitionEn": "For a machine or program to operate or function.",
+      "ordinal": 1,
+      "sourceKeys": ["run-vi"],
+      "semanticRationale": "主体为机器程序而非人；设备维护和电脑软件分开。",
+      "examples": [
+        {
+          "context": "机器维护",
+          "en": "Let the engine run for a minute before checking the oil.",
+          "zh": "检查机油之前，先让发动机运转一分钟。",
+          "semanticRationale": "engine为动作主体，run是运转，不是开车经营。"
+        },
+        {
+          "context": "软件使用",
+          "en": "This program will run on most modern laptops.",
+          "zh": "这个程序能在大多数现代笔记本电脑上运行。",
+          "semanticRationale": "program与设备平台使run明确为程序运行，区别机械维护。"
+        }
+      ]
+    },
+    {
+      "lemma": "run",
+      "key": "manage-organisation",
+      "pos": "vt.",
+      "definitionZh": "经营；负责组织或业务的日常运作",
+      "definitionEn": "To manage the regular activities of an organisation, business, or service.",
+      "ordinal": 2,
+      "sourceKeys": ["run-vt"],
+      "semanticRationale": "管理经营的及物义有组织宾语，区别不及物机器运转。",
+      "examples": [
+        {
+          "context": "餐饮经营",
+          "en": "Her parents run a small cafe near the university.",
+          "zh": "她的父母在大学附近经营一家小咖啡馆。",
+          "semanticRationale": "cafe为直接宾语，指负责经营实体而不是机器运转。"
+        },
+        {
+          "context": "社区服务",
+          "en": "Local volunteers run a free reading club for children.",
+          "zh": "当地志愿者为孩子们运营一个免费的读书俱乐部。",
+          "semanticRationale": "负责俱乐部持续活动与经营餐饮不同，中文运营对应管理义。"
+        }
+      ]
+    },
+    {
+      "lemma": "run",
+      "key": "running-outing",
+      "pos": "n.",
+      "definitionZh": "一次跑步；为锻炼而进行的跑步活动",
+      "definitionEn": "An occasion of running, especially for exercise.",
+      "ordinal": 3,
+      "sourceKeys": ["run-n"],
+      "semanticRationale": "可数跑步活动独立于动词奔跑，本批两句均有名词限定语。",
+      "examples": [
+        {
+          "context": "晨间锻炼",
+          "en": "A short run before breakfast helps me wake up.",
+          "zh": "早餐前跑一小会儿能让我清醒起来。",
+          "semanticRationale": "a short run整体为主语，明确一次跑步的名词用法。"
+        },
+        {
+          "context": "运动恢复",
+          "en": "After the long run, we stretched beside the lake.",
+          "zh": "长跑结束后，我们在湖边做了拉伸。",
+          "semanticRationale": "the long run指一次已完成运动，恢复场景不同于日常晨跑。"
+        }
+      ]
+    },
+    {
+      "lemma": "set",
+      "key": "put-position",
+      "pos": "vt.",
+      "definitionZh": "放置；把物体放在某个位置",
+      "definitionEn": "To put something in a particular place or position.",
+      "ordinal": 0,
+      "sourceKeys": ["set-vt"],
+      "semanticRationale": "具体物体放置与设定值分离；餐桌和实验室提供两个场景。",
+      "examples": [
+        {
+          "context": "餐桌摆放",
+          "en": "Please set the bowl in the middle of the table.",
+          "zh": "请把碗放在桌子中央。",
+          "semanticRationale": "bowl为物体宾语，位置短语in the middle排除设定义。"
+        },
+        {
+          "context": "实验室操作",
+          "en": "Set the sample on a clean surface before opening the container.",
+          "zh": "打开容器之前，先把样品放在干净的台面上。",
+          "semanticRationale": "sample与surface为具体放置，实验操作不同于餐桌场景。"
+        }
+      ]
+    },
+    {
+      "lemma": "set",
+      "key": "choose-value",
+      "pos": "vt.",
+      "definitionZh": "设定；选择时间、数值或目标",
+      "definitionEn": "To choose or fix a time, value, limit, or target.",
+      "ordinal": 1,
+      "sourceKeys": ["set-vt"],
+      "semanticRationale": "抽象设定与物理放置区分；温度与时间选择两个语境。",
+      "examples": [
+        {
+          "context": "烤箱温度",
+          "en": "Set the oven to one hundred and eighty degrees.",
+          "zh": "把烤箱温度设为一百八十度。",
+          "semanticRationale": "set to温度值表达设定参数，不是把烤箱搬到位置。"
+        },
+        {
+          "context": "闹钟设置",
+          "en": "I set my alarm for six because the train leaves early.",
+          "zh": "因为火车很早出发，我把闹钟设在六点。",
+          "semanticRationale": "alarm for six明确设定时间，与温度参数不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "set",
+      "key": "sun-go-below-horizon",
+      "pos": "vi.",
+      "definitionZh": "太阳落山；降到地平线以下",
+      "definitionEn": "For the sun to move below the horizon at the end of the day.",
+      "ordinal": 2,
+      "sourceKeys": ["set-vi"],
+      "semanticRationale": "天体日落的不及物义与凝固完全分开，分别旅游和季节观察。",
+      "examples": [
+        {
+          "context": "海边观景",
+          "en": "We watched the sun set over the sea.",
+          "zh": "我们看着太阳在海面上落下。",
+          "semanticRationale": "sun作宾语兼set逻辑主语，地理场景明确太阳落山。"
+        },
+        {
+          "context": "季节变化",
+          "en": "In winter, the sun can set before we finish work.",
+          "zh": "冬天，我们下班之前太阳就可能落山了。",
+          "semanticRationale": "winter及日程对比体现日落时间，不混入放置或参数设定。"
+        }
+      ]
+    },
+    {
+      "lemma": "set",
+      "key": "become-solid",
+      "pos": "vi.",
+      "definitionZh": "凝固；液体或软材料变硬成形",
+      "definitionEn": "For a liquid or soft material to become firm or solid.",
+      "ordinal": 3,
+      "sourceKeys": ["set-vi"],
+      "semanticRationale": "凝固过程与太阳落山或摆放分离；甜点和建筑材料分别示例。",
+      "examples": [
+        {
+          "context": "制作甜点",
+          "en": "Leave the jelly in the fridge until it has set.",
+          "zh": "把果冻放在冰箱里，直到它凝固。",
+          "semanticRationale": "jelly是凝固主体，has set为完成时，中文保持结果含义。"
+        },
+        {
+          "context": "建筑施工",
+          "en": "The concrete needs time to set before anyone walks on it.",
+          "zh": "混凝土需要一段时间凝固，之后人才能走上去。",
+          "semanticRationale": "concrete变硬与食品凝固场景不同，仍是相同过程义。"
+        }
+      ]
+    },
+    {
+      "lemma": "set",
+      "key": "matching-collection",
+      "pos": "n.",
+      "definitionZh": "一套；配合使用的一组同类物品",
+      "definitionEn": "A group of matching or related things intended to be used together.",
+      "ordinal": 4,
+      "sourceKeys": ["set-n"],
+      "semanticRationale": "源英文已原子化为配套物品集合，不混入数学集合及日落。",
+      "examples": [
+        {
+          "context": "厨房用具",
+          "en": "We bought a set of kitchen knives for the new flat.",
+          "zh": "我们为新公寓买了一套厨房刀具。",
+          "semanticRationale": "a set of knives为配套工具，非动词设置。"
+        },
+        {
+          "context": "教学设备",
+          "en": "Each classroom has a complete set of laboratory tools.",
+          "zh": "每间教室都有一整套实验室工具。",
+          "semanticRationale": "complete set强调配套集合，教学设备与家庭厨房不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "take off",
+      "key": "aircraft-leave-ground",
+      "pos": "phr. v.",
+      "definitionZh": "飞机起飞；离开地面升空",
+      "definitionEn": "For an aircraft to leave the ground and begin flying.",
+      "ordinal": 0,
+      "sourceKeys": ["take-off"],
+      "semanticRationale": "短语整体取航空起飞义，区别脱衣动作；航班与训练分别示例。",
+      "examples": [
+        {
+          "context": "航班延误",
+          "en": "Our plane could not take off until the fog cleared.",
+          "zh": "我们的飞机直到雾散后才能起飞。",
+          "semanticRationale": "plane和fog明确起飞，take off连续出现，不依赖随意词形猜测。"
+        },
+        {
+          "context": "飞行训练",
+          "en": "Student pilots learn to take off safely in crosswinds.",
+          "zh": "飞行学员学习如何在侧风中安全起飞。",
+          "semanticRationale": "飞行技能训练与旅客航班延误不同，二者都不是脱下衣物。"
+        }
+      ]
+    },
+    {
+      "lemma": "take off",
+      "key": "remove-clothing",
+      "pos": "phr. v.",
+      "definitionZh": "脱下；把穿戴的衣物移除",
+      "definitionEn": "To remove a piece of clothing that you are wearing.",
+      "ordinal": 1,
+      "sourceKeys": ["take-off"],
+      "semanticRationale": "及物短语接衣物，与飞机不及物起飞不同；医疗及室内礼仪分开。",
+      "examples": [
+        {
+          "context": "入室礼仪",
+          "en": "Please take off your shoes before entering the prayer room.",
+          "zh": "进入祈祷室之前，请脱掉鞋子。",
+          "semanticRationale": "shoes为衣物直接宾语，动作是脱下而不是起飞。"
+        },
+        {
+          "context": "医疗检查",
+          "en": "The nurse asked him to take off his coat for the examination.",
+          "zh": "护士请他脱下外套接受检查。",
+          "semanticRationale": "coat与医疗检查构成明确脱衣用法，与入室礼仪不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "look up",
+      "key": "consult-information",
+      "pos": "phr. v.",
+      "definitionZh": "查阅；在资料中寻找信息",
+      "definitionEn": "To search for a piece of information in a book or another reference source.",
+      "ordinal": 0,
+      "sourceKeys": ["look-up"],
+      "semanticRationale": "参考资料查询义不与抬头或好转混用，词典和旅行时刻表分别示例。",
+      "examples": [
+        {
+          "context": "词典查词",
+          "en": "You can look up unfamiliar words in this dictionary.",
+          "zh": "你可以用这本词典查阅不熟悉的单词。",
+          "semanticRationale": "dictionary给出查阅资料，look up不是向上看的身体动作。"
+        },
+        {
+          "context": "查询车次",
+          "en": "Let me look up the train times before we book the hotel.",
+          "zh": "订酒店之前，让我先查一下火车时刻。",
+          "semanticRationale": "train times为信息宾语，出行资料查询与词汇学习不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "look up",
+      "key": "raise-gaze",
+      "pos": "phr. v.",
+      "definitionZh": "抬头看；把目光转向上方",
+      "definitionEn": "To raise your eyes so that you are looking upwards.",
+      "ordinal": 1,
+      "sourceKeys": ["look-up"],
+      "semanticRationale": "视线物理上移独立于查询信息与形势改善；仰望和听见声音两场景。",
+      "examples": [
+        {
+          "context": "观察天空",
+          "en": "Look up and you may see the first stars of the evening.",
+          "zh": "抬头看看，你也许能看到傍晚最早出现的星星。",
+          "semanticRationale": "天空星星明确方向向上，非资料查询。"
+        },
+        {
+          "context": "课堂互动",
+          "en": "The teacher asked us to look up from our books.",
+          "zh": "老师让我们把目光从书本上移开，抬起头来。",
+          "semanticRationale": "from our books表示视线移离书本，不误当在书里查词。"
+        }
+      ]
+    },
+    {
+      "lemma": "look up",
+      "key": "situation-improve",
+      "pos": "phr. v.",
+      "definitionZh": "形势好转；状况开始改善",
+      "definitionEn": "For a situation or someone's prospects to start improving.",
+      "ordinal": 2,
+      "sourceKeys": ["look-up"],
+      "semanticRationale": "抽象状况开始改善与查阅和视线动作不同；生意及个人就业分别示例。",
+      "examples": [
+        {
+          "context": "经营改善",
+          "en": "Business began to look up after the new station opened.",
+          "zh": "新车站开通后，生意开始好转。",
+          "semanticRationale": "business是状况主体，look up表达改善而非抬头。"
+        },
+        {
+          "context": "求职进展",
+          "en": "Things may look up once she finishes her training.",
+          "zh": "她完成培训后，情况也许会好起来。",
+          "semanticRationale": "things及培训后展望构成个人境况改善，不与资料查阅混同。"
+        }
+      ]
+    },
+    {
+      "lemma": "break down",
+      "key": "machine-stop-working",
+      "pos": "phr. v.",
+      "definitionZh": "机器发生故障；停止正常运转",
+      "definitionEn": "For a machine or vehicle to stop working because of a fault.",
+      "ordinal": 0,
+      "sourceKeys": ["break-down-fail"],
+      "semanticRationale": "取消源行误加的化学限定，日常机器故障不等同把整体分解；词性原创归类。",
+      "examples": [
+        {
+          "context": "车辆故障",
+          "en": "Old buses sometimes break down on the steep road to the village.",
+          "zh": "旧公交车有时会在通往村庄的陡路上发生故障。",
+          "semanticRationale": "buses主体和公路环境明确机器失灵，不是化学分解。"
+        },
+        {
+          "context": "生产设备",
+          "en": "If the cooling system should break down, the factory must stop production.",
+          "zh": "如果冷却系统发生故障，工厂就必须停产。",
+          "semanticRationale": "冷却系统故障引发停产，工业设备与车辆交通不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "break down",
+      "key": "analyse-components",
+      "pos": "phr. v.",
+      "definitionZh": "分解；把复杂整体分成较简单的部分",
+      "definitionEn": "To divide a complex whole into smaller parts that are easier to understand or handle.",
+      "ordinal": 1,
+      "sourceKeys": ["break-down"],
+      "semanticRationale": "取源行分解这一动作，限定分析和任务拆分而非机器故障。",
+      "examples": [
+        {
+          "context": "制定计划",
+          "en": "We need to break down the project into smaller tasks.",
+          "zh": "我们需要把这个项目分解成较小的任务。",
+          "semanticRationale": "break down X into Y直接表示拆分整体，非设备停止工作。"
+        },
+        {
+          "context": "预算说明",
+          "en": "Can you break down the total cost by department?",
+          "zh": "你能按部门把总费用分项列出来吗？",
+          "semanticRationale": "按部门分析总费用属于分解成分，与项目任务组织不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "turn down",
+      "key": "reject-offer",
+      "pos": "phr. v.",
+      "definitionZh": "拒绝；不接受提议、邀请或申请",
+      "definitionEn": "To refuse an offer, invitation, or request.",
+      "ordinal": 0,
+      "sourceKeys": ["turn-down"],
+      "semanticRationale": "源行只支持拒绝；不凭常识追加无源依据的调低义，两语境分别工作和社交。",
+      "examples": [
+        {
+          "context": "工作机会",
+          "en": "She decided to turn down the job because it required too much travel.",
+          "zh": "她决定拒绝这份工作，因为出差太多。",
+          "semanticRationale": "the job为拒绝对象，原因明确，不是设备旋钮调节。"
+        },
+        {
+          "context": "社交邀请",
+          "en": "It was hard to turn down their invitation to the wedding.",
+          "zh": "他们邀请我们参加婚礼，让人很难拒绝。",
+          "semanticRationale": "invitation明确接受与否的含义，婚礼邀请与工作选择不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "get over",
+      "key": "recover-illness",
+      "pos": "phr. v.",
+      "definitionZh": "从疾病中恢复；康复",
+      "definitionEn": "To become well again after an illness.",
+      "ordinal": 0,
+      "sourceKeys": ["get-over"],
+      "semanticRationale": "从源行恢复义限定疾病康复，与克服恐惧和爬过障碍区分。",
+      "examples": [
+        {
+          "context": "感冒恢复",
+          "en": "It took me a week to get over that bad cold.",
+          "zh": "我花了一周才从那场重感冒中恢复过来。",
+          "semanticRationale": "bad cold为疾病宾语，get over表示康复。"
+        },
+        {
+          "context": "病后休息",
+          "en": "You need plenty of rest to get over the flu.",
+          "zh": "你需要充分休息才能从流感中康复。",
+          "semanticRationale": "休息帮助流感康复，与描述感冒病程时长的场景不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "get over",
+      "key": "overcome-difficulty",
+      "pos": "phr. v.",
+      "definitionZh": "克服；成功处理困难或心理障碍",
+      "definitionEn": "To overcome a difficulty or a mental barrier.",
+      "ordinal": 1,
+      "sourceKeys": ["get-over"],
+      "semanticRationale": "克服障碍的抽象义独立于疾病恢复；心理恐惧与团队冲突不同语境。",
+      "examples": [
+        {
+          "context": "公众演讲",
+          "en": "Practice helped him get over his fear of speaking in public.",
+          "zh": "练习帮助他克服了当众讲话的恐惧。",
+          "semanticRationale": "fear为心理障碍，未泛化为疾病康复。"
+        },
+        {
+          "context": "团队合作",
+          "en": "The two groups must get over their differences before the project can succeed.",
+          "zh": "两个小组必须克服分歧，这个项目才可能成功。",
+          "semanticRationale": "differences为合作障碍，团队冲突与个人演讲恐惧不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "in charge of",
+      "key": "responsible-for",
+      "pos": "prep. phr.",
+      "definitionZh": "负责；掌管某项事务或人员",
+      "definitionEn": "Responsible for managing a person, activity, or area of work.",
+      "ordinal": 0,
+      "sourceKeys": ["in-charge-of"],
+      "semanticRationale": "明确为负责者而非被照管者；活动组织和安全维护分别示例。",
+      "examples": [
+        {
+          "context": "活动组织",
+          "en": "Maya is in charge of arranging transport for the school trip.",
+          "zh": "玛雅负责安排学校旅行的交通。",
+          "semanticRationale": "is in charge of后接arranging，明确主语承担职责。"
+        },
+        {
+          "context": "安全管理",
+          "en": "Who is in charge of safety at the construction site?",
+          "zh": "谁负责建筑工地的安全？",
+          "semanticRationale": "安全管理责任与学校活动交通安排为两个真实场景。"
+        }
+      ]
+    },
+    {
+      "lemma": "by accident",
+      "key": "unintentionally",
+      "pos": "adv. phr.",
+      "definitionZh": "无意中；并非有意地",
+      "definitionEn": "Without intending to do so.",
+      "ordinal": 0,
+      "sourceKeys": ["by-accident"],
+      "semanticRationale": "限定并非故意的行为，不把随机巧合和任何事故都混为一义。",
+      "examples": [
+        {
+          "context": "误发邮件",
+          "en": "I sent the message to the wrong address by accident.",
+          "zh": "我无意中把这条消息发到了错误的地址。",
+          "semanticRationale": "错误收件地址体现无意操作，译文不扩大成交通事故。"
+        },
+        {
+          "context": "损坏物品",
+          "en": "The child knocked the glass off the table by accident.",
+          "zh": "孩子不小心把玻璃杯从桌子上碰了下去。",
+          "semanticRationale": "非故意碰落物品，与电子消息操作不同语境。"
+        }
+      ]
+    },
+    {
+      "lemma": "system",
+      "key": "connected-parts",
+      "pos": "n.",
+      "definitionZh": "系统；相互连接并协同运作的一组部件",
+      "definitionEn": "A group of connected parts that work together as a whole.",
+      "ordinal": 0,
+      "sourceKeys": ["system-n"],
+      "semanticRationale": "部件构成的系统与规则制度分离；水循环装置和生物系统体现两个领域。",
+      "examples": [
+        {
+          "context": "建筑供暖",
+          "en": "The heating system keeps every room at a steady temperature.",
+          "zh": "供暖系统使每个房间保持稳定的温度。",
+          "semanticRationale": "heating system为协同部件的实体系统，非制度规则。"
+        },
+        {
+          "context": "人体防御",
+          "en": "Sleep helps the immune system protect the body against infection.",
+          "zh": "睡眠有助于免疫系统保护身体免受感染。",
+          "semanticRationale": "免疫系统为协同生理部分，生物防御与建筑供暖不同领域。"
+        }
+      ]
+    },
+    {
+      "lemma": "system",
+      "key": "organised-method-rules",
+      "pos": "n.",
+      "definitionZh": "制度；一套有组织的规则或办事方法",
+      "definitionEn": "An organised set of rules or methods used to do something.",
+      "ordinal": 1,
+      "sourceKeys": ["system-n"],
+      "semanticRationale": "规则方法体系与物理系统区分；教育评价和资料整理两场景。",
+      "examples": [
+        {
+          "context": "教学评价",
+          "en": "The school introduced a new system for assessing group work.",
+          "zh": "学校引入了一套评价小组作业的新制度。",
+          "semanticRationale": "assessing为评价方法规则，不是机器部件系统。"
+        },
+        {
+          "context": "整理档案",
+          "en": "We need a better system for keeping track of borrowed books.",
+          "zh": "我们需要一套更好的方法来记录借出的图书。",
+          "semanticRationale": "记录借书的组织方法与学校评价制度不同，均为有组织的做事方式。"
+        }
+      ]
+    }
+  ]
+}

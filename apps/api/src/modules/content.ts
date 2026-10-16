@@ -10,7 +10,6 @@ import {
   settings,
   wordInclude,
   wordDto,
-  progressDto,
   normalize,
   obj,
   json,
@@ -26,6 +25,7 @@ import { learningPreferencesInput, updateLearningPreferences } from './learning-
 import { summarySenses } from './content-presentation.js';
 import { collectionState } from './collection-state.js';
 import { lockLearningPreferences } from './tasks.js';
+import { searchLookup } from './lookup-search.js';
 
 const pageQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
@@ -85,12 +85,21 @@ export function catalogWordDto(
       sourceUrl: pack?.sourceUrl ?? null,
       wordHasSiteEdits,
       siteEditVersion: wordHasSiteEdits ? word.contentVersion : null,
+      ...(sense.kind === 'learning'
+        ? {
+            kind: 'site-authored',
+            reference: 'NightStudy contributors',
+            packId: sense.contentVersion,
+            license: 'MIT',
+            sourceUrl: 'https://github.com/wudi000888-svg/nightstudy',
+          }
+        : {}),
     };
     return {
       ...sense,
       source,
       exampleSource:
-        !sense.exampleEn && !sense.exampleZh
+        !('exampleEn' in sense && sense.exampleEn) && !('exampleZh' in sense && sense.exampleZh)
           ? null
           : Object.keys(obj(sense.contentMetadata.exampleEn)).length ||
               Object.keys(obj(sense.contentMetadata.exampleZh)).length
@@ -115,6 +124,9 @@ export function catalogWordDto(
         word.senses.some((sense) => sense.id.startsWith('content-ecdict-'))) ||
       word.phoneticSource.includes(pack.id) ||
       word.senses.some((sense) => obj(sense.contentMetadata).packId === pack.id) ||
+      dto.senses.some(
+        (sense) => sense.kind === 'learning' && sense.contentVersion === pack.version,
+      ) ||
       (word.examples ?? []).some((example) => obj(example.contentMetadata).packId === pack.id),
   );
   return {
@@ -123,33 +135,33 @@ export function catalogWordDto(
     senseCount: dto.senseCount,
     detailAvailable: true,
     phonetics: [
-      ...(word.phoneticUs
+      ...(dto.phoneticUs
         ? [
             {
-              text: word.phoneticUs,
-              ipa: word.phoneticUs,
+              text: dto.phoneticUs,
+              ipa: dto.phoneticUs,
               region: 'US',
               notation: 'ipa',
               sourceRef: word.phoneticSource,
             },
           ]
         : []),
-      ...(word.phoneticUk
+      ...(dto.phoneticUk
         ? [
             {
-              text: word.phoneticUk,
-              ipa: word.phoneticUk,
+              text: dto.phoneticUk,
+              ipa: dto.phoneticUk,
               region: 'UK',
               notation: 'ipa',
               sourceRef: word.phoneticSource,
             },
           ]
         : []),
-      ...(word.phonetic
+      ...(dto.phonetic
         ? [
             {
-              text: word.phonetic,
-              ipa: word.phonetic,
+              text: dto.phonetic,
+              ipa: dto.phonetic,
               region: 'unspecified',
               notation: 'source-transcription',
               sourceRef: word.sourceRef,
@@ -269,50 +281,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
     });
     return { settings: value };
   });
-  app.get('/dictionary', async (req) => {
-    const ctx = await getContext(req),
-      query = parse(
-        z.object({
-          q: z.string().max(160).default(''),
-          limit: z.coerce.number().int().min(1).max(50).default(20),
-          cursor: z.string().max(1200).optional(),
-        }),
-        req.query,
-      );
-    const term = normalize(query.q);
-    const scope = `dictionary:${term}`,
-      after = decodeCursor(scope, query.cursor, 'string');
-    const packs = await readyPacks(ctx.prisma);
-    const catalog = {
-      source: 'postgres-catalog',
-      completeDictionary: packs.some((pack) => pack.id.startsWith('ecdict-')),
-      sources: packs.map(packDto),
-    };
-    if (!term)
-      return { items: [], page: { total: 0, hasMore: false, nextCursor: null }, ...catalog };
-    const where: Prisma.WordWhereInput = {
-      status: 'published',
-      normalizedLemma: { startsWith: term },
-    };
-    const [rows, total] = await Promise.all([
-      ctx.prisma.word.findMany({
-        where: {
-          ...where,
-          normalizedLemma: { startsWith: term, ...(after !== null ? { gt: after } : {}) },
-        },
-        include: wordInclude,
-        orderBy: { normalizedLemma: 'asc' },
-        take: query.limit + 1,
-      }),
-      ctx.prisma.word.count({ where }),
-    ]);
-    const pagination = pageInfo(rows, query.limit, total, scope, (row) => row.normalizedLemma);
-    return {
-      items: pagination.items.map((word) => catalogWordDto(word, packs, true)),
-      page: pagination.page,
-      ...catalog,
-    };
-  });
+  app.get('/dictionary', async (req) => searchLookup(await getContext(req), req.query));
   app.get('/dictionary/stats', async (req) => {
     const ctx = await getContext(req),
       packs = await readyPacks(ctx.prisma);
@@ -327,6 +296,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
               'phonetics',
               'audio',
               'bilingual',
+              'learning-senses',
               'phrase-books',
               'exam-books',
               'sentence-audio',
@@ -385,84 +355,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
       settings: await updateLearningPreferences(tx, user.id, input),
     }));
   });
-  app.get('/wordbook', async (req) => {
-    const ctx = await getContext(req),
-      user = requireUser(ctx);
-    const query = parse(
-      z
-        .object({
-          limit: z.coerce.number().int().min(1).max(100).default(50),
-          cursor: z.string().min(1).max(1200).optional(),
-          status: z.enum(['active', 'consolidated', 'all']).default('active'),
-        })
-        .strict(),
-      req.query,
-    );
-    const scope = `wordbook:${ctx.siteId}:${user.id}${query.status === 'active' ? '' : `:${query.status}`}`,
-      cursor = decodeCursor(scope, query.cursor, 'string');
-    let after: { updatedAt: Date; id: string } | null = null;
-    if (cursor !== null) {
-      try {
-        const value = z
-          .object({ updatedAt: z.string().datetime(), id })
-          .strict()
-          .parse(JSON.parse(cursor));
-        after = { updatedAt: new Date(value.updatedAt), id: value.id };
-      } catch {
-        throw new HttpError(400, 'invalid_cursor', '分页游标无效，请从第一页重新加载');
-      }
-    }
-    const membership = {
-      userId: user.id,
-      ...(query.status === 'active'
-        ? { graduatedAt: null }
-        : query.status === 'consolidated'
-          ? { graduatedAt: { not: null } }
-          : {}),
-    };
-    return ctx.prisma.$transaction(
-      async (tx) => {
-        const rows = await tx.userWord.findMany({
-          where: {
-            ...membership,
-            ...(after
-              ? {
-                  OR: [
-                    { updatedAt: { lt: after.updatedAt } },
-                    { updatedAt: after.updatedAt, id: { lt: after.id } },
-                  ],
-                }
-              : {}),
-          },
-          include: { word: { include: wordInclude } },
-          orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-          take: query.limit + 1,
-        });
-        const total = await tx.userWord.count({ where: membership });
-        const result = pageInfo(rows, query.limit, total, scope, (row) =>
-          JSON.stringify({ updatedAt: row.updatedAt.toISOString(), id: row.id }),
-        );
-        const progress = await tx.studyProgress.findMany({
-          where: { userId: user.id, wordId: { in: result.items.map((x) => x.wordId) } },
-        });
-        return {
-          items: result.items.map((row) => ({
-            id: row.id,
-            wordId: row.wordId,
-            word: wordDto(row.word),
-            note: row.note,
-            favorite: row.favorite,
-            paused: row.paused,
-            status: row.graduatedAt ? 'consolidated' : 'active',
-            graduatedAt: row.graduatedAt?.toISOString() ?? null,
-            progress: progressDto(progress.find((x) => x.wordId === row.wordId) ?? null),
-          })),
-          page: result.page,
-        };
-      },
-      { isolationLevel: 'RepeatableRead' },
-    );
-  });
+  app.get('/wordbook', async (req) => searchLookup(await getContext(req), req.query, true));
   app.get('/wordbook/:wordId', async (req) => {
     const ctx = await getContext(req),
       user = requireUser(ctx);

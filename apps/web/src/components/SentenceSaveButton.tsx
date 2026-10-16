@@ -9,7 +9,7 @@ import type { SavedSentence } from '../lib/mobile-content-types';
 interface SentenceStatus {
   wordId: string;
   items: {
-    sourceType: 'word-example' | 'sense';
+    sourceType: 'word-example';
     sourceId: string;
     saved: boolean;
     sentenceId: string | null;
@@ -17,7 +17,7 @@ interface SentenceStatus {
 }
 export interface SentenceSaveButtonProps {
   wordId: string;
-  sourceType: 'word-example' | 'sense';
+  sourceType: 'word-example';
   sourceId: string;
   compact?: boolean;
 }

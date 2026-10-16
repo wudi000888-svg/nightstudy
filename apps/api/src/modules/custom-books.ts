@@ -4,6 +4,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { z } from 'zod';
 import { HttpError, requireUser, type ContextResolver } from '../context.js';
 import { verifiedAudioBytes } from '../audio.js';
+import { wordPronunciationCompatible } from './learning-sense-view.js';
 import {
   id,
   goal,
@@ -180,6 +181,10 @@ async function resolveRows(
       normalizedLemma: true,
       phoneticUs: true,
       phoneticUk: true,
+      learningSenses: {
+        where: { status: { in: ['published', 'held'] } },
+        select: { status: true, contentMetadata: true },
+      },
       senses: { select: { definitionZh: true } },
       audio: {
         where: { status: 'ready', accent: { in: ['US', 'UK'] } },
@@ -189,7 +194,7 @@ async function resolveRows(
   });
   if (readFiles)
     await verifyAudioSources(
-      words.flatMap((word) => word.audio),
+      words.filter(wordPronunciationCompatible).flatMap((word) => word.audio),
       verified,
     );
   const byLemma = new Map(words.map((word) => [word.normalizedLemma, word]));
@@ -207,12 +212,17 @@ async function resolveRows(
         status: duplicate ? 'duplicate' : 'failed',
         reasons: [...reasons, { code: 'not_found', message: reasonMessages.not_found! }],
       };
+    const compatible = wordPronunciationCompatible(word);
     const readiness = {
       definition: word.senses.some((sense) => sense.definitionZh.trim()),
-      phoneticUs: Boolean(word.phoneticUs.trim()),
-      phoneticUk: Boolean(word.phoneticUk.trim()),
-      audioUs: word.audio.some((a) => a.accent === 'US' && verified.get(audioKey(a)) === true),
-      audioUk: word.audio.some((a) => a.accent === 'UK' && verified.get(audioKey(a)) === true),
+      phoneticUs: compatible && Boolean(word.phoneticUs.trim()),
+      phoneticUk: compatible && Boolean(word.phoneticUk.trim()),
+      audioUs:
+        compatible &&
+        word.audio.some((a) => a.accent === 'US' && verified.get(audioKey(a)) === true),
+      audioUk:
+        compatible &&
+        word.audio.some((a) => a.accent === 'UK' && verified.get(audioKey(a)) === true),
     };
     const checks = [
       ['definition', 'missing_definition'],

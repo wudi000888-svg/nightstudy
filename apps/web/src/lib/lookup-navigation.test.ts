@@ -6,7 +6,8 @@ import { LookupPage } from '../pages/Lookup';
 import { Dialog, WordView } from '../components/UI';
 import { api, post } from './api';
 import { wordbookEntryKey } from './wordbook';
-import type { Word, WordbookItem } from './types';
+import type { Word } from './types';
+import type { DictionaryBrief, LookupResponse } from './lookup-state';
 
 interface Effect {
   deps: unknown[];
@@ -27,7 +28,12 @@ const state = vi.hoisted(() => {
     pending: [] as { index: number; deps: unknown[]; setup: () => unknown }[],
     router: null as ReturnType<typeof createMemoryRouter> | null,
     client: null as QueryClient | null,
-    words: [] as WordbookItem[],
+    words: [] as LookupResponse['items'],
+    suggestions: [] as LookupResponse['suggestions'],
+    queryOptions: null as null | {
+      queryKey: unknown[];
+      queryFn: (value: { pageParam: null; signal: AbortSignal }) => Promise<unknown>;
+    },
     scrollY: 0,
   };
 });
@@ -61,11 +67,15 @@ vi.mock('react', async (original) => {
 });
 vi.mock('react-router-dom', async (original) => ({
   ...(await original<typeof import('react-router-dom')>()),
+  useLocation: () => state.router!.state.location,
   useSearchParams: () => [
     new URLSearchParams(state.router!.state.location.search),
-    (next: URLSearchParams, options?: { replace?: boolean }) =>
-      void state.router!.navigate(`/lookup?${next}`, options),
+    (next: URLSearchParams, options?: { replace?: boolean; state?: unknown }) =>
+      void state.router!.navigate(`${state.router!.state.location.pathname}?${next}`, options),
   ],
+}));
+vi.mock('../components/AppNavigation', () => ({
+  useAppNavigation: () => ({ goBack: () => void state.router!.navigate(-1) }),
 }));
 vi.mock('./screen-lifecycle', async (original) => ({
   ...(await original<typeof import('./screen-lifecycle')>()),
@@ -78,13 +88,15 @@ vi.mock('../AppContext', () => ({
 vi.mock('@tanstack/react-query', async (original) => ({
   ...(await original<typeof import('@tanstack/react-query')>()),
   useQueryClient: () => state.client,
-  useInfiniteQuery: (options: { enabled?: boolean }) => {
+  useInfiniteQuery: (options: { enabled?: boolean } & NonNullable<typeof state.queryOptions>) => {
+    state.queryOptions = options;
     state.infiniteEnabled = options.enabled;
     return {
       data: {
         pages: [
           {
             items: state.words,
+            suggestions: state.suggestions,
             page: { total: state.words.length, nextCursor: null, hasMore: false },
           },
         ],
@@ -164,11 +176,14 @@ beforeEach(() => {
   state.effects = [];
   state.pending = [];
   state.words = [];
+  state.suggestions = [];
+  state.queryOptions = null;
   state.scrollY = 0;
   state.router = createMemoryRouter([{ path: '*', element: null }], {
     initialEntries: ['/lookup'],
   });
   state.client = new QueryClient();
+  vi.useRealTimers();
   vi.mocked(api).mockReset();
   vi.mocked(post).mockReset();
   vi.stubGlobal('window', {
@@ -194,151 +209,268 @@ afterAll(() => {
   vi.unstubAllGlobals();
 });
 
-it('actually resolves a q deep link and opens only its exact canonical word instead of the first prefix neighbour', async () => {
-  await state.router!.navigate('/lookup?q=water');
-  vi.mocked(api).mockImplementation(async (path) =>
-    String(path).startsWith('dictionary/resolve')
-      ? { word: water, matchType: 'exact' }
-      : { items: [wait, water], page: { total: 2, nextCursor: null, hasMore: false } },
-  );
+const waterBrief: DictionaryBrief = {
+  id: water.id,
+  lemma: water.lemma,
+  normalizedLemma: 'water',
+  pos: ['n.'],
+  definitionZh: '水',
+  definitionEn: 'A clear liquid.',
+  matchType: 'prefix',
+  collection: { inWordbook: false, wordbookStatus: null },
+};
+const waitBrief: DictionaryBrief = {
+  ...waterBrief,
+  id: wait.id,
+  lemma: wait.lemma,
+  normalizedLemma: 'wait',
+  definitionZh: '等待',
+};
+it('keeps q searches as lists and sends every matching/sort condition to the server', async () => {
+  await state.router!.navigate('/lookup?q=sys&match=contains&sort=za');
+  state.words = [waterBrief, waitBrief];
   const tree = await settle();
-  expect(state.router!.state.location.search).toContain('entry=lookup-water');
-  expect(find(tree, (element) => element.type === WordView).props.word).toEqual(water);
-  expect(vi.mocked(api).mock.calls.map(([path]) => path)).toEqual([
-    'dictionary?q=water&limit=20',
-    'dictionary/resolve?text=water',
+  expect(elements(tree).some((element) => element.type === WordView)).toBe(false);
+  expect(api).not.toHaveBeenCalled();
+  expect(state.queryOptions!.queryKey).toEqual([
+    state.scope,
+    'lookup',
+    'pages',
+    'sys',
+    'contains',
+    'za',
+    'active',
   ]);
-});
-
-it('preserves results and list/page position across the real router back and forward without re-querying', async () => {
-  await state.router!.navigate('/lookup?q=wa');
-  vi.mocked(api).mockImplementation(async (path) =>
-    String(path).startsWith('dictionary/resolve')
-      ? { word: null, matchType: 'not-found' }
-      : String(path).startsWith('dictionary?')
-        ? { items: [water, wait], page: { total: 2, nextCursor: null, hasMore: false } }
-        : { word: String(path).endsWith('lookup-wait') ? wait : water },
+  await state.queryOptions!.queryFn({ pageParam: null, signal: new AbortController().signal });
+  expect(api).toHaveBeenCalledWith(
+    'dictionary?q=sys&match=contains&sort=za&limit=20',
+    expect.anything(),
   );
-  let tree = await settle();
-  expect(state.router!.state.location.search).toBe('?q=wa');
-  const list = find(tree, (element) => element.type === 'aside');
+  // The UI retains the server's order instead of sorting a loaded page.
+  expect(
+    elements(tree)
+      .filter((e) => String(e.props['aria-label']).startsWith('查看 '))
+      .map((e) => e.props['aria-label']),
+  ).toEqual(['查看 water 完整词条', '查看 wait 完整词条']);
+});
+it('matches the server contains guard for accented letters and literal punctuation', async () => {
+  for (const [q, enabled] of [
+    ['naïve', true],
+    ['abc%_', true],
+    ['ab', false],
+    ['a%b', false],
+  ] as const) {
+    await state.router!.navigate(`/lookup?q=${encodeURIComponent(q)}&match=contains`);
+    await settle();
+    expect(state.infiniteEnabled, q).toBe(enabled);
+  }
+});
+it('keeps a private q route private when opening and returning from a word', async () => {
+  await state.router!.navigate('/wordbook?q=wa&match=prefix&sort=za&status=consolidated');
+  state.words = [
+    {
+      id: 'saved-water',
+      wordId: water.id,
+      word: waterBrief,
+      note: '',
+      favorite: true,
+      paused: false,
+      status: 'consolidated',
+      progress: null,
+    },
+  ];
+  vi.mocked(api).mockResolvedValue({ word: water });
+  let tree = await settle('wordbook');
+  expect(find(tree, (e) => e.props['aria-label'] === '搜索我的生词本')).toBeDefined();
+  const list = find(tree, (e) => e.props['aria-label'] === '我的生词本列表');
+  const screenScroll = { scrollTop: 340 };
+  ((tree as Element).props.ref as { current: unknown }).current = { closest: () => screenScroll };
   (list.props.ref as { current: unknown }).current = { scrollTop: 58 };
   state.scrollY = 420;
   (
-    find(tree, (element) => element.props['aria-label'] === '查看 wait 完整词条').props
-      .onClick as () => void
+    find(tree, (e) => e.props['aria-label'] === '查看 water 完整词条').props.onClick as () => void
   )();
-  tree = await settle();
-  expect(state.router!.state.location.search).toContain('entry=lookup-wait');
-  expect(find(tree, (element) => element.type === WordView).props.word).toEqual(wait);
-  const count = vi.mocked(api).mock.calls.length;
-  await state.router!.navigate(-1);
-  tree = await settle();
-  expect(state.router!.state.location.search).toBe('?q=wa');
-  expect(
-    find(tree, (element) => element.props.className === 'dictionary-layout lookup-workspace'),
-  ).toBeDefined();
-  expect(state.scrollY).toBe(420);
-  expect((list.props.ref as { current: { scrollTop: number } }).current.scrollTop).toBe(58);
-  await state.router!.navigate(1);
-  await settle();
-  expect(vi.mocked(api)).toHaveBeenCalledTimes(count);
-});
-
-it('aborts an obsolete search and ignores late results when q changes', async () => {
-  let resolveOldList!: (value: unknown) => void, resolveOldExact!: (value: unknown) => void;
-  vi.mocked(api).mockImplementation((path) =>
-    String(path) === 'dictionary?q=water&limit=20'
-      ? new Promise((done) => {
-          resolveOldList = done;
-        })
-      : String(path) === 'dictionary/resolve?text=water'
-        ? new Promise((done) => {
-            resolveOldExact = done;
-          })
-        : Promise.resolve(
-            String(path).startsWith('dictionary/resolve')
-              ? { word: wait, matchType: 'exact' }
-              : { items: [wait], page: { total: 1, nextCursor: null, hasMore: false } },
-          ),
+  tree = await settle('wordbook');
+  expect(state.router!.state.location.pathname).toBe('/wordbook');
+  expect(state.router!.state.location.search).toBe(
+    '?q=wa&match=prefix&sort=za&status=consolidated&entry=lookup-water',
   );
-  await state.router!.navigate('/lookup?q=water');
+  expect(find(tree, (e) => e.type === WordView).props.word).toEqual(water);
+  expect(elements(tree).some((e) => e.props.className === 'dictionary-back')).toBe(false);
+  await state.router!.navigate(-1);
+  tree = await settle('wordbook');
+  expect(state.router!.state.location.search).toBe(
+    '?q=wa&match=prefix&sort=za&status=consolidated',
+  );
+  expect(state.scrollY).toBe(420);
+  expect(screenScroll.scrollTop).toBe(340);
+  expect((list.props.ref as { current: { scrollTop: number } }).current.scrollTop).toBe(58);
+  expect(find(tree, (e) => e.props['aria-label'] === '搜索我的生词本')).toBeDefined();
+});
+it('reads a deep-linked entry independently and preserves every condition when selecting a sense', async () => {
+  await state.router!.navigate(
+    '/wordbook?q=wa&match=smart&sort=relevance&status=active&entry=lookup-water&sense=water-noun',
+  );
+  vi.mocked(api).mockResolvedValue({ word: water });
+  let tree = await settle('wordbook');
+  expect(api).toHaveBeenCalledWith('words/lookup-water', expect.anything());
+  expect(api).toHaveBeenCalledTimes(1);
+  const details = find(tree, (e) => e.type === WordView);
+  expect(details.props.focusSenseId).toBe('water-noun');
+  (details.props.onSenseChange as (id: string) => void)('water-noun');
+  tree = await settle('wordbook');
+  expect(state.router!.state.location.pathname).toBe('/wordbook');
+  expect(state.router!.state.location.search).toContain(
+    'q=wa&match=smart&sort=relevance&status=active&entry=lookup-water&sense=water-noun',
+  );
+  (find(tree, (e) => e.props.className === 'dictionary-back').props.onClick as () => void)();
+  await settle('wordbook');
+  expect(state.router!.state.location.pathname).toBe('/wordbook');
+  expect(state.router!.state.location.search).not.toContain('entry=');
+});
+it('aborts obsolete details and never shows a late word under another entry', async () => {
+  let resolveOld!: (value: unknown) => void;
+  vi.mocked(api).mockImplementation((path) =>
+    String(path).endsWith(water.id)
+      ? new Promise((done) => {
+          resolveOld = done;
+        })
+      : Promise.resolve({ word: wait }),
+  );
+  await state.router!.navigate('/lookup?entry=lookup-water');
   render();
-  const firstSignal = vi.mocked(api).mock.calls[0]![1]!.signal;
-  await state.router!.navigate('/lookup?q=wait');
+  const signal = vi.mocked(api).mock.calls[0]![1]!.signal;
+  await state.router!.navigate('/lookup?entry=lookup-wait');
   await settle();
-  expect(firstSignal?.aborted).toBe(true);
-  resolveOldList({ items: [water], page: { total: 1, nextCursor: null, hasMore: false } });
-  resolveOldExact({ word: water, matchType: 'exact' });
+  expect(signal?.aborted).toBe(true);
+  resolveOld({ word: water });
   const tree = await settle();
-  expect(find(tree, (element) => element.type === WordView).props.word).toEqual(wait);
-  expect(state.router!.state.location.search).toContain('entry=lookup-wait');
+  expect(find(tree, (e) => e.type === WordView).props.word).toEqual(wait);
+});
+it('does not silently replace an invalid sense with a different meaning', async () => {
+  await state.router!.navigate('/lookup?entry=lookup-water&sense=missing');
+  vi.mocked(api).mockResolvedValue({ word: water });
+  const tree = await settle();
+  expect(elements(tree).some((e) => e.type === WordView)).toBe(false);
+  expect(elements(tree).some((e) => e.props.title === '这个词义暂时不可用。')).toBe(true);
 });
 
-it('can start a new desktop search from an open detail without mistaking it for back navigation', async () => {
-  vi.mocked(api).mockImplementation(async (path) => {
-    const target = String(path).includes('wait') ? wait : water;
-    return String(path).startsWith('dictionary/resolve')
-      ? { word: target, matchType: 'exact' }
-      : { items: [target], page: { total: 1, nextCursor: null, hasMore: false } };
-  });
-  await state.router!.navigate('/lookup?q=water');
+it('revalidates a cached detail when it is reopened instead of retaining held or edited meanings', async () => {
+  await state.router!.navigate('/lookup?q=wa');
+  state.words = [waterBrief];
+  vi.mocked(api).mockResolvedValue({ word: water });
   let tree = await settle();
   (
-    find(tree, (element) => element.props['aria-label'] === '查词输入').props.onChange as (
-      event: unknown,
-    ) => void
-  )({ target: { value: 'wait' } });
+    find(tree, (e) => e.props['aria-label'] === '查看 water 完整词条').props.onClick as () => void
+  )();
+  await settle();
+  await state.router!.navigate(-1);
+  await settle();
+  vi.mocked(api).mockResolvedValue({
+    word: { ...water, senses: [{ id: 'new', definitionZh: '更新后的释义' }] },
+  });
+  await state.router!.navigate(1);
+  tree = await settle();
+  expect(api).toHaveBeenCalledTimes(2);
+  expect((find(tree, (e) => e.type === WordView).props.word as Word).senses![0]!.id).toBe('new');
+});
+
+it('does not POP to an unrelated list after conditions in a detail URL have changed', async () => {
+  await state.router!.navigate('/lookup?q=wa');
+  state.words = [waterBrief];
+  vi.mocked(api).mockResolvedValue({ word: water });
+  let tree = await settle();
+  (
+    find(tree, (e) => e.props['aria-label'] === '查看 water 完整词条').props.onClick as () => void
+  )();
+  await settle();
+  const oldState: unknown = state.router!.state.location.state;
+  await state.router!.navigate('/lookup?q=sys&match=contains&sort=za&entry=lookup-water', {
+    state: oldState,
+  });
+  tree = await settle();
+  (find(tree, (e) => e.props.className === 'dictionary-back').props.onClick as () => void)();
+  await settle();
+  expect(state.router!.state.location.search).toBe('?q=sys&match=contains&sort=za');
+});
+it('debounces editable input, waits through IME composition and submits immediately on enter', async () => {
+  vi.useFakeTimers();
+  let tree = render();
+  let input = find(tree, (e) => e.props['aria-label'] === '查词输入');
+  (input.props.onCompositionStart as () => void)();
+  (input.props.onChange as (event: unknown) => void)({ target: { value: 'sys' } });
+  tree = render();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(state.router!.state.location.search).toBe('');
+  input = find(tree, (e) => e.props['aria-label'] === '查词输入');
+  (input.props.onCompositionEnd as (event: unknown) => void)({
+    currentTarget: { value: 'system' },
+  });
+  tree = render();
+  await vi.advanceTimersByTimeAsync(299);
+  expect(state.router!.state.location.search).toBe('');
+  await vi.advanceTimersByTimeAsync(1);
+  await settle();
+  expect(state.router!.state.location.search).toContain('q=system');
   tree = render();
   (
-    find(tree, (element) => element.props.className === 'search-bar').props.onSubmit as (
+    find(tree, (e) => e.props['aria-label'] === '查词输入').props.onChange as (
       event: unknown,
     ) => void
-  )({ preventDefault: vi.fn() });
+  )({ target: { value: 'water' } });
+  tree = render();
+  (find(tree, (e) => e.props.role === 'search').props.onSubmit as (event: unknown) => void)({
+    preventDefault: vi.fn(),
+  });
+  await settle();
+  expect(state.router!.state.location.search).toContain('q=water');
+});
+it('uses spelling suggestions only after an explicit user action', async () => {
+  await state.router!.navigate('/lookup?q=systme');
+  state.suggestions = [{ id: 'system', lemma: 'system', matchType: 'spelling' }];
+  let tree = await settle();
+  expect(state.router!.state.location.search).toBe('?q=systme');
+  const suggestions = find(tree, (e) => e.props['aria-label'] === '拼写建议');
+  (find(suggestions, (e) => e.type === 'button').props.onClick as () => void)();
   tree = await settle();
-  expect(find(tree, (element) => element.type === WordView).props.word).toEqual(wait);
-  expect(state.router!.state.location.search).toContain('entry=lookup-wait');
+  expect(state.router!.state.location.search).toContain('q=system');
+  expect(elements(tree).some((e) => e.type === WordView)).toBe(false);
 });
 
-it('restarts an aborted initial deep-link read after Strict Mode effect cleanup and setup', async () => {
-  await state.router!.navigate('/lookup?q=water');
-  vi.mocked(api)
-    .mockImplementationOnce(() => new Promise(() => {}))
-    .mockImplementationOnce(() => new Promise(() => {}));
-  render();
-  const firstSignal = vi.mocked(api).mock.calls[0]![1]!.signal;
-  cleanup();
-  state.effects = [];
-  vi.mocked(api).mockImplementation(async (path) =>
-    String(path).startsWith('dictionary/resolve')
-      ? { word: water, matchType: 'exact' }
-      : { items: [water], page: { total: 1, nextCursor: null, hasMore: false } },
-  );
-  const tree = await settle();
-  expect(firstSignal?.aborted).toBe(true);
-  expect(find(tree, (element) => element.type === WordView).props.word).toEqual(water);
+it('keeps text typed after a suggestion navigation while the prior q effect is still pending', async () => {
+  vi.useFakeTimers();
+  await state.router!.navigate('/lookup?q=systme');
+  state.suggestions = [{ id: 'system', lemma: 'system', matchType: 'spelling' }];
+  let tree = await settle();
+  const suggestions = find(tree, (e) => e.props['aria-label'] === '拼写建议');
+  (find(suggestions, (e) => e.type === 'button').props.onClick as () => void)();
+  (
+    find(tree, (e) => e.props['aria-label'] === '查词输入').props.onChange as (
+      event: unknown,
+    ) => void
+  )({ target: { value: 'bank' } });
+  tree = render();
+  await vi.advanceTimersByTimeAsync(300);
+  tree = await settle();
+  expect(new URLSearchParams(state.router!.state.location.search).get('q')).toBe('bank');
+  expect(find(tree, (e) => e.props['aria-label'] === '查词输入').props.value).toBe('bank');
 });
-
-it('remounts private notes on account changes and never publishes an old save receipt after cleanup', async () => {
+it('unmounts private notes on account changes and rejects a late save receipt', async () => {
   state.words = [
     {
-      id: 'lookup-saved',
+      id: 'saved-water',
       wordId: water.id,
-      word: water,
+      word: waterBrief,
       note: 'private-a-note',
       favorite: true,
       paused: false,
-      progress: null,
       status: 'active',
+      progress: null,
     },
   ];
   let tree = render('wordbook');
-  (
-    find(tree, (element) => element.props['aria-label'] === '编辑 water 备注').props
-      .onClick as () => void
-  )();
+  (find(tree, (e) => e.props['aria-label'] === '编辑 water 备注').props.onClick as () => void)();
   tree = render('wordbook');
-  expect(find(tree, (element) => element.type === Dialog).props.open).toBe(true);
   let resolve!: (value: unknown) => void;
   vi.mocked(post).mockImplementation(
     () =>
@@ -346,10 +478,12 @@ it('remounts private notes on account changes and never publishes an old save re
         resolve = done;
       }),
   );
-  const save = elements(find(tree, (element) => element.type === Dialog)).find(
-    (element) => element.type === 'button',
-  )!;
-  (save.props.onClick as () => void)();
+  (
+    find(
+      find(tree, (e) => e.type === Dialog),
+      (e) => e.type === 'button',
+    ).props.onClick as () => void
+  )();
   await Promise.resolve();
   const previous = LookupPage({ initialTab: 'wordbook' }).key;
   cleanup();
@@ -357,55 +491,30 @@ it('remounts private notes on account changes and never publishes an old save re
   state.slots = [];
   state.refs = [];
   state.effects = [];
-  state.pending = [];
   state.words = [];
   expect(LookupPage({ initialTab: 'wordbook' }).key).not.toBe(previous);
   tree = render('wordbook');
-  resolve({
-    item: { ...state.words[0], id: 'lookup-saved', wordId: water.id, note: 'private-a-note' },
-  });
-  await Promise.resolve();
-  expect(find(tree, (element) => element.type === Dialog).props.open).toBe(false);
-  expect(find(tree, (element) => element.type === 'textarea').props.value).toBe('');
+  resolve({ item: { id: 'saved-water', wordId: water.id, note: 'private-a-note' } });
+  await settle('wordbook');
+  expect(find(tree, (e) => e.type === Dialog).props.open).toBe(false);
+  expect(find(tree, (e) => e.type === 'textarea').props.value).toBe('');
   expect(
     state.client!.getQueryData(wordbookEntryKey('lookup-test:user-a', water.id)),
   ).toBeUndefined();
   expect(state.client!.getQueryData(wordbookEntryKey(state.scope, water.id))).toBeUndefined();
 });
-
-it('retains a late exact lookup result while hidden without replacing the foreground route', async () => {
-  await state.router!.navigate('/lookup?q=water');
-  let resolveList!: (value: unknown) => void, resolveExact!: (value: unknown) => void;
-  vi.mocked(api).mockImplementation(
-    (path) =>
-      new Promise((done) => {
-        if (String(path).startsWith('dictionary/resolve')) resolveExact = done;
-        else resolveList = done;
-      }),
-  );
-  render();
+it('does not hydrate hidden details and aborts a visible request on screen deactivation', async () => {
   state.active = false;
-  render();
-  expect(state.infiniteEnabled).toBe(false);
-  resolveList({ items: [water], page: { total: 1, nextCursor: null, hasMore: false } });
-  resolveExact({ word: water, matchType: 'exact' });
-  const tree = await settle();
-  expect(state.router!.state.location.search).toBe('?q=water');
-  expect(find(tree, (element) => element.type === WordView).props.word).toEqual(water);
-  expect(api).toHaveBeenCalledTimes(2);
-});
-it('does not hydrate a hidden lookup until its own screen becomes active', async () => {
-  state.active = false;
-  await state.router!.navigate('/lookup?q=water');
+  await state.router!.navigate('/lookup?q=water&entry=lookup-water');
   await settle();
   expect(api).not.toHaveBeenCalled();
+  expect(state.infiniteEnabled).toBe(false);
   state.active = true;
-  vi.mocked(api).mockImplementation(async (path) =>
-    String(path).startsWith('dictionary/resolve')
-      ? { word: water, matchType: 'exact' }
-      : { items: [water], page: { total: 1, nextCursor: null, hasMore: false } },
-  );
-  await settle();
-  expect(api).toHaveBeenCalledTimes(2);
-  expect(state.router!.state.location.search).toContain('entry=lookup-water');
+  vi.mocked(api).mockImplementation(() => new Promise(() => {}));
+  render();
+  const signal = vi.mocked(api).mock.calls[0]![1]!.signal;
+  state.active = false;
+  render();
+  expect(signal?.aborted).toBe(true);
+  expect(state.infiniteEnabled).toBe(false);
 });

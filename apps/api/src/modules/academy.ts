@@ -18,6 +18,7 @@ import {
 import { libraryCursor, lockLibraryUser } from './learning-library.js';
 import { pageInfo } from './pagination.js';
 import { academyLessons, type AcademyLesson } from './academy-content.js';
+import { wordPronunciationCompatible } from './learning-sense-view.js';
 const category = z.enum(['reading', 'shadowing', 'listening', 'topic']);
 const shuffled = <T>(values: readonly T[]) => {
   const result = [...values];
@@ -58,12 +59,17 @@ async function targetAudio(db: Db, lesson: AcademyLesson, accent: 'us' | 'uk', v
       lemma: true,
       normalizedLemma: true,
       audio: { where: { accent: accent.toUpperCase(), status: 'ready' } },
+      learningSenses: {
+        where: { status: { in: ['published', 'held'] } },
+        select: { status: true, contentMetadata: true },
+      },
     },
   });
   const ordered = lesson.listeningTargets.map((lemma) =>
     words.find((word) => word.normalizedLemma === lemma),
   );
-  if (ordered.some((word) => !word?.audio.length)) return null;
+  if (ordered.some((word) => !word || !word.audio.length || !wordPronunciationCompatible(word)))
+    return null;
   if (verify) {
     try {
       await Promise.all(ordered.map((word) => verifiedAudioBytes(word!.audio[0]!)));

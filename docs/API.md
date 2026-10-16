@@ -1,6 +1,6 @@
 # Alpha API 契约
 
-对应当前0.9源码接口；最终版本的测试、发行与线上验收范围见 [README](../README.md) 和 [每日任务](DAILY_TASKS.md)，已记录的较早结果保留为历史证据。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
+对应当前0.11源码接口；最终版本的测试、发行与线上验收范围见 [README](../README.md) 和 [每日任务](DAILY_TASKS.md)，已记录的较早结果保留为历史证据。业务前缀为 `<basePath>/api/v2`，下表省略此前缀。根站basePath为空，子路径如/school-a；认证为 `<basePath>/api/auth`，手动初始化为 `<basePath>/setup`。
 
 请求由可信 Host 与规范 basePath 选择 operator 配置的 Realm，随后只访问该站独立认证/业务 PG DB。客户端不能通过 `siteId`、`userId`、数据库 URL 参数切换身份。真正互不信任的站点使用不同 origin；同 origin 子路径属于同一信任域。
 
@@ -63,22 +63,22 @@
 | `GET /books`                        | 访客/本人 | 公开已发布词书及登录用户本人的私有书；wordCount/learnedCount/coveredCount/claimedKnownCount/isDemo/visibility/ownedByMe |
 | `GET /books/:id`                    | 访客/本人 | 公开书或本人私有书的book/items/page；limit 1–200，默认100；cursor按ordinal继续读取完整词书                              |
 | `POST /books/:id/select`            | 用户      | JSON `{}`；更新 currentBookId 与 goal，返回 settings                                                                    |
-| `GET /dictionary?q=rain&limit=20`   | 访客      | 规范化前缀查词；limit 1–50，cursor；items/page/source/sources/completeDictionary                                        |
+| `GET /dictionary?q=rain&limit=20`   | 访客      | q/match/sort/limit/cursor；精简items、page、query、revision及显式拼写suggestions，规则见下文                            |
 | `GET /dictionary/resolve?text=rain` | 访客      | 点词精确解析；word/queried/matchedLemma/matchType，未命中word=null                                                      |
 | `GET /dictionary/stats`             | 访客      | ready数据包元数据；installedDictionary/countBasis/declaredEntryCount/packs                                              |
 | `GET /dictionary/credits?q=rain`    | 访客      | 全部ready包来源与可选精确词条的原始来源/用法说明；不把独立语言义项冒称翻译对照                                          |
-| `GET /words/:id`                    | 访客      | 已发布word的全部senses、音标与来源；每个Sense包含source/exampleSource                                                   |
+| `GET /words/:id`                    | 访客      | 已发布word详情：学习senses及各自examples、dictionarySenses原词典释义、可用英美音标/词音                                 |
 | `GET /me/settings`                  | 用户      | settings                                                                                                                |
 | `PATCH /me/profile`                 | 用户      | name；不允许修改 role/email/其他用户                                                                                    |
 | `PATCH /me/settings`                | 用户      | 可选 goal/currentBookId/dailyTotalGoal/groupSize/timeZone/expectedRevision；旧dailyNewLimit仅作兼容                     |
-| `GET /wordbook?limit=50&cursor=...` | 用户      | 本人活动生词本游标分页，排除软毕业项，默认50条、每页最多100条，items/page含note/favorite/paused/progress                |
+| `GET /wordbook?limit=50&cursor=...` | 用户      | 本人词本；status=active/consolidated/all，支持q/match/sort/limit/cursor，默认最近更新                                   |
 | `GET /wordbook/:wordId`             | 用户      | 读取本人精确收藏项或null，不用列表首批推断收藏状态                                                                      |
 | `POST /wordbook`                    | 用户      | wordId与可选note；已有活动项返回added=false/alreadySaved=true，不覆盖笔记；重新加入毕业项恢复活动状态                   |
 | `PATCH /wordbook/:wordId`           | 用户      | 可选 note/favorite/paused                                                                                               |
 | `DELETE /wordbook/:wordId`          | 用户      | JSON `{}`；移除生词本项，保留学习进度                                                                                   |
 | `GET /announcements`                | 访客      | 最近 20 条已发布公告                                                                                                    |
 
-Word DTO保持canonical ID、词性、音标、senses、独立examples与实际collocations。字段级contentMetadata保留来源；中英文若分属两个Sense，只能作为同词的独立解释，不假定逐义配对。`GET /dictionary/credits`提供独立说明页所需的原始来源以及受原文摘要保护的learningDefinitions。学习正文不因隐藏技术说明而删除可追溯来源数据。
+Word DTO保持canonical ID和实际collocations。`senses` 优先返回经来源核验的原子学习义项，每义有kind、contentVersion、bindingHash和仅属于自己的 `examples[]`；每句有稳定id、learningSenseId、contentVersion、contextLabel及英中句文。不再提供词级examples供前端拼接到任意义项。尚未关联的原句保留为candidate，不进入当前义项。无已核验学习义项时senses返回词典释义且examples为空；dictionarySenses另保留全部可见原词典释义。中英文若分属不同源Sense，不能假定为逐义配译。`meaningCoverage`区分实际原子义项、配句义项及词典源义项，不声称穷尽覆盖。`pronunciationCompatible=false`时音标和词音为空，独立媒体GET/HEAD也拒绝播放；它不影响正确绑定的整句音频。原始来源保留在credits及管理归档，普通学习界面不展示技术字段。
 
 `GET /wordbook/:wordId`还返回collection：`inWordbook`为活动收藏状态，known为manual/automatic/null。生词本删除、软毕业和熟词来源均不删除FSRS历史；具体自动规则见 [内容与个人词本](CONTENT.md#生词本与熟词本)。
 
@@ -86,7 +86,11 @@ goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固�
 
 `/dictionary/resolve` 接受text长度1–80，当前执行规范化精确匹配，返回 `matchType=exact` 或 `not-found`；没有前缀近似替代、后缀猜测或未经证实的原形推断。客户端可兼容未来有词典关系证据的 `inflection` 类型，但本轮不能把它描述为已实现的词形分析。未命中示例：`{ "word": null, "queried": "…", "matchedLemma": null, "matchType": "not-found" }`。
 
-词书详情、字典和admin词检索使用keyset分页，返回 `page={total,hasMore,nextCursor}`；词书按ordinal、词检索按normalizedLemma排序。后续请求原样携带nextCursor；游标绑定词书ID或规范化查询词，不能在变更q或词书时复用，否则400 `invalid_cursor`。它是分页位置，不能切换Realm，也不是事务快照。列表仅提供前3个Sense及senseCount/detailAvailable，完整多义项从 `/words/:id` 读取。
+公共字典和本人生词本使用独立的查词契约：q最多160字符、按既有规则规范化，拒绝NUL；match=smart（默认）/exact/prefix/contains。contains必须能提取至少一段连续3个字母或数字，否则400 `query_too_short`；smart在此情况下退回prefix，并在query.effectiveMatch如实标出。sort=relevance/az/za，私人列表另有updated-desc；公共字典和带q的私人查询默认relevance，无q的私人列表默认updated-desc。公共字典limit默认20、范围1–50，私人列表默认50、范围1–100。公共字典不接受status或updated-desc。全部排序在完整匹配集的服务端执行，列表只带词形、精简定义、词性、匹配层和本人收藏摘要，不读取音频/例句完整图。
+
+响应为items、`page={total,hasMore,nextCursor}`、规范条件query、revision和最多数个suggestions。total为当前主匹配集合精确计数，建议不混入总数；错拼建议不会自动替换q或打开近似词，systme可显式选择system。q只检索词形，不支持中文语义查询或词形还原。
+
+查词游标有效15分钟，由服务端HMAC签名，绑定实例、站点、账户、公开/私人范围、关键词、匹配/排序/分类及catalog/collection revision。篡改、跨条件或跨身份400 `invalid_cursor`，过期410 `cursor_expired`，内容/收藏变化409 `list_changed`，客户端从第一页重新加载。每页RepeatableRead不代表跨HTTP事务快照；不在已变集合上继续旧游标。词书详情和admin检索保留各自keyset规则，不能与查词游标互用。完整词条由 `/words/:id` 独立读取。
 
 字典返回 `source=postgres-catalog`，已安装ready ECDICT时 `completeDictionary=true`；该值只声明固定数据包已安装，不代表覆盖所有英语。`/dictionary/stats` 的 `countBasis=installed-pack-metadata`，declaredEntryCount累计ready词典包声明词数，排除kind=phonetics的独立音标包，不能当作当前已发布Word的实时计数。每个Word及Sense披露来源，原创例句、站点编辑和源释义分开标记；缺失的释义、音标、例句保持缺失。现代US/UK IPA与原始source-transcription分开，参见 [PHONETICS.md](PHONETICS.md)。
 
@@ -143,7 +147,7 @@ goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固�
 | `GET /library/words`               | view=learning/recent/learned，q、limit、cursor 可选；返回本人真实学习词条和进度                                |
 | `GET /sentences`                   | q、wordId、limit、cursor 可选；本人收藏快照列表                                                                |
 | `GET /sentences/status?wordId=...` | 返回 `{wordId,items:[{sourceType,sourceId,saved,sentenceId}]}`，一次核对当前源的精确收藏状态，不依赖列表第一页 |
-| `POST /sentences`                  | `{sourceType:'word-example'或'sense',sourceId,wordId?}`；返回 `{sentence,duplicate}`                           |
+| `POST /sentences`                  | `{sourceType:'word-example',sourceId,wordId?}`；只接受当前发布义项的同版双语例句，返回 `{sentence,duplicate}`  |
 | `DELETE /sentences/:id`            | 无请求体或 `{}`；仅删除本人收藏，返回 `{deleted:true}`                                                         |
 | `GET /notes`                       | q、wordId、limit、cursor 可选；本人笔记列表                                                                    |
 | `GET /notes/:id`                   | 返回 `{note}`，其他用户或不存在的笔记返回404                                                                   |
@@ -155,7 +159,7 @@ goal 取 `daily`、`ielts`、`cet4`、`cet6`、`high-school`。默认安装固�
 
 学习库、句库、笔记列表默认50条、最多100条，q 最长120字符。学习库只列存在真实 firstLearnedAt 的已发布词；learning 排除本人暂停的词，recent 限最近30天有真实评价的词，learned 列全部已学词。每项含 word、progress、reviewedAt、dueAt、learnedAt、reviewCount、paused；reviewCount 不包含首学评价，学习库摘要只带有限释义与例句。
 
-句库只能收藏当前已发布词中可核实且英中例句均非空的 WordExample 或可学习 Sense；不接受客户端提交自写例句或伪造来源。收藏保存正文与归因快照，源编辑不会改写已有快照。同源同内容并发收藏去重；源正文或归因变化后，当前版本可能显示未收藏，旧快照仍在句库中。状态接口最多读取1000个源候选，超限返回413 `sentence_sources_limit`，不会静默截断。每人最多5000句，超限429 `sentence_limit`；源不可见、空句或被排除时404 `sentence_source_not_found`。收藏项包含 id、wordId、sourceType/sourceId、exampleEn/exampleZh、metadata、createdAt；源词被删除后 wordId 可为 null。
+句库新收藏仅接受当前已发布词的WordExample，必须绑定同词、同内容版本、来源摘要仍核对通过的published LearningSense，且语境及英中句文均非空；旧词级句和内嵌Sense句不能新加入。历史收藏只读保留，不接受客户端提交自写例句或伪造来源。收藏保存句文、对应义项及版本快照，源编辑不会回写已有快照。同源同内容并发收藏去重；源正文或归因变化后，当前版本可能显示未收藏，旧快照仍在句库中。状态接口最多读取1000个有效源，超限返回413 `sentence_sources_limit`，不会静默截断。每人最多5000句，超限429 `sentence_limit`；源不可见、空句、挂起或被排除时404 `sentence_source_not_found`。收藏项包含 id、wordId、sourceType/sourceId、exampleEn/exampleZh、metadata、createdAt；源词被删除后 wordId 可为 null。
 
 笔记 title 去空白后1–120字符，body 为1–20000字符纯文本，不接受 NUL；每人最多1000篇，超限429 `note_limit`。可关联本站已发布 canonical word，不能借关联读取他人的私有词书关系。每项含 id、wordId、title、body、revision、createdAt、updatedAt；更新或删除时版本冲突返回409 `note_conflict`，details.note 为当前笔记。错误游标或多余请求字段返回400；本人不存在或非本人资源返回404。
 

@@ -143,6 +143,8 @@ export interface ContentAttribution {
 }
 export interface Sense {
   id: string;
+  kind?: 'learning' | 'dictionary';
+  sourceSenseIds?: string[];
   pos?: string;
   definitionZh: string;
   definitionEn?: string;
@@ -152,14 +154,21 @@ export interface Sense {
   source?: ContentAttribution;
   exampleSource?: ContentAttribution | null;
   contentMetadata?: Record<string, unknown>;
+  contentVersion?: string;
+  bindingHash?: string;
+  examples?: WordExample[];
 }
 export interface WordExample {
   id: string;
   exampleEn: string;
   exampleZh: string;
+  contextLabel?: string;
+  learningSenseId?: string;
+  contentVersion?: string;
   contentMetadata?: Record<string, unknown>;
 }
 export interface Word {
+  pronunciationCompatible?: boolean;
   entryKind?: 'single' | 'phrase';
   dictionaryName?: string;
   collocations?: {
@@ -200,6 +209,7 @@ export interface Word {
   } | null;
   sources?: { id: string; version: string; license: string; sourceUrl: string }[];
   senses?: Sense[];
+  dictionarySenses?: Sense[];
   learningDefinitions?: Sense[];
   senseCount?: number;
   detailAvailable?: boolean;

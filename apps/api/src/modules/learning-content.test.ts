@@ -92,7 +92,7 @@ describe('source-bound learning corrections and real phrase display', () => {
     });
     expect(wordDto(word, true).senses).toHaveLength(2);
   });
-  it('supplements issued presentation without altering the issued source or accepting an unrelated exclusion', () => {
+  it('preserves issued source meaning when a later correction has a different identity', () => {
     const issued = { id: 'w', senses: [sense()], contentVersion: 'old' };
     const original = structuredClone(issued);
     const fresh = {
@@ -103,8 +103,8 @@ describe('source-bound learning corrections and real phrase display', () => {
       collocations: [{ wordId: 'p', lemma: 'out of the question' }],
     };
     const display = supplementIssuedWord(issued, fresh, 'w');
-    expect((display.senses as Sense[]).map((item) => item.id)).toEqual(['correct']);
-    expect(display.collocations).toEqual(fresh.collocations);
+    expect((display.senses as Sense[]).map((item) => item.id)).toEqual(['s']);
+    expect(display).not.toHaveProperty('collocations');
     expect(issued).toEqual(original);
     const edited = { ...issued, senses: [sense({ definitionZh: '后台已校对' })] };
     expect((supplementIssuedWord(edited, fresh, 'w').senses as Sense[])[0]!.definitionZh).toBe(

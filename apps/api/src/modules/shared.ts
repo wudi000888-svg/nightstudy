@@ -13,10 +13,18 @@ import { createEmptyCard, fsrs, Rating, type Card } from 'ts-fsrs';
 import { HttpError } from '../context.js';
 import { contentCoverage, senseLexicalWarnings } from './content-presentation.js';
 import { learningDefinitionView } from './learning-definitions.js';
+import {
+  atomicSenseView,
+  learningSensesInclude,
+  verifiedLearningSenses,
+  wordPronunciationCompatible,
+  type AtomicLearningSense,
+} from './learning-sense-view.js';
 
 export type Db = PrismaClient | Prisma.TransactionClient;
 export type WordWithSenses = Word & {
   senses: Sense[];
+  learningSenses?: AtomicLearningSense[];
   audio?: WordAudio[];
   examples?: WordExample[];
   collocations?: {
@@ -28,6 +36,7 @@ export type WordWithSenses = Word & {
 };
 export const wordInclude = {
   senses: { orderBy: { ordinal: 'asc' as const } },
+  learningSenses: learningSensesInclude,
   audio: { where: { status: 'ready' }, orderBy: { accent: 'asc' as const } },
   examples: { orderBy: [{ ordinal: 'asc' as const }, { id: 'asc' as const }] },
   collocations: {
@@ -103,7 +112,7 @@ export function learningSense(sense: Sense) {
     quality.sourceTextSha256 !== crypto.createHash('sha256').update(source, 'utf8').digest('hex')
   );
 }
-export function displayPos(sense: Sense) {
+export function displayPos(sense: Pick<Sense, 'pos' | 'contentMetadata'>) {
   if (sense.pos.trim()) return sense.pos;
   const metadata = obj(sense.contentMetadata);
   const authored = obj(metadata.authoredDisplayPosSource);
@@ -130,15 +139,42 @@ export function selectLearningSense(senses: Sense[], focusSenseId?: string | nul
     available.find((sense) => sense.definitionZh.trim())
   );
 }
+export function selectWordLearningSense(word: WordWithSenses, focusSenseId?: string | null) {
+  const atomic = verifiedLearningSenses(word);
+  if (!atomic.length) return selectLearningSense(word.senses, focusSenseId);
+  return (
+    atomic.find((sense) => sense.id === focusSenseId) ??
+    atomic.find((sense) =>
+      sense.sourceBindings.some((binding) => binding.sourceSenseId === focusSenseId),
+    ) ??
+    atomic[0]
+  );
+}
 export function wordDto(word: WordWithSenses, includeHeldSources = false) {
-  const senses = includeHeldSources
+  const dictionarySenses = includeHeldSources
     ? word.senses
     : word.senses.filter(learningSense).map(learningDefinitionView);
+  const atomic = includeHeldSources ? [] : verifiedLearningSenses(word).map(atomicSenseView);
+  const ambiguousPronunciation = !wordPronunciationCompatible(word);
+  const senses = atomic.length
+    ? atomic
+    : dictionarySenses.map((sense) => ({
+        ...sense,
+        kind: 'dictionary' as const,
+        contentVersion: word.contentVersion,
+        bindingHash: '',
+        sourceSenseIds: [sense.id],
+        examples: [] as WordExample[],
+      }));
   return {
     id: word.id,
     lemma: word.lemma,
     entryKind: /\s/.test(word.normalizedLemma) ? 'phrase' : 'single',
-    dictionaryName: word.sourceRef?.startsWith('pack:ecdict') ? '英汉词典' : 'NightStudy',
+    dictionaryName: atomic.length
+      ? 'NightStudy'
+      : word.sourceRef?.startsWith('pack:ecdict')
+        ? '英汉词典'
+        : 'NightStudy',
     collocations: (word.collocations ?? [])
       .map(({ phrase }) => {
         const sense =
@@ -154,9 +190,10 @@ export function wordDto(word: WordWithSenses, includeHeldSources = false) {
         };
       })
       .filter((item) => item.definitionZh || item.definitionEn),
-    phonetic: word.phonetic,
-    phoneticUs: word.phoneticUs,
-    phoneticUk: word.phoneticUk,
+    phonetic: ambiguousPronunciation ? '' : word.phonetic,
+    pronunciationCompatible: !ambiguousPronunciation,
+    phoneticUs: ambiguousPronunciation ? '' : word.phoneticUs,
+    phoneticUk: ambiguousPronunciation ? '' : word.phoneticUk,
     phoneticSource: word.phoneticSource,
     difficulty: word.difficulty,
     status: word.status,
@@ -167,15 +204,25 @@ export function wordDto(word: WordWithSenses, includeHeldSources = false) {
     learningExclusions: word.senses
       .filter((sense) => !learningSense(sense))
       .map((sense) => ({ id: sense.id, ...obj(obj(sense.contentMetadata).lexicalQuality) })),
-    contentCoverage: contentCoverage(senses, word.examples),
+    contentCoverage: contentCoverage(
+      senses.map((sense) => ({ ...sense, exampleEn: '', exampleZh: '' })),
+      senses.flatMap((sense) => sense.examples),
+    ),
+    meaningCoverage: {
+      atomicSenseCount: atomic.length,
+      contextualSenseCount: atomic.filter(
+        (sense) => new Set(sense.examples.map((example) => example.contextLabel)).size >= 2,
+      ).length,
+      dictionarySenseCount: dictionarySenses.length,
+    },
     lexicalWarnings: senseLexicalWarnings(word.senses),
-    examples: (word.examples ?? []).map((example) => ({
-      id: example.id,
-      exampleEn: example.exampleEn,
-      exampleZh: example.exampleZh,
-      contentMetadata: obj(example.contentMetadata),
+    dictionarySenses: dictionarySenses.map((sense) => ({
+      id: sense.id,
+      pos: displayPos(sense),
+      definitionZh: sense.definitionZh,
+      definitionEn: sense.definitionEn,
     })),
-    audio: (word.audio ?? []).map((audio) => ({
+    audio: (ambiguousPronunciation ? [] : (word.audio ?? [])).map((audio) => ({
       id: audio.id,
       accent: audio.accent,
       kind: audio.kind,
@@ -192,8 +239,20 @@ export function wordDto(word: WordWithSenses, includeHeldSources = false) {
       pos: displayPos(s),
       definitionZh: s.definitionZh,
       definitionEn: s.definitionEn,
-      exampleEn: s.exampleEn,
-      exampleZh: s.exampleZh,
+      ...(includeHeldSources ? { exampleEn: s.exampleEn, exampleZh: s.exampleZh } : {}),
+      kind: s.kind,
+      contentVersion: s.contentVersion,
+      bindingHash: s.bindingHash,
+      sourceSenseIds: s.sourceSenseIds,
+      examples: s.examples.map((example) => ({
+        id: example.id,
+        learningSenseId: example.learningSenseId,
+        contextLabel: example.contextLabel,
+        contentVersion: example.contentVersion,
+        exampleEn: example.exampleEn,
+        exampleZh: example.exampleZh,
+        contentMetadata: obj(example.contentMetadata),
+      })),
       contentMetadata: obj(s.contentMetadata),
     })),
     ...(includeHeldSources

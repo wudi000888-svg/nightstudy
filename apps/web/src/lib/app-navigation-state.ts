@@ -1,5 +1,6 @@
 import type { Location } from 'react-router-dom';
 import { moduleRoots, screenIdentity, screenModule, type AppModule } from './navigation';
+import { lookupConditions, lookupParams } from './lookup-state';
 
 export const locationHref = (value: Pick<Location, 'pathname' | 'search' | 'hash'>) =>
   `${value.pathname}${value.search}${value.hash}`;
@@ -34,6 +35,33 @@ interface HistoryEntry {
   module: AppModule | null;
 }
 export type NavigationAction = 'POP' | 'PUSH' | 'REPLACE';
+
+function lookupEntry(value: Location) {
+  return (
+    ['/lookup', '/wordbook'].includes(value.pathname) &&
+    new URLSearchParams(value.search).has('entry')
+  );
+}
+function opensLookupDetail(
+  previous: Location | undefined,
+  current: Location,
+  action: NavigationAction,
+) {
+  if (
+    action !== 'PUSH' ||
+    !previous ||
+    current.pathname !== previous.pathname ||
+    !lookupEntry(current) ||
+    lookupEntry(previous)
+  )
+    return false;
+  const proof = current.state as { lookupListKey?: string } | null;
+  if (proof?.lookupListKey !== previous.key) return false;
+  const kind = current.pathname === '/wordbook' ? 'wordbook' : 'lookup';
+  const conditions = (value: Location) =>
+    String(lookupParams(lookupConditions(new URLSearchParams(value.search), kind), kind));
+  return conditions(previous) === conditions(current);
+}
 
 const retainedRoutes = new Set([
   '/',
@@ -118,15 +146,19 @@ export class AppNavigationState {
       stack = [...previous.slice(0, existing), location];
     } else if (location.pathname === moduleRoots[module]) {
       stack = [location];
+    } else if (opensLookupDetail(previous.at(-1), location, action)) {
+      stack = [...previous, location];
     } else if (previous.at(-1)?.pathname === location.pathname) {
       stack = [...previous.slice(0, -1), location];
     } else {
       const entryBefore = this.history.get(index - 1);
       const continuesModule = action === 'PUSH' && entryBefore?.module === module;
       stack =
-        continuesModule && previous.length
-          ? [...previous, location]
-          : [rootLocation(module), location];
+        !previous.length && lookupEntry(location)
+          ? [location]
+          : continuesModule && previous.length
+            ? [...previous, location]
+            : [rootLocation(module), location];
     }
     // Routes are a finite set; repeated visits never make an unbounded page stack.
     if (stack.length > 12) stack = [stack[0]!, ...stack.slice(-11)];
@@ -134,7 +166,11 @@ export class AppNavigationState {
   }
 
   destination(module: AppModule) {
-    return locationHref(this.modules.get(module)?.at(-1) ?? rootLocation(module));
+    return locationHref(this.destinationLocation(module));
+  }
+
+  destinationLocation(module: AppModule) {
+    return this.modules.get(module)?.at(-1) ?? rootLocation(module);
   }
 
   previous(module: AppModule) {

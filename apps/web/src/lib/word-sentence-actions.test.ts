@@ -32,6 +32,15 @@ const word: Word = {
       definitionEn: 'Water falling from clouds.',
       exampleEn: 'The rain stopped before dawn.',
       exampleZh: '雨在黎明前停了。',
+      examples: [
+        {
+          id: 'meaning-example',
+          learningSenseId: 'sense-bilingual',
+          exampleEn: 'The rain stopped before dawn.',
+          exampleZh: '雨在黎明前停了。',
+          contextLabel: '天气',
+        },
+      ],
     },
     {
       id: 'sense-en-only',
@@ -61,28 +70,21 @@ function render(element: React.ReactElement) {
 }
 beforeAll(() => vi.stubGlobal('React', React));
 afterAll(() => vi.unstubAllGlobals());
-it('binds each real bilingual sentence to its own canonical word/example or sense tuple', () => {
-  const reading = render(React.createElement(WordView, { word }));
-  expect((reading.match(/data-sentence-word="sentence-word"/g) ?? []).length).toBe(2);
-  expect(reading).toContain('data-sentence-source="sense:sense-bilingual"');
-  expect(reading).toContain('data-sentence-source="word-example:word-bilingual"');
-  expect(reading).not.toContain('data-sentence-source="word-example:word-one-language"');
-  expect(reading).not.toContain('data-sentence-source="sense:sense-en-only"');
-  const study = render(React.createElement(WordView, { word, presentation: 'study' }));
-  // The mobile context browser renders one actual example at a time.
-  expect((study.match(/data-sentence-word="sentence-word"/g) ?? []).length).toBe(1);
-  expect(study).toContain('data-sentence-source="sense:sense-bilingual"');
-  const wordUsage = render(
+it('binds the current meaning example to its own stable canonical example ID', () => {
+  for (const presentation of ['reading', 'study'] as const) {
+    const markup = render(React.createElement(WordView, { word, presentation }));
+    expect((markup.match(/data-sentence-word="sentence-word"/g) ?? []).length).toBe(1);
+    expect(markup).toContain('data-sentence-source="word-example:meaning-example"');
+    expect(markup).not.toContain('word-example:word-bilingual');
+    expect(markup).not.toContain('sense:sense-bilingual');
+  }
+  const missing = render(
     React.createElement(WordView, {
-      word: {
-        ...word,
-        senses: word.senses!.map((sense) => ({ ...sense, exampleEn: '', exampleZh: '' })),
-      },
-      presentation: 'study',
+      word: { ...word, senses: word.senses!.map((sense) => ({ ...sense, examples: [] })) },
     }),
   );
-  expect(wordUsage).toContain('data-sentence-source="word-example:word-bilingual"');
-  expect(wordUsage).not.toContain('data-sentence-source="sense:');
+  expect(missing).not.toContain('data-sentence-');
+  expect(missing).toContain('本义项暂无例句');
 });
 it('keeps unrevealed content and noninteractive floating-card text free of sentence actions', () => {
   const hidden = render(

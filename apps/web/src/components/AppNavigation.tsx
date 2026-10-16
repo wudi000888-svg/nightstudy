@@ -236,9 +236,10 @@ export function AppNavigationProvider({ children }: { children: ReactNode }) {
       activeModule: module,
       canGoBack: !!module && !!state.current.previous(module),
       openModule: (target) => {
-        const destination = state.current.destination(target);
+        const last = state.current.destinationLocation(target);
+        const destination = locationHref(last);
         pendingRestore.current = destination;
-        navigate(destination);
+        navigate(destination, { state: last.state });
       },
       closeModule,
       goBack,

@@ -12,6 +12,7 @@ import { HttpError } from '../context.js';
 import { registerLearningLibrary } from './learning-library.js';
 import { registerAcademy } from './academy.js';
 import { academyLessons, type AcademyLesson } from './academy-content.js';
+import { learningSenseBindingHash, learningSenseTextHash } from './learning-sense-integrity.js';
 const a = process.env.TEST_DATABASE_URL,
   b = process.env.TEST_DATABASE_URL_B;
 const suite = a && b ? describe : describe.skip;
@@ -27,6 +28,61 @@ suite(
     const dbA = createDatabase(a),
       dbB = createDatabase(b),
       prefix = `library-${randomUUID()}`;
+    async function publishFixtureExamples(
+      db: typeof dbA,
+      wordId: string,
+      sourceSenseId: string,
+      exampleIds: string[],
+    ) {
+      const source = await db.sense.findUniqueOrThrow({ where: { id: sourceSenseId } });
+      const binding = {
+        sourceSenseId,
+        relation: 'exact',
+        sourcePosSha256: learningSenseTextHash(source.pos),
+        sourceDefinitionZhSha256: learningSenseTextHash(source.definitionZh),
+        sourceDefinitionEnSha256: learningSenseTextHash(source.definitionEn),
+      };
+      const meaning = {
+        id: `${wordId}-atomic-meaning`,
+        wordId,
+        pos: source.pos,
+        definitionZh: source.definitionZh,
+        definitionEn: source.definitionEn || 'An original synthetic test meaning.',
+        contentVersion: 'library-fixture-1',
+      };
+      await db.learningSense.create({
+        data: {
+          ...meaning,
+          status: 'published',
+          bindingHash: learningSenseBindingHash({ ...meaning, sourceBindings: [binding] }),
+        },
+      });
+      await db.senseSourceBinding.create({
+        data: {
+          ...binding,
+          id: `${meaning.id}-source-binding`,
+          wordId,
+          learningSenseId: meaning.id,
+        },
+      });
+      await db.wordExample.updateMany({
+        where: { id: { in: exampleIds }, wordId },
+        data: {
+          learningSenseId: meaning.id,
+          status: 'published',
+          contextLabel: 'Synthetic test context',
+          contentVersion: 'library-fixture-1',
+        },
+      });
+    }
+    async function deleteFixtureWords(db: typeof dbA, ids: string[]) {
+      await db.wordExample.deleteMany({ where: { wordId: { in: ids } } });
+      await db.senseSourceBinding.deleteMany({ where: { wordId: { in: ids } } });
+      await db.learningSense.deleteMany({ where: { wordId: { in: ids } } });
+      await db.word.deleteMany({
+        where: { id: { in: ids }, normalizedLemma: { startsWith: prefix } },
+      });
+    }
     const first = `${prefix}-first`,
       second = `${prefix}-second`,
       actors = [first, second];
@@ -207,6 +263,8 @@ suite(
             },
           },
         });
+      for (const [index, wordId] of wordIds.entries())
+        await publishFixtureExamples(dbA, wordId, `${wordId}-sense`, [sourceIds[index]!]);
       authA = await buildApp(cfg(), false);
       authB = await buildApp(cfg(true), false);
       for (const [auth, users, other] of [
@@ -247,9 +305,7 @@ suite(
       ]);
       await dbA.user.deleteMany({ where: { id: { in: actors } } });
       await dbB.user.deleteMany({ where: { id: first } });
-      await dbA.word.deleteMany({
-        where: { id: { in: wordIds }, normalizedLemma: { startsWith: prefix } },
-      });
+      await deleteFixtureWords(dbA, wordIds);
       await Promise.all([dbA.$disconnect(), dbB.$disconnect()]);
       if (oldAudio === undefined) delete process.env.AUDIO_CACHE_DIR;
       else process.env.AUDIO_CACHE_DIR = oldAudio;
@@ -350,8 +406,8 @@ suite(
       expect(
         (
           await request('POST', '/sentences', {
-            sourceType: 'sense',
-            sourceId: `${wordIds[1]}-sense`,
+            sourceType: 'word-example',
+            sourceId: sourceIds[1],
           })
         ).statusCode,
       ).toBe(200);
@@ -401,7 +457,7 @@ suite(
     });
     it('returns exact current-source favorite states beyond the first list page without leaking another user or realm', async () => {
       const wordId = `${prefix}-status-word`,
-        exampleIds = Array.from({ length: 52 }, (_, index) => `${wordId}-example-${index}`),
+        exampleIds = Array.from({ length: 53 }, (_, index) => `${wordId}-example-${index}`),
         senseId = `${wordId}-sense`,
         heldId = `${wordId}-held`,
         definitionZh = '不用于学习的测试源';
@@ -458,8 +514,11 @@ suite(
             normalizedLemma: wordId,
             sourceRef: 'NightStudy status fixture',
             examples: { create: { id: exampleIds[0]!, ...text, contentMetadata: metadata } },
+            senses: { create: { id: senseId, pos: 'n.', definitionZh: '测试源' } },
           },
         });
+        await publishFixtureExamples(dbA, wordId, senseId, exampleIds);
+        await publishFixtureExamples(dbB, wordId, senseId, [exampleIds[0]!]);
         const route = `/sentences/status?wordId=${wordId}`;
         const original = await request('POST', '/sentences', {
           sourceType: 'word-example',
@@ -468,11 +527,15 @@ suite(
         });
         expect(original.statusCode).toBe(200);
         const originalSentence = original.json().sentence;
-        const senseSaved = await request('POST', '/sentences', {
-          sourceType: 'sense',
-          sourceId: senseId,
+        const contextSaved = await request('POST', '/sentences', {
+          sourceType: 'word-example',
+          sourceId: exampleIds[52],
         });
-        expect(senseSaved.statusCode).toBe(200);
+        expect(contextSaved.statusCode).toBe(200);
+        expect(
+          (await request('POST', '/sentences', { sourceType: 'sense', sourceId: senseId }))
+            .statusCode,
+        ).toBe(400);
         await dbA.librarySentence.updateMany({
           where: { userId: first, wordId },
           data: { createdAt: new Date('2026-01-01T00:00:00Z') },
@@ -509,10 +572,10 @@ suite(
           sentenceId: originalSentence.id,
         });
         expect(status.json().items).toContainEqual({
-          sourceType: 'sense',
-          sourceId: senseId,
+          sourceType: 'word-example',
+          sourceId: exampleIds[52],
           saved: true,
-          sentenceId: senseSaved.json().sentence.id,
+          sentenceId: contextSaved.json().sentence.id,
         });
         expect(
           status.json().items.some((row: { sourceId: string }) => row.sourceId === heldId),
@@ -542,7 +605,7 @@ suite(
         expect(
           (await request('POST', '/sentences', { sourceType: 'sense', sourceId: heldId }))
             .statusCode,
-        ).toBe(404);
+        ).toBe(400);
 
         await dbA.wordExample.update({
           where: { id: exampleIds[0] },
@@ -580,26 +643,31 @@ suite(
             .items.find((row: { sourceId: string }) => row.sourceId === exampleIds[0]),
         ).toMatchObject({ saved: false, sentenceId: null });
         expect(
-          (await request('DELETE', `/sentences/${senseSaved.json().sentence.id}`, {})).statusCode,
+          (await request('DELETE', `/sentences/${contextSaved.json().sentence.id}`, {})).statusCode,
         ).toBe(200);
         expect(
           (await request('GET', route))
             .json()
-            .items.find((row: { sourceId: string }) => row.sourceId === senseId),
+            .items.find((row: { sourceId: string }) => row.sourceId === exampleIds[52]),
         ).toMatchObject({ saved: false, sentenceId: null });
         await dbA.word.update({ where: { id: wordId }, data: { status: 'archived' } });
         expect((await request('GET', route)).statusCode).toBe(404);
       } finally {
         await dbA.librarySentence.deleteMany({ where: { userId: first, wordId } });
-        await dbA.word.deleteMany({ where: { id: wordId, normalizedLemma: wordId } });
-        await dbB.word.deleteMany({ where: { id: wordId, normalizedLemma: wordId } });
+        await deleteFixtureWords(dbA, [wordId]);
+        await deleteFixtureWords(dbB, [wordId]);
       }
     });
     it('rejects excessive source sets explicitly instead of returning misleading truncated favorite states', async () => {
       const wordId = `${prefix}-status-limit`;
       try {
         await dbA.word.create({
-          data: { id: wordId, normalizedLemma: wordId, lemma: 'source limit fixture' },
+          data: {
+            id: wordId,
+            normalizedLemma: wordId,
+            lemma: 'source limit fixture',
+            senses: { create: { id: `${wordId}-source`, pos: 'n.', definitionZh: '容量测试词义' } },
+          },
         });
         await dbA.wordExample.createMany({
           data: Array.from({ length: 1001 }, (_, index) => ({
@@ -609,12 +677,18 @@ suite(
             exampleZh: '雨掠过空荡的道路。',
           })),
         });
+        await publishFixtureExamples(
+          dbA,
+          wordId,
+          `${wordId}-source`,
+          Array.from({ length: 1001 }, (_, index) => `${wordId}-${index}`),
+        );
         const response = await request('GET', `/sentences/status?wordId=${wordId}`);
         expect(response.statusCode).toBe(413);
         expect(response.json().code).toBe('sentence_sources_limit');
         expect(await dbA.librarySentence.count({ where: { userId: first, wordId } })).toBe(0);
       } finally {
-        await dbA.word.deleteMany({ where: { id: wordId, normalizedLemma: wordId } });
+        await deleteFixtureWords(dbA, [wordId]);
       }
     });
     it('provides private note CRUD, stale edit/delete conflicts, plain text limits, and canonical published word validation', async () => {
@@ -798,6 +872,69 @@ suite(
       expect(await dbA.reviewLog.count({ where: { userId: { in: actors } } })).toBe(reviewCount);
       expect(await dbA.dailyPlan.count({ where: { userId: { in: actors } } })).toBe(0);
       expect(await dbA.autoKnownWord.count({ where: { userId: { in: actors } } })).toBe(0);
+    });
+    it('refuses new listening questions for published or held incompatible pronunciations while preserving issued snapshots', async () => {
+      const issued = await request('POST', `/academy/${synthetic.id}/attempts`, {
+        commandId: randomUUID(),
+        accent: 'us',
+      });
+      expect(issued.statusCode, issued.body).toBe(200);
+      const issuedId = issued.json().attempt.id as string;
+      const snapshot = await dbA.academyAttempt.findUniqueOrThrow({ where: { id: issuedId } });
+      const meaning = await dbA.learningSense.findUniqueOrThrow({
+        where: { id: `${wordIds[0]}-atomic-meaning` },
+      });
+      const attemptCount = await dbA.academyAttempt.count({ where: { userId: first } });
+      const receiptCount = await dbA.commandReceipt.count({ where: { userId: first } });
+      const progress = await dbA.studyProgress.findMany({ where: { userId: { in: actors } } });
+      const reviewCount = await dbA.reviewLog.count({ where: { userId: { in: actors } } });
+      try {
+        for (const status of ['published', 'held']) {
+          await dbA.learningSense.update({
+            where: { id: meaning.id },
+            data: {
+              status,
+              contentMetadata: { pronunciation: { wordAudioCompatible: false } },
+            },
+          });
+          expect((await request('GET', `/academy/${synthetic.id}`)).json().lesson).toMatchObject({
+            audioAvailable: false,
+          });
+          const catalog = (await request('GET', '/academy')).json().items as Array<{
+            id: string;
+            audioAvailable: boolean;
+          }>;
+          expect(catalog.find((lesson) => lesson.id === synthetic.id)?.audioAvailable).toBe(false);
+          for (const accent of ['us', 'uk']) {
+            const denied = await request('POST', `/academy/${synthetic.id}/attempts`, {
+              commandId: randomUUID(),
+              accent,
+            });
+            expect(denied.statusCode, denied.body).toBe(503);
+            expect(denied.json().code).toBe('academy_audio_not_ready');
+          }
+          expect(await dbA.academyAttempt.count({ where: { userId: first } })).toBe(attemptCount);
+          expect(await dbA.commandReceipt.count({ where: { userId: first } })).toBe(receiptCount);
+          const retained = await request('GET', `/academy/attempts/${issuedId}`);
+          expect(retained.statusCode).toBe(200);
+          expect(retained.json().attempt.items).toEqual(issued.json().attempt.items);
+          expect(
+            (await dbA.academyAttempt.findUniqueOrThrow({ where: { id: issuedId } })).itemsJson,
+          ).toEqual(snapshot.itemsJson);
+        }
+        expect(await dbA.studyProgress.findMany({ where: { userId: { in: actors } } })).toEqual(
+          progress,
+        );
+        expect(await dbA.reviewLog.count({ where: { userId: { in: actors } } })).toBe(reviewCount);
+      } finally {
+        await dbA.learningSense.update({
+          where: { id: meaning.id },
+          data: { status: meaning.status, contentMetadata: meaning.contentMetadata! },
+        });
+      }
+      expect((await request('GET', `/academy/${synthetic.id}`)).json().lesson.audioAvailable).toBe(
+        true,
+      );
     });
     it('records reading/shadowing/topic completion without a score, preserves lesson snapshot, and refuses missing physical audio', async () => {
       for (const category of ['reading', 'shadowing', 'topic']) {

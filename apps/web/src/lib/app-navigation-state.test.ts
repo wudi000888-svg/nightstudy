@@ -25,6 +25,43 @@ function visit(
 }
 
 describe('H5 module navigation state', () => {
+  it('keeps a proven lookup detail as a subpage for header, page and native back', () => {
+    for (const path of ['/lookup', '/wordbook']) {
+      const state = new AppNavigationState();
+      const list = visit(state, `${path}?q=sys&match=contains&sort=za`, 0, 'POP');
+      const detail = {
+        ...location(`${path}?q=sys&match=contains&sort=za&entry=system`, 'detail'),
+        state: { lookupListKey: list.key },
+      };
+      state.visit(detail, 'PUSH', 1);
+      expect(state.previous('content')).toEqual(list);
+      expect(state.canPopTo(list, 1)).toBe(true);
+      const sense = { ...detail, search: detail.search + '&sense=noun', key: 'sense' };
+      state.visit(sense, 'REPLACE', 1);
+      expect(state.previous('content')).toEqual(list);
+      expect(state.destinationLocation('content').state).toEqual({ lookupListKey: list.key });
+      state.visit(list, 'POP', 0);
+      expect(state.destination('content')).toBe(`${path}?q=sys&match=contains&sort=za`);
+      expect(state.previous('content')?.pathname).not.toBe(path);
+    }
+  });
+  it('does not invent a lookup list on a direct entry or treat mismatched conditions as list history', () => {
+    const deep = new AppNavigationState();
+    visit(deep, '/lookup?q=sys&entry=system', 0, 'POP');
+    expect(deep.previous('content')).toBeUndefined();
+    expect(deep.homeDistance(0)).toBeNull();
+    const state = new AppNavigationState();
+    const list = visit(state, '/wordbook?q=bank&sort=az', 0, 'POP');
+    state.visit(
+      {
+        ...location('/wordbook?q=sys&sort=za&entry=system', 'mismatched'),
+        state: { lookupListKey: list.key },
+      },
+      'PUSH',
+      1,
+    );
+    expect(state.previous('content')?.key).not.toBe(list.key);
+  });
   it('keeps the committed route index during a cancelled pop and realigns a remounted scope after restoration', () => {
     const learning = location('/learning?section=plan', 'learning');
     const previous = { location: learning, index: 2 };

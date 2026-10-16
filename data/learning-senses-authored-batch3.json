@@ -1,0 +1,789 @@
+{
+  "editorialPolicy": {
+    "decision": "publish",
+    "reviewer": "Codex",
+    "expertCertified": false,
+    "method": "Direct bilingual authorship and explicit sense-by-sense editorial review; no expert certification."
+  },
+  "pronunciationPolicies": {
+    "subject": {"wordAudioCompatible": false, "reason": "subject 的名词与动词重音和弱读音节不同；现有 Word 级音标和音频没有义项或词性证据，在核对前不能匹配给本义项。"}
+  },
+  "sourceSelectors": {
+    "right-n": {
+      "pos": "n.",
+      "definitionZh": "权利, 右边, 正义, 右派, 公正",
+      "definitionEn": "A legal or moral entitlement; the side opposite the left; justice or fairness; a politically conservative group.",
+      "relation": "narrower",
+      "reason": "从混合源行明确拆出权利，不混右边方位和政治分类。"
+    },
+    "right-adj": {
+      "pos": "a.",
+      "definitionZh": "正确的, 对的, 恰当的, 正常的, 正直的, 正面的, 右方的",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "正确与右侧是同一混合行中的不同属性；分别建立不可互配的义项。"
+    },
+    "current-n": {
+      "pos": "n.",
+      "definitionZh": "涌流, 趋势, 流",
+      "definitionEn": "a flowing stream; a tendency or trend; a flow",
+      "relation": "narrower",
+      "reason": "取水持续朝一个方向流动的水流义，不借源行泛化为电流或社会趋势。"
+    },
+    "current-adj": {
+      "pos": "a.",
+      "definitionZh": "流通的, 现在的, 当前的, 流行的",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "仅取当前存在的形容词义，不混流行或市场流通。"
+    },
+    "figure-n": {
+      "pos": "n.",
+      "definitionZh": "数字, 价格, 图形, 形状",
+      "definitionEn": "A number; a price or amount; a diagram or geometric form; a shape.",
+      "relation": "narrower",
+      "reason": "数量数字与说明图形分开，保留混合原文而不覆盖。"
+    },
+    "issue-n": {
+      "pos": "n.",
+      "definitionZh": "发行, 问题, 后果, 流出, 出口, 争端",
+      "definitionEn": "The act of publishing or supplying; a problem; a consequence or outcome; an outflow; an outlet; a dispute.",
+      "relation": "narrower",
+      "reason": "从混合名词源行仅取需讨论解决的问题，不把发行行为当一本刊物。"
+    },
+    "issue-v": {
+      "pos": "vt.",
+      "definitionZh": "使流出, 放出, 发行, 发布, 发给",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "选择机构正式发布或发给的动作，不与问题名词混同。"
+    },
+    "cover-n": {
+      "pos": "n.",
+      "definitionZh": "盖子, 封面, 藉口",
+      "definitionEn": "A lid or protective covering; the outer binding of a book; an excuse or pretext.",
+      "relation": "narrower",
+      "reason": "取书籍外面的封面含义，区别容器盖及隐瞒借口。"
+    },
+    "cover-v": {
+      "pos": "vt.",
+      "definitionZh": "覆盖, 掩饰, 保护, 掩护, 包括",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "物理覆盖与范围包括不同；两者从同一混合动词行中分别限定。"
+    },
+    "date-n": {
+      "pos": "n.",
+      "definitionZh": "日期, 约会, 枣椰树",
+      "definitionEn": "A specified day; an appointment or meeting; a date palm.",
+      "relation": "narrower",
+      "reason": "日期与约会分别限定，不把植物源义错误扩写成日期或约会例句。"
+    },
+    "point-n": {
+      "pos": "n.",
+      "definitionZh": "点, 小数点, 标点, 地点, 要点, 特点, 尖端, 分数, 得分, 穴位",
+      "definitionEn": "A dot, decimal mark, or punctuation mark; a place; a main idea or feature; a sharp tip; a score or mark; an acupuncture location.",
+      "relation": "narrower",
+      "reason": "分别从混合名词行取要点及尖端，避免给同一整行共享不相干句。"
+    },
+    "point-v": {
+      "pos": "vi.",
+      "definitionZh": "指, 指向, 表明",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "取用手指示方向的动作义，区别表明证据等抽象含义。"
+    },
+    "stand-vi": {
+      "pos": "vi.",
+      "definitionZh": "站, 立, 坐落, 停滞, 位于, 坚持, 维持原状",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "仅取人以双脚直立的核心含义，不混建筑坐落或坚持立场。"
+    },
+    "stand-vt": {
+      "pos": "vt.",
+      "definitionZh": "忍受, 使站立, 抵挡",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "仅取对不愉快事物忍受的及物含义，不与直立动作或抵挡合并。"
+    },
+    "stand-n": {
+      "pos": "n.",
+      "definitionZh": "站立, 站住, 停顿, 讲台, 看台, 立场, 法院证人席",
+      "definitionEn": "An upright position or halt; a lectern or raised platform; spectator seating; a position on an issue; a witness's place in court.",
+      "relation": "narrower",
+      "reason": "名词行取对议题所持的立场，不把看台和证人席并入。"
+    },
+    "subject-n": {
+      "pos": "n.",
+      "definitionZh": "科目, 主题, 臣民, 主语, 题目, (事物的)经受者, 学科, 受治疗者, 原因, 理由",
+      "definitionEn": "a school course or field; a topic or title; a person owing allegiance to a ruler; a grammatical subject; a person or thing undergoing an action; a patient receiving treatment; a cause or reason",
+      "relation": "narrower",
+      "reason": "课程、讨论主题与语法主语均为源行明示的独立用法，分别制作例句。"
+    },
+    "fine-adj": {
+      "pos": "a.",
+      "definitionZh": "好的, 晴朗的, 健康的, 细小的, 精细的",
+      "definitionEn": "",
+      "relation": "narrower",
+      "reason": "从多义形容词行取身体状态良好与粒度细小，避免天气或评价泛化。"
+    },
+    "fine-n-corrected": {
+      "pos": "n./adj.",
+      "definitionZh": "[名词]罚款，罚金；[形容词]（天气）晴朗的；精细的，精确的",
+      "definitionEn": "As a noun, a monetary penalty; as an adjective, fair or clear of weather, or precise and finely detailed.",
+      "relation": "narrower",
+      "reason": "源校对行已按标签声明名词罚款；独立抽取原子名词义，不与形容词混用。"
+    }
+  },
+  "meanings": [
+    {
+      "lemma": "right",
+      "key": "correct",
+      "pos": "adj.",
+      "definitionZh": "正确的；符合事实、规则或答案的",
+      "definitionEn": "Correct according to facts, rules, or the expected answer.",
+      "ordinal": 0,
+      "sourceKeys": ["right-adj"],
+      "semanticRationale": "事实正确这一形容词不等于方位右侧或名词权利，计算和路线核实两个语境。",
+      "examples": [
+        {
+          "context": "计算核对",
+          "en": "Your final answer is right, but please show how you worked it out.",
+          "zh": "你的最终答案是正确的，但请写出计算过程。",
+          "semanticRationale": "answer is right为结果正确，不是答案位置在右边。"
+        },
+        {
+          "context": "确认路线",
+          "en": "Are we on the right road to the museum?",
+          "zh": "我们现在走的是去博物馆的正确道路吗？",
+          "semanticRationale": "right road指路线无误，与计算结果核对不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "right",
+      "key": "opposite-left",
+      "pos": "adj.",
+      "definitionZh": "右边的；与左边相对的一侧的",
+      "definitionEn": "On or towards the side opposite the left.",
+      "ordinal": 1,
+      "sourceKeys": ["right-adj"],
+      "semanticRationale": "物理右侧方位独立于正确评价；身体辨识和车辆部件分别示例。",
+      "examples": [
+        {
+          "context": "身体辨识",
+          "en": "Raise your right hand if you can hear the sound.",
+          "zh": "如果能听见声音，请举起右手。",
+          "semanticRationale": "right hand为身体方位，不表示道德正确的手。"
+        },
+        {
+          "context": "车辆检查",
+          "en": "The right front tyre needs more air before the journey.",
+          "zh": "出发前，右前轮胎需要再充些气。",
+          "semanticRationale": "车辆右前部件的方位与人的左右辨识是不同场景。"
+        }
+      ]
+    },
+    {
+      "lemma": "right",
+      "key": "legal-moral-entitlement",
+      "pos": "n.",
+      "definitionZh": "权利；依法或依道理可以享有的资格",
+      "definitionEn": "Something that a person is legally or morally entitled to have or do.",
+      "ordinal": 2,
+      "sourceKeys": ["right-n"],
+      "semanticRationale": "名词法定道德权利独立于正确与右侧；法律援助和隐私分别示例。",
+      "examples": [
+        {
+          "context": "法律保障",
+          "en": "Every defendant has the right to legal advice.",
+          "zh": "每一名被告都有获得法律咨询的权利。",
+          "semanticRationale": "has the right to为权利结构，legal advice明确法律保障。"
+        },
+        {
+          "context": "个人隐私",
+          "en": "Employees have a right to privacy outside working hours.",
+          "zh": "员工在工作时间之外享有隐私权。",
+          "semanticRationale": "工作之外的个人权益与法庭被告保障不同，但同为资格权利。"
+        }
+      ]
+    },
+    {
+      "lemma": "current",
+      "key": "existing-now",
+      "pos": "adj.",
+      "definitionZh": "当前的；现在存在或正在发生的",
+      "definitionEn": "Existing or happening at the present time.",
+      "ordinal": 0,
+      "sourceKeys": ["current-adj"],
+      "semanticRationale": "当前时间属性独立于水流名词，工程和会籍两场景。",
+      "examples": [
+        {
+          "context": "工程进度",
+          "en": "The current plan is to finish the bridge by September.",
+          "zh": "目前的计划是在九月前完成这座桥。",
+          "semanticRationale": "current plan表当前方案，不是水流或价格流通。"
+        },
+        {
+          "context": "会籍资料",
+          "en": "Please bring proof of your current membership to the reception desk.",
+          "zh": "请把你目前有效的会员资格证明带到前台。",
+          "semanticRationale": "现有会籍有效状态与施工计划不同，均为当下属性。"
+        }
+      ]
+    },
+    {
+      "lemma": "current",
+      "key": "flowing-water",
+      "pos": "n.",
+      "definitionZh": "水流；水朝某个方向持续流动的运动",
+      "definitionEn": "A continuous movement of water in a particular direction.",
+      "ordinal": 1,
+      "sourceKeys": ["current-n"],
+      "semanticRationale": "限定液体水流，不借宽泛流这一源义声称已完成电流专业义。",
+      "examples": [
+        {
+          "context": "河流安全",
+          "en": "The river current is too strong for swimming today.",
+          "zh": "今天河里的水流太急，不适合游泳。",
+          "semanticRationale": "river和swimming明确水的流动，非当前形容词。"
+        },
+        {
+          "context": "海洋航行",
+          "en": "A warm current carries the floating seeds towards the island.",
+          "zh": "一股暖流把漂浮的种子带向岛屿。",
+          "semanticRationale": "海上漂浮迁移与河中游泳安全是不同水文场景。"
+        }
+      ]
+    },
+    {
+      "lemma": "figure",
+      "key": "numerical-amount",
+      "pos": "n.",
+      "definitionZh": "数字；表示数量或金额的数值",
+      "definitionEn": "A number that represents an amount or quantity.",
+      "ordinal": 0,
+      "sourceKeys": ["figure-n"],
+      "semanticRationale": "数值信息与说明图形分开；财政估算和统计核查不同场景。",
+      "examples": [
+        {
+          "context": "费用估算",
+          "en": "The final figure includes the cost of materials and labour.",
+          "zh": "最终的数字包括材料费和人工费。",
+          "semanticRationale": "cost使figure为金额数值，不是人物外形或示意图。"
+        },
+        {
+          "context": "人口统计",
+          "en": "Check each figure against the original census report.",
+          "zh": "请把每个数字都与原始人口普查报告核对。",
+          "semanticRationale": "统计数据核查与工程费用估算不同，均为数量信息。"
+        }
+      ]
+    },
+    {
+      "lemma": "figure",
+      "key": "illustration-diagram",
+      "pos": "n.",
+      "definitionZh": "图；用来说明信息的图形或示意图",
+      "definitionEn": "A diagram or illustration used to explain information.",
+      "ordinal": 1,
+      "sourceKeys": ["figure-n"],
+      "semanticRationale": "说明性图形与数量数字不可互配，教材与报告分别示例。",
+      "examples": [
+        {
+          "context": "教材示意",
+          "en": "The figure on the next page shows how the heart pumps blood.",
+          "zh": "下一页的图展示了心脏如何泵血。",
+          "semanticRationale": "shows how及页上图指说明示意，而不是金额数字。"
+        },
+        {
+          "context": "报告制图",
+          "en": "Add a clear label to each figure in the research report.",
+          "zh": "给研究报告中的每幅图加上清楚的标签。",
+          "semanticRationale": "每幅图加标签是图示编排场景，与阅读生物教材不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "issue",
+      "key": "problem-matter",
+      "pos": "n.",
+      "definitionZh": "问题；需要关注、讨论或解决的事项",
+      "definitionEn": "A matter or problem that needs attention, discussion, or a solution.",
+      "ordinal": 0,
+      "sourceKeys": ["issue-n"],
+      "semanticRationale": "议题或问题名词与发布文件动作分开，公共政策和私人事务两个语境。",
+      "examples": [
+        {
+          "context": "公共政策",
+          "en": "Affordable housing is a major issue for the growing city.",
+          "zh": "对于这座不断发展的城市来说，可负担住房是一个重大问题。",
+          "semanticRationale": "housing needs使issue为待解决事项，不是杂志刊次。"
+        },
+        {
+          "context": "家庭安排",
+          "en": "We need to discuss the issue of childcare before accepting the new jobs.",
+          "zh": "接受新工作之前，我们需要讨论孩子照料的问题。",
+          "semanticRationale": "childcare为待商量事项，家庭安排与城市政策不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "issue",
+      "key": "provide-officially",
+      "pos": "vt.",
+      "definitionZh": "正式发出；发布或发给文件、物品",
+      "definitionEn": "To officially publish or provide a document, statement, or item.",
+      "ordinal": 1,
+      "sourceKeys": ["issue-v"],
+      "semanticRationale": "机构正式发布与发给都属于同一核心动作，不混名词问题。",
+      "examples": [
+        {
+          "context": "天气预警",
+          "en": "The weather service may issue a warning if the storm gets stronger.",
+          "zh": "如果风暴增强，气象部门可能会发布预警。",
+          "semanticRationale": "issue warning为机构正式发出信息，不是讨论问题。"
+        },
+        {
+          "context": "证件办理",
+          "en": "The office will issue a replacement card after checking your identity.",
+          "zh": "办公室核实你的身份后，会补发一张卡。",
+          "semanticRationale": "发给实体证件与发布公开预警不同，但都为正式发出。"
+        }
+      ]
+    },
+    {
+      "lemma": "cover",
+      "key": "place-over",
+      "pos": "vt.",
+      "definitionZh": "覆盖；把物体放在另一物体表面上",
+      "definitionEn": "To put something over a surface or object so that it is protected or hidden.",
+      "ordinal": 0,
+      "sourceKeys": ["cover-v"],
+      "semanticRationale": "物理盖住动作独立于包括话题和名词书封面，食品和车辆保护分开。",
+      "examples": [
+        {
+          "context": "保存食物",
+          "en": "Cover the bowl with a clean cloth while the dough rises.",
+          "zh": "面团发酵时，用干净的布盖住碗。",
+          "semanticRationale": "with cloth显示具体物理覆盖动作，不是范围包含。"
+        },
+        {
+          "context": "天气防护",
+          "en": "We cover the bicycles to keep the rain off them at night.",
+          "zh": "夜里我们把自行车盖起来，免得淋雨。",
+          "semanticRationale": "车辆遮雨与食物发酵保护是不同实用场景。"
+        }
+      ]
+    },
+    {
+      "lemma": "cover",
+      "key": "include-range",
+      "pos": "vt.",
+      "definitionZh": "涉及；包括某个范围的内容或事项",
+      "definitionEn": "To include or deal with a particular range of subjects or activities.",
+      "ordinal": 1,
+      "sourceKeys": ["cover-v"],
+      "semanticRationale": "内容范围包括与用材料遮盖不同；课程知识与报告覆盖时间分别示例，不与保险保障混同。",
+      "examples": [
+        {
+          "context": "课程范围",
+          "en": "The course will cover basic grammar as well as everyday conversation.",
+          "zh": "这门课程将涉及基础语法和日常会话。",
+          "semanticRationale": "课程涉及内容为抽象范围，不是用布覆盖教材。"
+        },
+        {
+          "context": "研究报告",
+          "en": "The report will cover changes in employment over the past five years.",
+          "zh": "这份报告将涉及过去五年的就业变化。",
+          "semanticRationale": "报告所涉及的时间及内容范围与课程知识范围不同，均为包括所谈内容。"
+        }
+      ]
+    },
+    {
+      "lemma": "cover",
+      "key": "insurance-protection",
+      "pos": "vt.",
+      "definitionZh": "承保；为损失或费用提供保险保障",
+      "definitionEn": "To provide financial protection against a loss or expense through insurance.",
+      "ordinal": 3,
+      "sourceKeys": ["cover-v"],
+      "semanticRationale": "从保护这一源义限定保险经济保障，不能把它当课程涉及内容的句子来凑语境。",
+      "examples": [
+        {
+          "context": "房屋保险",
+          "en": "Does your policy cover damage caused by flooding?",
+          "zh": "你的保险承保洪水造成的损失吗？",
+          "semanticRationale": "policy cover damage表示承担损失的保险保障，不只是讨论洪水内容。"
+        },
+        {
+          "context": "营业设备保险",
+          "en": "This insurance will cover the cost of replacing stolen equipment.",
+          "zh": "这份保险将承担更换失窃设备的费用。",
+          "semanticRationale": "承担设备失窃经济损失，与住房洪灾保障不同，均为保险赔付范围。"
+        }
+      ]
+    },
+    {
+      "lemma": "cover",
+      "key": "outer-book-binding",
+      "pos": "n.",
+      "definitionZh": "封面；包在书籍外侧的保护部分",
+      "definitionEn": "The outer protective part of a book or magazine.",
+      "ordinal": 2,
+      "sourceKeys": ["cover-n"],
+      "semanticRationale": "书的外层实体名词独立于动词覆盖与范围包括，出版设计和保存损伤分开。",
+      "examples": [
+        {
+          "context": "出版设计",
+          "en": "The cover of the novel shows a tiny boat beneath a dark sky.",
+          "zh": "这本小说的封面画着一叶小舟，天空一片昏暗。",
+          "semanticRationale": "cover of novel展示封面图像，不是动词盖住。"
+        },
+        {
+          "context": "书籍修复",
+          "en": "The old book needs a new cover because the original one has torn.",
+          "zh": "旧书原来的封面破了，需要换个新封面。",
+          "semanticRationale": "更换实体封面属于修复场景，与视觉封面设计不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "date",
+      "key": "calendar-day",
+      "pos": "n.",
+      "definitionZh": "日期；日历中标明的某一天",
+      "definitionEn": "A particular day identified by its day, month, or year.",
+      "ordinal": 0,
+      "sourceKeys": ["date-n"],
+      "semanticRationale": "日历时间名词与约会活动分开，活动通知与食品标签不同场景。",
+      "examples": [
+        {
+          "context": "活动通知",
+          "en": "Write the date of the meeting at the top of the notice.",
+          "zh": "把会议日期写在通知的顶端。",
+          "semanticRationale": "date of meeting为日历中的一天，未强调浪漫会面。"
+        },
+        {
+          "context": "食品标签",
+          "en": "Check the expiry date before you buy the yoghurt.",
+          "zh": "买酸奶之前，先检查保质期截止日期。",
+          "semanticRationale": "expiry date为标定时间，商品检查与会议通知不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "date",
+      "key": "romantic-meeting",
+      "pos": "n.",
+      "definitionZh": "约会；有恋爱意向的两人相约见面",
+      "definitionEn": "An arranged meeting between two people who have or may develop a romantic relationship.",
+      "ordinal": 1,
+      "sourceKeys": ["date-n"],
+      "semanticRationale": "取约会中明确恋爱情境，区别任何日历日期；首次约会和纪念日分别示例。",
+      "examples": [
+        {
+          "context": "初次约会",
+          "en": "They chose a quiet cafe for their first date.",
+          "zh": "他们为第一次约会选了一家安静的咖啡馆。",
+          "semanticRationale": "their first date和两人咖啡馆语境为浪漫会面，不是枣树。"
+        },
+        {
+          "context": "伴侣相处",
+          "en": "The couple arranged a dinner date to celebrate their anniversary.",
+          "zh": "这对伴侣安排了一次晚餐约会来庆祝纪念日。",
+          "semanticRationale": "伴侣纪念日相约用餐与初次见面不同，均为恋爱会面。"
+        }
+      ]
+    },
+    {
+      "lemma": "point",
+      "key": "main-idea",
+      "pos": "n.",
+      "definitionZh": "要点；讨论或表达中的重要想法",
+      "definitionEn": "An important idea or piece of information in a discussion or statement.",
+      "ordinal": 0,
+      "sourceKeys": ["point-n"],
+      "semanticRationale": "信息要点名词与尖端和手指动作分开，会议及阅读练习不同场景。",
+      "examples": [
+        {
+          "context": "会议意见",
+          "en": "She made a good point about the need for more training.",
+          "zh": "她就增加培训的必要性提出了一个很好的观点。",
+          "semanticRationale": "made a point about为提出重要想法，非标点或尖端。"
+        },
+        {
+          "context": "阅读理解",
+          "en": "Underline the main point in each paragraph before writing your summary.",
+          "zh": "写摘要之前，先在每段的要点下画线。",
+          "semanticRationale": "paragraph main point为主要内容，阅读训练与开会意见不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "point",
+      "key": "sharp-end",
+      "pos": "n.",
+      "definitionZh": "尖端；物体细而尖的末端",
+      "definitionEn": "The narrow, sharp end of an object.",
+      "ordinal": 1,
+      "sourceKeys": ["point-n"],
+      "semanticRationale": "具体尖端与抽象要点分离；书写工具和缝纫工具分别示例。",
+      "examples": [
+        {
+          "context": "书写工具",
+          "en": "The point of my pencil broke during the exam.",
+          "zh": "考试时，我的铅笔尖断了。",
+          "semanticRationale": "point of pencil为尖的物理末端，不是考试要点。"
+        },
+        {
+          "context": "缝纫安全",
+          "en": "Keep the point of the needle away from your fingers.",
+          "zh": "让针尖远离你的手指。",
+          "semanticRationale": "needle point是细尖末端，缝纫安全与写字故障不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "point",
+      "key": "indicate-with-finger",
+      "pos": "vi.",
+      "definitionZh": "用手指指向；向某个方向示意",
+      "definitionEn": "To indicate a person, thing, or direction with a finger or hand.",
+      "ordinal": 2,
+      "sourceKeys": ["point-v"],
+      "semanticRationale": "肢体指示方向这一动词限定明确，地图说明和行为礼仪分别示例。",
+      "examples": [
+        {
+          "context": "指示地图",
+          "en": "Can you point to the village where your grandparents live?",
+          "zh": "你能指出你祖父母居住的那个村庄吗？",
+          "semanticRationale": "point to位置要求手指示意，非计算分数或主要内容。"
+        },
+        {
+          "context": "交往礼仪",
+          "en": "It is rude to point at people while you are talking about them.",
+          "zh": "谈论别人时用手指着他们是不礼貌的。",
+          "semanticRationale": "point at people为肢体示意，礼仪评价与地理指认不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "stand",
+      "key": "upright-on-feet",
+      "pos": "vi.",
+      "definitionZh": "站立；用双脚支撑身体保持直立",
+      "definitionEn": "To be upright with the body supported by the feet.",
+      "ordinal": 0,
+      "sourceKeys": ["stand-vi"],
+      "semanticRationale": "身体姿势独立于忍受和立场，排队与交通安全分别示例。",
+      "examples": [
+        {
+          "context": "排队等候",
+          "en": "Please stand behind the yellow line until your number is called.",
+          "zh": "叫到号码之前，请站在黄线后面。",
+          "semanticRationale": "stand behind line表示人的站立位置，不是支持某种观点。"
+        },
+        {
+          "context": "交通安全",
+          "en": "Passengers should not stand near the doors while the train is moving.",
+          "zh": "列车行驶时，乘客不应站在车门附近。",
+          "semanticRationale": "车厢内姿势与排队等候不同，二者均为双脚直立。"
+        }
+      ]
+    },
+    {
+      "lemma": "stand",
+      "key": "tolerate",
+      "pos": "vt.",
+      "definitionZh": "忍受；接受不愉快或令人厌烦的事物",
+      "definitionEn": "To tolerate something unpleasant or annoying.",
+      "ordinal": 1,
+      "sourceKeys": ["stand-vt"],
+      "semanticRationale": "对不愉快体验的及物忍受义与站立动作完全不同。",
+      "examples": [
+        {
+          "context": "气味不适",
+          "en": "I cannot stand the smell of wet paint in a closed room.",
+          "zh": "我受不了封闭房间里未干油漆的气味。",
+          "semanticRationale": "cannot stand接气味明确无法忍受，不指身体无法站立。"
+        },
+        {
+          "context": "等待烦躁",
+          "en": "He can stand a short delay, but not several hours without information.",
+          "zh": "他能忍受短暂延误，却受不了几个小时没有消息。",
+          "semanticRationale": "延误和缺乏消息带来的烦躁，与室内气味刺激不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "stand",
+      "key": "position-on-issue",
+      "pos": "n.",
+      "definitionZh": "立场；对某项议题所持的明确态度",
+      "definitionEn": "A clear opinion or position that someone takes on an issue.",
+      "ordinal": 2,
+      "sourceKeys": ["stand-n"],
+      "semanticRationale": "对议题的名词态度与物理站立及讲台不同，公共安全和环保决定分别示例。",
+      "examples": [
+        {
+          "context": "公共安全",
+          "en": "The council took a firm stand against dangerous driving.",
+          "zh": "地方议会对危险驾驶采取了坚决反对的立场。",
+          "semanticRationale": "took stand against为反对态度，不是站在某物上。"
+        },
+        {
+          "context": "环保政策",
+          "en": "Her stand on protecting the forest cost her some political support.",
+          "zh": "她在保护森林问题上的立场使她失去了一部分政治支持。",
+          "semanticRationale": "stand on议题及政治代价说明态度，与道路安全政策不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "subject",
+      "key": "school-field",
+      "pos": "n.",
+      "definitionZh": "学科；在学校或大学学习的知识领域",
+      "definitionEn": "An area of knowledge studied at school or university.",
+      "ordinal": 0,
+      "sourceKeys": ["subject-n"],
+      "semanticRationale": "课程知识领域与讨论话题和句法主语分开，兴趣和选课两种场景。",
+      "examples": [
+        {
+          "context": "学习兴趣",
+          "en": "History was her favourite subject when she was at school.",
+          "zh": "她上学时最喜欢的学科是历史。",
+          "semanticRationale": "history和school明确课程领域，不是被试或臣民。"
+        },
+        {
+          "context": "课程选择",
+          "en": "Students choose one additional subject in their second year.",
+          "zh": "学生在第二学年再选修一门学科。",
+          "semanticRationale": "课程选择制度与个人喜好不同，均为学校知识领域。"
+        }
+      ]
+    },
+    {
+      "lemma": "subject",
+      "key": "topic-discussion",
+      "pos": "n.",
+      "definitionZh": "话题；讨论、写作或思考所围绕的内容",
+      "definitionEn": "The topic that people discuss, write about, or think about.",
+      "ordinal": 1,
+      "sourceKeys": ["subject-n"],
+      "semanticRationale": "交流研究的话题而非课程类别，研究课题和会议讨论是两个语境；不把图像描绘对象混入。",
+      "examples": [
+        {
+          "context": "研究课题",
+          "en": "The changing coastline became the main subject of her research.",
+          "zh": "不断变化的海岸线成了她研究的主要课题。",
+          "semanticRationale": "研究围绕的课题属于思考和写作内容，与会议话题不同，不与照片描绘对象混合。"
+        },
+        {
+          "context": "会议讨论",
+          "en": "Let us return to the subject of improving public transport.",
+          "zh": "让我们回到改善公共交通这个话题上。",
+          "semanticRationale": "return to subject表讨论议题，与研究课题语境不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "subject",
+      "key": "grammatical-subject",
+      "pos": "n.",
+      "definitionZh": "主语；句子中说明动作主体或陈述对象的成分",
+      "definitionEn": "The part of a sentence that names what the sentence is about or who performs its action.",
+      "ordinal": 2,
+      "sourceKeys": ["subject-n"],
+      "semanticRationale": "源行明示语法主语；在识别句子结构与修改主谓一致中分别练习。",
+      "examples": [
+        {
+          "context": "句子分析",
+          "en": "In this sentence, the word children is the subject.",
+          "zh": "在这个句子中，children 这个词是主语。",
+          "semanticRationale": "sentence及单词children明确句法成分，不是学校课程。"
+        },
+        {
+          "context": "语法修改",
+          "en": "Make sure that the verb agrees with its subject.",
+          "zh": "确保动词与主语保持一致。",
+          "semanticRationale": "verb agrees with subject指主谓一致检查，与识别名词成分不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "fine",
+      "key": "well-in-health",
+      "pos": "adj.",
+      "definitionZh": "身体好的；没有生病或不适的",
+      "definitionEn": "Feeling well and not ill or in discomfort.",
+      "ordinal": 0,
+      "sourceKeys": ["fine-adj"],
+      "semanticRationale": "健康状态形容词与颗粒细小和罚款区分，病后恢复和运动检查分别示例。",
+      "examples": [
+        {
+          "context": "病后恢复",
+          "en": "I felt tired yesterday, but I am fine this morning.",
+          "zh": "我昨天觉得疲倦，但今天早上已经好了。",
+          "semanticRationale": "feel及身体前后变化明确健康状态，不是罚金或好天气。"
+        },
+        {
+          "context": "运动检查",
+          "en": "The runner said she was fine and did not need medical help.",
+          "zh": "那位跑步者说自己身体没事，不需要医疗帮助。",
+          "semanticRationale": "医疗援助是否需要与病后主观恢复不同，均为身体良好。"
+        }
+      ]
+    },
+    {
+      "lemma": "fine",
+      "key": "small-particles",
+      "pos": "adj.",
+      "definitionZh": "细小的；颗粒或纤维很小的",
+      "definitionEn": "Made up of very small particles or thin strands.",
+      "ordinal": 1,
+      "sourceKeys": ["fine-adj"],
+      "semanticRationale": "粒度与纤维尺寸的细小属性不同于精良评价或健康良好。",
+      "examples": [
+        {
+          "context": "海边沙粒",
+          "en": "Fine sand slipped easily between her fingers.",
+          "zh": "细沙很容易从她的指缝间滑落。",
+          "semanticRationale": "sand及指缝突出颗粒细小，不是在评价沙子健康。"
+        },
+        {
+          "context": "烘焙准备",
+          "en": "Grind the almonds into a fine powder before adding them to the cake.",
+          "zh": "把杏仁磨成细粉，然后再加入蛋糕。",
+          "semanticRationale": "powder的颗粒细小直接对应本义，烘焙研磨与自然沙粒触感不同。"
+        }
+      ]
+    },
+    {
+      "lemma": "fine",
+      "key": "financial-penalty",
+      "pos": "n.",
+      "definitionZh": "罚款；因违反规定而必须支付的钱",
+      "definitionEn": "Money that must be paid as a punishment for breaking a rule or law.",
+      "ordinal": 2,
+      "sourceKeys": ["fine-n-corrected"],
+      "semanticRationale": "已校对混合源的名词部分独立抽取，不把健康或细小形容词句挂进来。",
+      "examples": [
+        {
+          "context": "交通处罚",
+          "en": "He had to pay a fine for parking in the bus lane.",
+          "zh": "他因把车停在公交车道而不得不缴纳罚款。",
+          "semanticRationale": "pay fine for违法停车明确金钱处罚，非形容词良好。"
+        },
+        {
+          "context": "图书逾期",
+          "en": "The library charges a small fine for each overdue book.",
+          "zh": "图书馆对每本逾期未还的书收取少量罚款。",
+          "semanticRationale": "图书逾期制度与道路处罚不同，但都为违规金钱惩罚。"
+        }
+      ]
+    }
+  ]
+}

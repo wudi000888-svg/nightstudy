@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, CloudUpload, Search, X } from 'lucide-react';
+import { ArrowLeft, ChevronDown, CloudUpload, Languages, Search, X } from 'lucide-react';
 import { Link, useLocation, type Location } from 'react-router-dom';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityTimer } from './ActivityTimer';
@@ -38,6 +38,10 @@ export function H5ScreenHeader({ location }: { location: Location }) {
       {!isAdmin && !isAuth && location.pathname !== '/lookup' ? (
         <Link className="icon-button" to="/lookup" aria-label="查词" title="查词">
           <Search size={21} aria-hidden="true" />
+        </Link>
+      ) : location.pathname === '/lookup' ? (
+        <Link className="icon-button" to="/translate" aria-label="网页翻译" title="网页翻译">
+          <Languages size={21} aria-hidden="true" />
         </Link>
       ) : (
         <span className="h5-header-spacer" />

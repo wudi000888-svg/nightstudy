@@ -5,6 +5,7 @@ import { HttpError, type ContextResolver } from '../context.js';
 import { id, parse } from './shared.js';
 import type { WordAudio } from '@prisma/client';
 import { verifiedAudioBytes } from '../audio.js';
+import { wordPronunciationCompatible } from './learning-sense-view.js';
 
 export function pronunciationDto(word: {
   id: string;
@@ -15,43 +16,49 @@ export function pronunciationDto(word: {
   phoneticUk?: string;
   phoneticSource?: string;
   audio?: WordAudio[];
+  learningSenses?: { status: string; contentMetadata: unknown }[];
 }) {
+  const compatible = wordPronunciationCompatible(word);
+  const audioEntries = compatible ? (word.audio ?? []) : [];
   return {
     wordId: word.id,
     text: word.lemma,
-    phonetics: [
-      ...(word.phoneticUs
-        ? [
-            {
-              ipa: word.phoneticUs,
-              region: 'US',
-              notation: 'ipa',
-              sourceRef: word.phoneticSource ?? '',
-            },
-          ]
-        : []),
-      ...(word.phoneticUk
-        ? [
-            {
-              ipa: word.phoneticUk,
-              region: 'UK',
-              notation: 'ipa',
-              sourceRef: word.phoneticSource ?? '',
-            },
-          ]
-        : []),
-      ...(word.phonetic
-        ? [
-            {
-              ipa: word.phonetic,
-              region: 'unspecified',
-              notation: 'source-transcription',
-              sourceRef: word.sourceRef,
-            },
-          ]
-        : []),
-    ],
-    audio: (word.audio ?? []).map((audio) => ({
+    pronunciationCompatible: compatible,
+    phonetics: compatible
+      ? [
+          ...(word.phoneticUs
+            ? [
+                {
+                  ipa: word.phoneticUs,
+                  region: 'US',
+                  notation: 'ipa',
+                  sourceRef: word.phoneticSource ?? '',
+                },
+              ]
+            : []),
+          ...(word.phoneticUk
+            ? [
+                {
+                  ipa: word.phoneticUk,
+                  region: 'UK',
+                  notation: 'ipa',
+                  sourceRef: word.phoneticSource ?? '',
+                },
+              ]
+            : []),
+          ...(word.phonetic
+            ? [
+                {
+                  ipa: word.phonetic,
+                  region: 'unspecified',
+                  notation: 'source-transcription',
+                  sourceRef: word.sourceRef,
+                },
+              ]
+            : []),
+        ]
+      : [],
+    audio: audioEntries.map((audio) => ({
       id: audio.id,
       accent: audio.accent,
       kind: audio.kind,
@@ -63,7 +70,7 @@ export function pronunciationDto(word: {
       attribution: audio.attribution,
       mimeType: audio.mimeType,
     })),
-    recordedAudioAvailable: (word.audio ?? []).some((audio) => audio.kind === 'recorded'),
+    recordedAudioAvailable: audioEntries.some((audio) => audio.kind === 'recorded'),
   };
 }
 
@@ -117,6 +124,10 @@ export async function registerPronunciation(app: FastifyInstance, getContext: Co
         phoneticUk: true,
         phoneticSource: true,
         audio: { where: { status: 'ready' } },
+        learningSenses: {
+          where: { status: { in: ['published', 'held'] } },
+          select: { status: true, contentMetadata: true },
+        },
       },
     });
     if (!word) throw new HttpError(404, 'word_not_found');
@@ -132,8 +143,20 @@ export async function registerPronunciation(app: FastifyInstance, getContext: Co
         status: 'ready',
         word: { status: 'published' },
       },
+      include: {
+        word: {
+          select: {
+            learningSenses: {
+              where: { status: { in: ['published', 'held'] } },
+              select: { status: true, contentMetadata: true },
+            },
+          },
+        },
+      },
     });
     if (!entry) throw new HttpError(404, 'audio_not_ready');
+    if (!wordPronunciationCompatible(entry.word))
+      throw new HttpError(404, 'audio_asset_unavailable');
     const bytes = await verifiedAudioBytes(entry);
     return sendVerifiedAudio(req, reply, bytes, entry);
   });

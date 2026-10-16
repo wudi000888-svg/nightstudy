@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, MessageCircle } from 'lucide-react';
 import type { Sense, Word } from '../../lib/types';
 import { dictionaryText } from '../../lib/dictionary';
@@ -6,41 +6,30 @@ import { InteractiveEnglish } from '../InteractiveEnglish';
 import { SentenceSaveButton } from '../SentenceSaveButton';
 import { SentenceAudioButton } from '../SentenceAudio';
 import { BilingualDefinition } from '../BilingualDefinition';
+import { stopApplicationAudio } from '../../lib/audio-manager';
 
 export interface StudyExample {
   id: string;
   sourceId: string;
   english: string;
   chinese: string;
-  origin: 'sense' | 'word';
+  contextLabel: string;
 }
 
-// A word-level example demonstrates usage of the word, not a verified match to
-// the currently selected sense. Preserve that distinction in the visible label.
-export function studyExamples(word: Word, sense: Sense | undefined): StudyExample[] {
-  const candidates: StudyExample[] = [
-    ...(sense && (dictionaryText(sense.exampleEn) || dictionaryText(sense.exampleZh))
-      ? [
-          {
-            id: `sense:${sense.id}`,
-            sourceId: sense.id,
-            english: dictionaryText(sense.exampleEn),
-            chinese: dictionaryText(sense.exampleZh),
-            origin: 'sense' as const,
-          },
-        ]
-      : []),
-    ...(word.examples ?? []).map((example) => ({
-      id: `word:${example.id}`,
+// Only reviewed examples belonging to this meaning can enter its context.
+export function studyExamples(_word: Word, sense: Sense | undefined): StudyExample[] {
+  const candidates: StudyExample[] = (sense?.examples ?? [])
+    .filter((example) => example.learningSenseId === sense?.id)
+    .map((example) => ({
+      id: example.id,
       sourceId: example.id,
       english: dictionaryText(example.exampleEn),
       chinese: dictionaryText(example.exampleZh),
-      origin: 'word' as const,
-    })),
-  ];
+      contextLabel: dictionaryText(example.contextLabel),
+    }));
   const seen = new Set<string>();
   return candidates.filter((example) => {
-    if (!example.english && !example.chinese) return false;
+    if (!example.english || !example.chinese) return false;
     const key = JSON.stringify([example.english, example.chinese]);
     if (seen.has(key)) return false;
     seen.add(key);
@@ -61,7 +50,11 @@ function ExampleContext({
   const activeIndex = Math.max(0, Math.min(index, examples.length - 1));
   const example = examples[activeIndex];
   const bodyId = useId();
-  if (!example) return null;
+  if (!example) return <p className="study-content-empty study-example-empty">本义项暂无例句。</p>;
+  function selectExample(next: number) {
+    stopApplicationAudio();
+    setIndex(next);
+  }
   return (
     <details className="study-context-card" open>
       <summary>
@@ -79,8 +72,7 @@ function ExampleContext({
       <div className="study-context-body" id={bodyId}>
         <div className="study-context-toolbar">
           <span>
-            {example.origin === 'sense' ? '本义项例句' : '单词用法'} · {activeIndex + 1} /{' '}
-            {examples.length}
+            {example.contextLabel || '本义项语境'} · {activeIndex + 1} / {examples.length}
           </span>
           {examples.length > 1 && (
             <div className="study-context-arrows">
@@ -89,7 +81,7 @@ function ExampleContext({
                 aria-label="上一条例句"
                 aria-controls={bodyId}
                 disabled={activeIndex <= 0}
-                onClick={() => setIndex(Math.max(0, activeIndex - 1))}
+                onClick={() => selectExample(Math.max(0, activeIndex - 1))}
               >
                 <ChevronLeft size={18} />
               </button>
@@ -98,7 +90,7 @@ function ExampleContext({
                 aria-label="下一条例句"
                 aria-controls={bodyId}
                 disabled={activeIndex >= examples.length - 1}
-                onClick={() => setIndex(Math.min(examples.length - 1, activeIndex + 1))}
+                onClick={() => selectExample(Math.min(examples.length - 1, activeIndex + 1))}
               >
                 <ChevronRight size={18} />
               </button>
@@ -121,7 +113,7 @@ function ExampleContext({
             <SentenceSaveButton
               key={example.id}
               wordId={wordId}
-              sourceType={example.origin === 'sense' ? 'sense' : 'word-example'}
+              sourceType="word-example"
               sourceId={example.sourceId}
               compact
             />
@@ -137,23 +129,55 @@ export function StudyWordDetails({
   senses,
   englishSenses,
   interactive,
+  selectedSenseId,
+  onSenseChange,
+  showDirectory = false,
 }: {
   word: Word;
   senses: Sense[];
   englishSenses: Sense[];
   interactive: boolean;
+  selectedSenseId?: string;
+  onSenseChange?: (id: string) => void;
+  showDirectory?: boolean;
 }) {
   const [index, setIndex] = useState(0);
   const meaningId = useId();
-  const activeIndex = Math.max(0, Math.min(index, senses.length - 1));
+  const controlledIndex = selectedSenseId
+    ? senses.findIndex((entry) => entry.id === selectedSenseId)
+    : -1;
+  const activeIndex = Math.max(
+    0,
+    Math.min(controlledIndex >= 0 ? controlledIndex : index, senses.length - 1),
+  );
   const sense = senses[activeIndex];
+  useEffect(() => () => stopApplicationAudio(), [word.id, sense?.id]);
   const examples = studyExamples(word, sense);
   const collocations = (word.collocations ?? []).filter((entry) => dictionaryText(entry.lemma));
   function select(next: number) {
+    stopApplicationAudio();
     setIndex(next);
+    if (senses[next]) onSenseChange?.(senses[next].id);
   }
   return (
     <div className="study-word-details">
+      {showDirectory && senses.length > 1 && (
+        <div className="lookup-sense-directory" role="group" aria-label="选择词义">
+          {senses.map((entry, order) => (
+            <button
+              key={entry.id}
+              type="button"
+              aria-pressed={entry.id === sense?.id}
+              onClick={() => select(order)}
+            >
+              <span>{entry.pos || '词义'}</span>
+              <span className="lookup-sense-label">
+                {dictionaryText(entry.definitionZh) || dictionaryText(entry.definitionEn)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       {sense ? (
         <section className="study-meaning-browser" aria-label="词义">
           <div className="study-meaning-topline">
@@ -197,7 +221,7 @@ export function StudyWordDetails({
       ) : (
         <p className="study-content-empty">暂无释义。</p>
       )}
-      {examples.length > 0 && (
+      {sense && (
         <ExampleContext
           key={`${word.id}:${sense?.id ?? ''}`}
           wordId={word.id}
@@ -220,7 +244,7 @@ export function StudyWordDetails({
         </details>
       )}
       {collocations.length > 0 && (
-        <details className="study-collocations">
+        <details className="study-collocations" aria-label="词组搭配">
           <summary>
             <span>
               常用搭配 <small>{collocations.length}</small>

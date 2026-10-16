@@ -33,6 +33,15 @@ const word: Word = {
       definitionEn: 'A clear liquid for drinking.',
       exampleEn: 'She poured water into a cup.',
       exampleZh: '她把水倒进杯子里。',
+      examples: [
+        {
+          id: 'noun-example',
+          learningSenseId: 'water-noun',
+          exampleEn: 'She poured water into a cup.',
+          exampleZh: '她把水倒进杯子里。',
+          contextLabel: '饮水',
+        },
+      ],
     },
     {
       id: 'water-verb',
@@ -41,6 +50,22 @@ const word: Word = {
       definitionEn: 'To give a plant water.',
       exampleEn: 'We water the plants every morning.',
       exampleZh: '我们每天早上给植物浇水。',
+      examples: [
+        {
+          id: 'verb-example',
+          learningSenseId: 'water-verb',
+          exampleEn: 'We water the plants every morning.',
+          exampleZh: '我们每天早上给植物浇水。',
+          contextLabel: '园艺',
+        },
+        {
+          id: 'verb-example-2',
+          learningSenseId: 'water-verb',
+          exampleEn: 'Water the soil before planting the seeds.',
+          exampleZh: '播种之前先给土壤浇水。',
+          contextLabel: '播种',
+        },
+      ],
     },
   ],
   examples: [
@@ -172,7 +197,7 @@ it('keeps the server focus sense first, two thumb actions and the two precise ra
   expect(markup).not.toContain('保密名词水义');
   expect(markup).toContain('To');
   expect(markup).toContain('下一义项');
-  expect(markup).toContain('本义项例句');
+  expect(markup).toContain('园艺');
   expect(markup).toContain('下一条例句');
   for (const rating of ['again', 'hard', 'good', 'easy'])
     expect(markup).toContain(`class="study-rating-${rating}"`);
@@ -209,26 +234,37 @@ it('binds the thumb submit button to the real spelling form and never renders an
   expect(markup).not.toContain('pronunciation-speaker');
 });
 
-it('uses only the selected sense example and real word-level usage without inventing a sense alignment', () => {
+it('uses only the selected meaning examples and rejects unrelated word-level candidates', () => {
   const examples = studyExamples(word, word.senses![1]);
   expect(examples.map((row) => row.english)).toEqual([
     'We water the plants every morning.',
-    'Cold water filled the basin.',
+    'Water the soil before planting the seeds.',
   ]);
-  expect(examples.map((row) => row.origin)).toEqual(['sense', 'word']);
-  expect(examples.map((row) => row.sourceId)).toEqual(['water-verb', 'word-usage']);
-  expect(examples.map((row) => row.id)).not.toContain('sense:water-noun');
+  expect(examples.map((row) => row.contextLabel)).toEqual(['园艺', '播种']);
+  expect(examples.map((row) => row.sourceId)).toEqual(['verb-example', 'verb-example-2']);
   expect(
-    studyExamples(
-      {
-        ...word,
-        examples: [
-          { id: 'same', exampleEn: examples[0]!.english, exampleZh: examples[0]!.chinese },
-        ],
-      },
-      word.senses![1],
-    ),
-  ).toHaveLength(1);
+    studyExamples(word, {
+      id: 'unprepared',
+      definitionZh: '未制作',
+      exampleEn: 'Unreviewed.',
+      exampleZh: '未复核。',
+    }),
+  ).toEqual([]);
+});
+
+it('rejects examples with a missing or mismatched meaning binding', () => {
+  const base = { exampleEn: 'She poured water into a cup.', exampleZh: '她把水倒进杯子里。' };
+  expect(
+    studyExamples(word, {
+      id: 'current',
+      definitionZh: '水',
+      examples: [
+        { ...base, id: 'unbound' },
+        { ...base, id: 'wrong', learningSenseId: 'another-meaning' },
+        { ...base, id: 'valid', learningSenseId: 'current' },
+      ],
+    }).map((item) => item.id),
+  ).toEqual(['valid']);
 });
 
 it('describes a server-completed group with spelling disabled without inventing spelling evidence', () => {
@@ -261,8 +297,17 @@ it('keeps unrelated English definitions independent and preserves completely pla
     ],
   };
   const markup = render(React.createElement(WordView, { word: value, presentation: 'study' }));
-  expect(markup).toContain('这个词的独立英文解释');
-  expect(markup).toContain('v.');
+  expect(markup).not.toContain('Independent English explanation.');
+  const english = render(
+    React.createElement(WordView, {
+      word: value,
+      presentation: 'study',
+      focusSenseId: 'en-only',
+      interactive: false,
+    }),
+  );
+  expect(english).toContain('Independent English explanation.');
+  expect(english).toContain('v.');
   expect(markup).not.toContain('中英释义对照');
   const card = render(React.createElement(WordCardContent, { word }));
   expect(card).not.toContain('word-token');

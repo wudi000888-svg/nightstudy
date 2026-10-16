@@ -25,3 +25,7 @@ data/sentence-audio.manifest.json
 data/bilingual-v2.manifest.json
 data/bilingual-v2.sources.manifest.json
 data/sentence-audio-v2.manifest.json
+# Atomic meaning records and their authoring inputs are byte-pinned together.
+data/learning-senses-authored*.json
+data/learning-senses-v1.manifest.json
+data/sentence-audio-v3.manifest.json

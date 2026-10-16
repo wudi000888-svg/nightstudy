@@ -88,6 +88,10 @@ describe('DeepSeek missing-content candidates', () => {
           {
             id: 'ex',
             wordId: 'rain',
+            learningSenseId: null,
+            contextLabel: '',
+            status: 'candidate',
+            contentVersion: '',
             ordinal: 0,
             exampleEn: 'Rain fell on the roof all evening.',
             exampleZh: '整个晚上，雨都落在屋顶上。',
@@ -134,6 +138,10 @@ describe('DeepSeek missing-content candidates', () => {
     const example: WordExample = {
       id: 'ex',
       wordId: 'rain',
+      learningSenseId: null,
+      contextLabel: '',
+      status: 'candidate',
+      contentVersion: '',
       ordinal: 0,
       exampleEn: 'A visitor told our class about his childhood.',
       exampleZh: '一位访客向我们班讲述了他的童年。',

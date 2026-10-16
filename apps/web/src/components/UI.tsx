@@ -1,15 +1,12 @@
-import { Fragment, type ReactNode, useEffect, useId, useRef } from 'react';
+import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { AlertCircle, ArrowRight, LoaderCircle, Star, X, MoonStar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { errorText } from '../lib/api';
-import type { Sense, Word } from '../lib/types';
+import type { Word } from '../lib/types';
 import { AudioButton } from './Pronunciation';
-import { SentenceAudioButton } from './SentenceAudio';
 import { dictionaryText } from '../lib/dictionary';
-import { InteractiveEnglish } from './InteractiveEnglish';
 import { StudyWordDetails } from './study/StudyWordDetails';
-import { BilingualDefinition } from './BilingualDefinition';
-import { SentenceSaveButton, type SentenceSaveButtonProps } from './SentenceSaveButton';
+import { DictionaryMeanings } from './DictionaryMeanings';
 import './study/mobile-study.css';
 import { beforeAppBackEvent, useScreenActive } from '../lib/screen-lifecycle';
 export { AudioButton } from './Pronunciation';
@@ -273,52 +270,10 @@ function MetadataSources({
     </>
   );
 }
-function BilingualExample({
-  english,
-  chinese,
-  interactive,
-  source,
-}: {
-  english: string;
-  chinese: string;
-  interactive: boolean;
-  source: Omit<SentenceSaveButtonProps, 'compact'>;
-}) {
-  return (
-    <blockquote
-      className="bilingual-example"
-      aria-label={english && chinese ? '中英例句对照' : english ? '英文例句' : '中文例句'}
-    >
-      {english && (
-        <div className="bilingual-cell" lang="en">
-          <p className="example-en">
-            <InteractiveEnglish text={english} enabled={interactive} />
-          </p>
-        </div>
-      )}
-      {chinese && (
-        <div className="bilingual-cell" lang="zh-CN">
-          <p className="example-zh">{chinese}</p>
-        </div>
-      )}
-      {english && <SentenceAudioButton text={english} />}
-      {interactive && english && chinese && <SentenceSaveButton {...source} compact />}
-    </blockquote>
-  );
-}
-function isNativeEnglishSense(sense: Sense) {
-  const source = fieldMetadata(sense.contentMetadata, 'definitionEn');
-  return (
-    !!dictionaryText(sense.definitionEn) &&
-    !dictionaryText(sense.definitionZh) &&
-    source?.kind !== 'machine-translation' &&
-    source?.kind !== 'generated' &&
-    source?.sourceLanguage !== 'zh'
-  );
-}
 export function WordView({
   word,
   focusSenseId,
+  onSenseChange,
   hideMeanings = false,
   interactive = true,
   presentation = 'reading',
@@ -326,136 +281,23 @@ export function WordView({
 }: {
   word: Word;
   focusSenseId?: string;
+  onSenseChange?: (id: string) => void;
   hideMeanings?: boolean;
   interactive?: boolean;
   presentation?: 'reading' | 'study';
   headerAction?: ReactNode;
 }) {
-  const availableSenses = (hideMeanings ? [] : (word.senses ?? [])).filter((sense) =>
-    [sense.definitionZh, sense.definitionEn, sense.exampleEn, sense.exampleZh].some(
-      (value) => !!dictionaryText(value),
-    ),
+  const available = (word.senses?.length ? word.senses : word.dictionarySenses) ?? [];
+  const senses = available.filter((sense) =>
+    [sense.definitionZh, sense.definitionEn].some((value) => !!dictionaryText(value)),
   );
-  const primarySense =
-    availableSenses.find((sense) => sense.id === focusSenseId) ||
-    availableSenses.find((sense) => !!dictionaryText(sense.definitionZh)) ||
-    availableSenses[0];
-  const normalizePos = (pos: string | undefined) => (pos || '').toLowerCase().replace(/[.\s]/g, '');
-  // Independent dictionary English senses are kept separate: shared POS does not prove
-  // a one-to-one translation relationship with the focused Chinese definition.
-  const englishSenses =
-    primarySense && dictionaryText(primarySense.definitionZh)
-      ? availableSenses
-          .filter((sense) => sense !== primarySense && isNativeEnglishSense(sense))
-          .sort(
-            (a, b) =>
-              Number(!!primarySense.pos && normalizePos(b.pos) === normalizePos(primarySense.pos)) -
-              Number(!!primarySense.pos && normalizePos(a.pos) === normalizePos(primarySense.pos)),
-          )
-      : [];
-  const senses = primarySense
-    ? [
-        primarySense,
-        ...availableSenses.filter(
-          (sense) => sense !== primarySense && !englishSenses.includes(sense),
-        ),
-      ]
-    : [];
   const sourceTranscription =
-    word.phonetic || word.phonetics?.find((entry) => entry.region === 'unspecified')?.text;
-  const seenExamples = new Set<string>();
-  if (
-    primarySense &&
-    (dictionaryText(primarySense.exampleEn) || dictionaryText(primarySense.exampleZh))
-  )
-    seenExamples.add(
-      JSON.stringify([
-        dictionaryText(primarySense.exampleEn),
-        dictionaryText(primarySense.exampleZh),
-      ]),
-    );
-  const examples = hideMeanings
-    ? []
-    : (word.examples ?? []).filter((example) => {
-        const en = dictionaryText(example.exampleEn),
-          zh = dictionaryText(example.exampleZh);
-        if (!en && !zh) return false;
-        const key = JSON.stringify([en, zh]);
-        if (seenExamples.has(key)) return false;
-        seenExamples.add(key);
-        return true;
-      });
-  const collocations = hideMeanings
-    ? []
-    : (word.collocations ?? []).filter((entry) => dictionaryText(entry.lemma));
-  const exampleSection =
-    examples.length > 0 ? (
-      <section className="word-examples" aria-label="单词用法例句">
-        <div className="word-example-list">
-          {examples.map((example) => (
-            <div className="word-example" key={example.id}>
-              <BilingualExample
-                english={dictionaryText(example.exampleEn)}
-                chinese={dictionaryText(example.exampleZh)}
-                interactive={interactive}
-                source={{ wordId: word.id, sourceType: 'word-example', sourceId: example.id }}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-    ) : null;
-  const englishSection =
-    englishSenses.length > 0 ? (
-      <details className="word-english-explanations" aria-label="英文解释">
-        <summary>
-          更多英文释义 <span>{englishSenses.length} 义</span>
-        </summary>
-        {englishSenses.map((sense) => (
-          <div className="english-explanation" key={sense.id}>
-            {sense.pos && <span className="sense-pos">{sense.pos}</span>}
-            <BilingualDefinition english={sense.definitionEn} interactive={interactive} />
-            {(dictionaryText(sense.exampleEn) || dictionaryText(sense.exampleZh)) && (
-              <BilingualExample
-                english={dictionaryText(sense.exampleEn)}
-                chinese={dictionaryText(sense.exampleZh)}
-                interactive={interactive}
-                source={{ wordId: word.id, sourceType: 'sense', sourceId: sense.id }}
-              />
-            )}
-          </div>
-        ))}
-      </details>
-    ) : null;
-  const collocationSection =
-    collocations.length > 0 ? (
-      <section className="word-collocations" aria-label="词组搭配">
-        <h3>常用搭配</h3>
-        <div className="collocation-list">
-          {collocations.map((entry) => (
-            <div className="collocation-entry" key={entry.id}>
-              <p className="collocation-lemma" lang="en">
-                <InteractiveEnglish text={entry.lemma} enabled={interactive} />
-              </p>
-              {entry.pos && <span className="collocation-pos">{entry.pos}</span>}
-              {dictionaryText(entry.definitionZh) && (
-                <p lang="zh-CN">{dictionaryText(entry.definitionZh)}</p>
-              )}
-              {dictionaryText(entry.definitionEn) && (
-                <p className="collocation-definition" lang="en">
-                  <InteractiveEnglish
-                    text={dictionaryText(entry.definitionEn)}
-                    enabled={interactive}
-                  />
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-    ) : null;
+    word.pronunciationCompatible !== false &&
+    (word.phonetic || word.phonetics?.find((entry) => entry.region === 'unspecified')?.text);
   return (
-    <div className={`word-content${presentation === 'study' ? ' word-content-study' : ''}`}>
+    <div
+      className={`word-content${presentation === 'study' ? ' word-content-study' : ' word-content-reading'}`}
+    >
       <div className="word-title-row">
         <div>
           <h2 className={`word-title${word.lemma.length > 20 ? ' word-title-long' : ''}`}>
@@ -473,84 +315,27 @@ export function WordView({
         <AudioButton word={word} autoPlay={presentation === 'study'} />
         {headerAction && <div className="word-header-action">{headerAction}</div>}
       </div>
-      {presentation === 'study' ? (
-        !hideMeanings && (
-          <StudyWordDetails
-            key={`${word.id}:${focusSenseId ?? ''}`}
-            word={word}
-            senses={senses}
-            englishSenses={englishSenses}
+      {!hideMeanings && (
+        <StudyWordDetails
+          key={word.id}
+          word={word}
+          senses={senses}
+          englishSenses={[]}
+          interactive={interactive}
+          selectedSenseId={focusSenseId}
+          onSenseChange={onSenseChange}
+          showDirectory={presentation === 'reading'}
+        />
+      )}
+      {!hideMeanings &&
+        presentation === 'reading' &&
+        word.senses?.some((sense) => sense.kind === 'learning') && (
+          <DictionaryMeanings
+            key={word.id}
+            senses={word.dictionarySenses ?? []}
             interactive={interactive}
           />
-        )
-      ) : (
-        <>
-          {senses.length > 0 && (
-            <div className="meanings">
-              {senses.map((sense, index) => {
-                const definitionZh = dictionaryText(sense.definitionZh);
-                const definitionEn = dictionaryText(sense.definitionEn);
-                const exampleEn = dictionaryText(sense.exampleEn);
-                const exampleZh = dictionaryText(sense.exampleZh);
-                const characters = Array.from((definitionZh || definitionEn).replace(/\s+/g, ' '));
-                const shortSummary =
-                  characters.length > 100
-                    ? `${characters.slice(0, 100).join('')}…`
-                    : characters.join('');
-                const heading = <span className="sense-pos">{sense.pos || '词义'}</span>;
-                const content = (
-                  <>
-                    <BilingualDefinition
-                      chinese={definitionZh}
-                      english={definitionEn}
-                      interactive={interactive}
-                    />
-                    {(exampleEn || exampleZh) && (
-                      <BilingualExample
-                        english={exampleEn}
-                        chinese={exampleZh}
-                        interactive={interactive}
-                        source={{ wordId: word.id, sourceType: 'sense', sourceId: sense.id }}
-                      />
-                    )}
-                  </>
-                );
-                return index === 0 ? (
-                  <Fragment key={`${word.id}:${sense.id}`}>
-                    <div className="sense">
-                      {heading}
-                      {content}
-                    </div>
-                    {exampleSection}
-                    {englishSection}
-                    {collocationSection}
-                  </Fragment>
-                ) : (
-                  <details className="sense sense-collapsed" key={`${word.id}:${sense.id}`}>
-                    <summary>
-                      <span className="sense-summary-top">
-                        {heading}
-                        <span className="sense-expand-icon" aria-hidden="true">
-                          ⌄
-                        </span>
-                      </span>
-                      <span className="sense-summary-text">{shortSummary || '展开查看例句'}</span>
-                    </summary>
-                    <div className="sense-expanded">{content}</div>
-                  </details>
-                );
-              })}
-            </div>
-          )}
-          {!hideMeanings && senses.length === 0 && <p className="fine-print">暂无释义。</p>}
-          {senses.length === 0 && (
-            <>
-              {exampleSection}
-              {collocationSection}
-            </>
-          )}
-        </>
-      )}
+        )}
     </div>
   );
 }

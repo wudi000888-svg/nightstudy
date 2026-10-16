@@ -7,17 +7,17 @@
 
 **在线使用：[english.minminlove.top](https://english.minminlove.top)**
 
-<img src="docs/media/mobile-home-0.10.png" alt="移动学习首页" width="260"> <img src="docs/media/mobile-word-0.10.png" alt="专注词卡与双语语境" width="260">
+<img src="docs/media/mobile-word-0.12.jpg" alt="0.12 移动词卡：分义项双语解释、语境与英美发音" width="260">
 
-0.10 线上匿名公开页面：雨夜首页与双语词卡。
+0.12 线上真实词卡：独立义项、双语语境和英美发音。
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前发布：[0.11.0-alpha.3](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.11.0-alpha.3)。** 已在本机及 VPS 部署，修复切书后的旧任务、每日计数与迟到响应。97文件839项测试、完整 CI 与 Compose 冷安装通过；两端各338项公开接口及39项匿名手机浏览器检查通过。真实切书、同步冲突与返回验收见 [修复记录](docs/BOOK_SWITCH_TASKS_FIX.md)；逐义项内容的实际范围仍见 [0.11交付记录](docs/LOOKUP_SENSES_011.md#15-发行与保数据升级状态)。
+**当前发布：[0.12.0-alpha.1](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.12.0-alpha.1)。** 已完成 main / 发行 CI 与完整 Compose 冷安装，107 文件、918 项测试通过。Native 与 VPS 已升级，原学习数据和媒体保留；两端各 347 项公开 HTTP 检查通过。实际状态见 [本轮 H5 记录](docs/REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
 
 查词支持智能、前缀、包含、精确匹配及显式错拼建议，公共查词与本人生词本独立，服务端全局排序和签名游标保证分页条件。原子学习义项各自绑定不同语境的双语例句；首包为35词、98义、196句和392条英美成品句音，其余18,732个内置词仍待逐义审核，不能把旧词级例句当作每个意思的配句。源码实现、内容边界和验证记录见 [查词与义项改造](docs/LOOKUP_SENSES_011.md)。
 
-`0.12.0-alpha.1` 工作树已按真机方案增加可选新词辨义、就近简卡与独立详情、词形优先的词表和书内定位、紧凑计划与目标预览。辨义只采用已审且绑定来源的义项，选项不足时使用回忆；不把选择正确当作记住。实际发行与部署状态见 [本轮 H5 记录](docs/REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)，发布前线上仍以上方当前版本为准。
+`0.12` 按已批准的真机参考方案增加可选新词辨义、就近简卡与独立详情、词形优先的词表和书内定位、紧凑计划与目标预览，并精修首页任务数字和学习转场。辨义只采用已审且绑定来源的义项，选项不足时使用回忆；选择正确仍需明确评价，不会自动写入熟练度。切书保留真实进度和今日去重完成数，结束旧未完成任务的规则继续生效。
 
 <img src="docs/media/mobile-lookup-0.11.png" alt="包含匹配与服务端排序" width="260"> <img src="docs/media/mobile-sense-0.11.png" alt="河岸义项及对应双语语境" width="260">
 
@@ -37,7 +37,7 @@
 - 普通用户拥有本站词书选择、学习进度、复习记录、熟词声明、生词本及设置。
 - 桌面悬停英文释义或例句中的词立即打开词卡，移入保持、离开短延时关闭、点击固定；键盘和手机点击也可打开。卡片正文不递归生成另一张卡，来源与音源说明单独查看。精确查词未命中显示空态；已保存的词显示状态，未揭晓的学习内容保持遮蔽。
 - 自定义词书只对本人可见。标准TXT、DOCX、纯文本PDF先预览合格/失败/重复行，再确认合格词；提供失败原因导出、词书选择、编辑及归档。
-- 固定会话先回忆、再评价，按偏好安排拼写；动作去重与版本冲突保护避免重复评价。个人曲线使用真实 FSRS 状态，无数据时显示空态。
+- 新学组可按偏好先辨义或回忆，Review 保持回忆；揭晓后仍需明确评价，按偏好安排拼写。动作去重与版本冲突保护避免重复评价。个人曲线使用真实 FSRS 状态，无数据时显示空态。
 - 每日总目标为复习与新学的不同词数，先预留今日到期复习，再用余量学本书新词；复习覆盖本站全部已学词。未安排逾期、待巩固、待拼写与等待同步各自可见。
 - 学习日按计划时区当地04:00交接，时区更改从下个学习日生效。切换词书会结束原来所有未完成任务，保留已学进度、复习记录与今日已练词数，并按新书重新安排；降低总目标或跨日仍保留有效任务。暂停、页面24小时延期、恢复与完成历史按本人账户保存，API延期上限七天。
 - 同词巩固须等真实FSRS到期再评分，当天只计一个不同词，拼写不额外写FSRS。主动额外复习可超出主目标；七天负担明确假设后续尚未复习，不伪造完成预测。
@@ -91,7 +91,9 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 
 ## 验证记录
 
-0.11.0-alpha.3 的97文件839项、类型/格式与冻结构建通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38863609506) 和 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38863835264) 均成功，包含完整Compose首装及Python/检查器自测。真实隔离 H5 验收保留两词完成数并重排新书四词，最终30项只读续验通过；两端均完成338项HTTP与39项匿名手机视口检查。应用升级保留原数据库和媒体，没有迁移、seed或生产测试评分；新备份仅核catalog。详见 [切书修复](docs/BOOK_SWITCH_TASKS_FIX.md)。
+0.12.0-alpha.1 的 107 份测试文件、918 项测试、类型/格式和冻结构建通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881203417) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881311451) 均成功，包含双 PG17 回归、Python/检查器和默认完整 Compose 冷安装。独立 H5 环境完成 32 项浏览器交互检查，并验证 320×568、844×390 的评价操作与桌面悬停。Native 与 VPS 均完成 19→20 迁移、50 张旧表原行/原列保护和零变更重放；两端各 347 项公开 HTTP 断言 / 123 次匿名请求通过。Native 6 项匿名浏览器检查与 VPS 12 项公开页面/音频/导航检查通过；VPS 浏览器保留既有登录，不将其称为匿名。4 个隔离测试库和 6 份临时凭据已精确清理，测试集群停止并移除。真实 iPhone / Android、Safari、实体软键盘和主屏幕安装态未据此验收；没有在生产创建测试账户或评分。本轮新备份仅核验 catalog，另用真实旧备份完成过隔离恢复演练。详见 [真机方案实施记录](docs/REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
+
+历史 0.11.0-alpha.3 的97文件839项、类型/格式与冻结构建通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38863609506) 和 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38863835264) 均成功，包含完整Compose首装及Python/检查器自测。真实隔离 H5 验收保留两词完成数并重排新书四词，最终30项只读续验通过；两端均完成338项HTTP与39项匿名手机视口检查。应用升级保留原数据库和媒体，没有迁移、seed或生产测试评分；新备份仅核catalog。详见 [切书修复](docs/BOOK_SWITCH_TASKS_FIX.md)。
 
 历史0.11.0-alpha.1 的93份测试文件/794项、155项Python及186项检查器自测、四组类型检查和隔离构建通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38856139140) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38856132567) 完成完整Compose冷安装；固定linux/amd64镜像已匿名核验并部署。旧库备份在独立测试库实际恢复，四迁移增量和重放保护通过；Native与VPS各338项HTTP检查、39项匿名Chromium手机视口检查通过，未在生产创建测试用户或评分。实体手机、逐句专家审核及VPS并发容量仍未验收。范围与证据见 [对应记录](docs/LOOKUP_SENSES_011.md)。
 

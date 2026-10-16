@@ -1,10 +1,10 @@
 # Alpha 运行与部署
 
-当前发布为 [`0.11.0-alpha.3`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.11.0-alpha.3)，运行源码为 [`61462adf`](https://github.com/wudi000888-svg/nightstudy/commit/61462adfb054546ad2745209665cb294cb0a1394)。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38863609506) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38863835264) 均成功，公开镜像已完成匿名核验。本机 Native 与目标 VPS 均已升级并通过 `0.11.0-alpha.3` 就绪检查；本次为无 schema/内容变化的应用补丁，切书与任务验收见 [修复记录](BOOK_SWITCH_TASKS_FIX.md)。
+当前发布为 [`0.12.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.12.0-alpha.1)，运行源码为 [`b8cde5bb`](https://github.com/wudi000888-svg/nightstudy/commit/b8cde5bb8283da2f2f0b20daffd86515b9d2270f)。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881203417) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881311451) 均成功，公开镜像已完成匿名核验。Native 与 VPS 均已升级并通过就绪、原数据保护及公开验收；实际状态见 [H5 交付记录](REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
 
-两端各338项公开HTTP断言、120次匿名GET/HEAD通过，含服务端39份PWA静态资源的完整SHA/size/MIME。两端另各39项匿名Chromium手机视口检查通过，覆盖320/390/横屏、搜索分页、返回锚点、分义项例句与真实英美句音；无生产身份、收藏或评分写请求。这些不包含实体手机或逐条专家听审。
+两端本轮各完成 347 项公开 HTTP 断言、123 次匿名请求，包括 PWA 完整摘要和成品音频。Native 通过 6 项匿名浏览器检查；VPS 通过 12 项公开页面、音频和导航检查，其浏览器保留既有登录，不称为匿名。隔离环境完成 32 项浏览器交互及小屏、横屏和桌面悬停检查；没有在生产创建测试账户或进行收藏、偏好、评分写请求。这些不包含实体手机、Safari、主屏幕安装态或逐条专家听辨。
 
-0.11增加4个迁移，完整首装共19个；旧站从47张原表增量到50张表，保留旧记录。目录继续为18本、18,767个有效词目与69,840条成员关系；0.10词级内容作为来源和未绑定候选保留。新原子义项首包仅35词、98义、196条双语语境及392条英美句音，18,732词仍待逐义审核。未绑定句不借给其它意思，不宣称全词典770,611词逐义完备。范围、备份演练、上线与测试清理见 [0.11交付记录](LOOKUP_SENSES_011.md#15-发行与保数据升级状态)。
+0.12 新增辨义偏好与查询版本触发器的一个迁移，完整首装共 20 个；从 0.11 升级仍为 50 张业务表，保留旧列与旧行。本轮不导入内容或音频。目录继续为18本、18,767个有效词目与69,840条成员关系；0.10词级内容作为来源和未绑定候选保留。新原子义项首包仅35词、98义、196条双语语境及392条英美句音，18,732词仍待逐义审核。未绑定句不借给其它意思，不宣称全词典770,611词逐义完备。范围、备份演练、上线与测试清理见 [0.11交付记录](LOOKUP_SENSES_011.md#15-发行与保数据升级状态)。
 
 Render、主机断电恢复、异机/密钥灾备、高并发容量及音源逐条专家听辨未验收。下文保留各历史版本的对应证据，标明版本的旧镜像与检查结果不代表当前运行版本。
 
@@ -115,7 +115,7 @@ PG 业务数据、内容源缓存与音频分别保存在 postgres-data、conten
 
 受控站重装、身份变化或离线时，旧授权可能无法确认撤销。管理员明确确认远端grant可能仍存在后可本地forget：清密文、标forgotten、停止远程操作并审计，返回remoteRevocationConfirmed=false；同URL可用新票重配。它不等于远端撤销。每站最多20张活跃票据，每张10分钟有效；最多100条活跃grant，连接记录总量最多100条（含revoked/forgotten）。
 
-后台的检测更新只读取固定NightStudy GitHub Release。当前运行预发布版本选prerelease渠道，否则stable仅正式；严格SemVer排序，空发布返回no-release，不把main代码版本冒充最新Release。PG保存各Realm状态、60秒冷却和检查锁，跨进程竞争只覆盖该Realm；同进程固定上游请求合并/短时缓存。失败保留上次成功结果与错误，不刷新成功时间。功能只给发布链接，升级仍按备份/迁移/独立init程序由operator执行；不提供网页一键升级或shell入口。
+后台的检测更新只读取固定NightStudy GitHub Release。当前运行预发布版本选prerelease渠道，否则stable仅正式；严格SemVer排序，空发布返回no-release，不把main代码版本冒充最新Release。PG保存各Realm状态、60秒冷却和检查锁，跨进程竞争只覆盖该Realm；同进程固定上游请求合并/短时缓存。失败保留上次成功结果与错误，不刷新成功时间。功能只给发布链接，升级仍由 operator 按目标版本执行备份、明确的迁移及必要内容增量；新站 init 不作为既有站点升级入口；不提供网页一键升级或shell入口。
 
 完整接口见 [API.md](API.md#群站配对与限权管理)。0.3的并发首装、票据兑换、权限/撤销、离线解绑与重配、幂等、历史长昵称、更新冷却与失败保留通过真实双PG回归；CI完成随机初始密码实际登录。VPS另使用临时独立子站完成公网HTTPS配对、用户启停、分页、注册开关、公告去重与撤销，未注入transport；临时资源已清理。同源子路径测试不构成互不信任租户的浏览器强隔离证据。
 
@@ -218,7 +218,9 @@ docker compose exec -T postgres sh -c 'exec pg_restore -U "$POSTGRES_USER" --exi
 
 升级先保留可恢复备份、私有配置和当前应用/镜像身份，再按具体来源版本审阅代码、schema、内容包与安装器差异。不要把新站的 `db:prepare` 或默认 seed 命令直接当作既有站点升级脚本；不要假定回滚镜像会撤销数据库变更。
 
-- 本轮0.11 alpha.1→alpha.3：schema、19条迁移、data与Compose配置逐字节相同，先生成新备份并核catalog，再只切Native冻结产物与VPS app；不运行init、迁移、seed、恢复或媒体导入。学习进度与今日完成数保留，正常切书只结束未完成任务并重排。两端原PG、VPS网关与媒体卷保持；新备份本轮未实际restore，不声称启动后数据库逐行相等。详见[切书修复记录](BOOK_SWITCH_TASKS_FIX.md)。
+- 本轮 0.11 alpha.3→0.12 alpha.1：先绑定明确的源码、镜像、站点/数据库身份与剩余空间，隔离构建并核验媒体和源文件；只停止身份已确认的本站 API，保留 PG 与网关。停写窗口内生成新备份、核 catalog 和 50 表原列/原行指纹，使用已审的迁移入口执行新增一个 SQL，再核增量与零变更重放，最后切冻结应用或固定镜像。不得运行新站 init、db:prepare、seed、业务库 restore 或内容/媒体安装；Compose 最后只更新 app 并使用 `--no-deps --no-build`。Native 与 VPS 均已完成，原 PG 与 VPS 网关保持；新备份仅核 catalog，真实旧备份另在独立库做过恢复演练。本轮 4 个隔离测试库、6 份临时凭据与仅 55443 测试集群已精确清理/停用，生产和备份保留。详见 [本轮 H5 记录](REAL_DEVICE_H5_ROADMAP.md#发行与保数据升级)。
+
+- 历史 0.11 alpha.1→alpha.3：schema、19条迁移、data与Compose配置逐字节相同，先生成新备份并核catalog，再只切Native冻结产物与VPS app；不运行init、迁移、seed、恢复或媒体导入。学习进度与今日完成数保留，正常切书只结束未完成任务并重排。两端原PG、VPS网关与媒体卷保持；新备份本轮未实际restore，不声称启动后数据库逐行相等。详见[切书修复记录](BOOK_SWITCH_TASKS_FIX.md)。
 
 - 历史0.10→0.11 alpha.1：审阅并应用四个新迁移（原子义项、查询索引、绑定失效、例句版本外键），仅安装固定learning-senses-v1和sentence-audio-v3增量。媒体先预置；明确站点/库/OID/instance后，停本站写入、做新备份和before指纹，再迁移/严格安装/after/零变更重放，最后只切换应用。Native原环境/PG进程、VPS原PG/网关容器保持。允许接口不兼容不等于清库；本轮没有seed/reset或业务库restore。Native旧备份在独立测试库实际恢复并演练，VPS新备份仅核catalog。具体范围见[0.11记录](LOOKUP_SENSES_011.md#152-真实旧库演练与两端增量)。
 
@@ -235,21 +237,21 @@ alpha 不提供自动无损跨版本恢复保证；0.10的“无新增迁移”�
 
 ## CI 与镜像发行
 
-当前`0.11.0-alpha.3`对应源码[`61462adfb054546ad2745209665cb294cb0a1394`](https://github.com/wudi000888-svg/nightstudy/commit/61462adfb054546ad2745209665cb294cb0a1394)；[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38863609506)与[发行CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38863835264)均成功。发行verify完成后才发布镜像，不以main通过代替镜像发行结果。
+当前 `0.12.0-alpha.1` 对应源码 [`b8cde5bb8283da2f2f0b20daffd86515b9d2270f`](https://github.com/wudi000888-svg/nightstudy/commit/b8cde5bb8283da2f2f0b20daffd86515b9d2270f)；[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881203417) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881311451) 均成功。发行verify完成后才发布镜像，不以main通过代替镜像发行结果。
 
-本机冻结基线为97份测试文件/839项、类型检查、格式与隔离构建通过；CI另完成Python与检查器自测。CI在双PG17测试库执行回归，另外在独立Compose project完成默认ecdict首装、原始内容快照保护、严格增量/重放及四包音频检查；基础测试配置显式demo/manual。新站共19迁移，不在启动请求中执行迁移。
+本机冻结基线为 107 份测试文件 / 918 项、类型检查、格式与隔离构建通过；CI另完成Python与检查器自测。CI在双PG17测试库执行回归，另外在独立Compose project完成默认ecdict首装、原始内容快照保护、严格增量/重放及四包音频检查；基础测试配置显式demo/manual。新站共 20 迁移，不在启动请求中执行迁移。
 
-已公开核验、VPS实际运行的固定OCI index：
+已公开匿名核验、VPS 实际运行的固定 OCI index：
 
 ```text
-ghcr.io/wudi000888-svg/nightstudy@sha256:9bd78800f6ba9236a94ed14f0df3d02c9a67f3dd3d5e44db65f7e1815ca3d7ea
+ghcr.io/wudi000888-svg/nightstudy@sha256:884c62d81a69f243f370fa30c3b563ffe6dc4eee776cc9848a2e33380d5b43b5
 ```
 
-匿名请求的index body SHA与digest响应头一致，version、revision和linux/amd64均匹配。VPS使用空Docker认证配置实际拉取并核运行身份。流水线保留provenance/SBOM，一个attestation条目不表示存在arm64镜像；公开核验回执SHA-256为`f2d60182d35692adcbb9de339357348be69f9776967a718581bae63981483167`。
+匿名请求的 index body SHA 与 digest 响应头一致，version、revision 和 linux/amd64 均匹配，压缩层摘要与解包 diffID 也独立核验。流水线保留 provenance/SBOM；一个 attestation 条目不表示存在 arm64 镜像。VPS 使用空 Docker 认证配置实际拉取并核对运行身份、源码和 Prisma；正式运行固定为上述摘要。公开 OCI 身份证据及部署收据保存在本轮私密交付记录中。
 
 完整首装保留770,611基础词典、18本书/69,840有效成员和0.10文本来源与候选，再安装35词/98原子义项/196独立语境及392句音身份。独立检查原源行不变、来源摘要、同词同版、每义两个语境及成品文件；不把保留的旧词级句当成全部义项配句完成。随机初始admin实际登录和闭合网关未鉴权401另验，它们不证明Google上游可用。600秒为Compose smoke等待上限；清理只针对当前CI的独立project。
 
-`release.yml`仅在发布GitHub Release时触发；tag如`v0.11.0-alpha.3`须与package.json版本相同。公开仓库不保证GHCR package自动公开，仍需匿名核验。新站准备私有`.env`、密钥与HTTPS后，将`NIGHTSTUDY_IMAGE`设为上述固定引用，使用`docker compose up --detach --no-build --wait app`；init准备新站管理员与内容。已有站点按前文增量，不重新seed。`scripts/install.sh`为源码构建入口，使用发行镜像时不加`--build`。不依赖浮动latest；[GitHub镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)。
+`release.yml`仅在发布GitHub Release时触发；tag 如 `v0.12.0-alpha.1`须与package.json版本相同。公开仓库不保证GHCR package自动公开，仍需匿名核验。新站准备私有`.env`、密钥与HTTPS后，将`NIGHTSTUDY_IMAGE`设为上述固定引用，使用`docker compose up --detach --no-build --wait app`；init准备新站管理员与内容。已有站点按前文增量，不重新seed。`scripts/install.sh`为源码构建入口，使用发行镜像时不加`--build`。不依赖浮动latest；[GitHub镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)。
 
 以下保留旧版发行记录，分别对应当时的源码与验收范围。
 

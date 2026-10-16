@@ -35,6 +35,7 @@ const packSource = z
       'recorded-audio-v2',
       'word-audio-v2',
       'sentence-audio-v1',
+      'sentence-audio-v2',
     ]),
     status: z.literal('ready'),
     source: pinnedSource,
@@ -55,7 +56,13 @@ const packSource = z
 const builtPack = z
   .object({
     schemaVersion: z.union([z.literal(1), z.literal(2)]),
-    version: z.enum(['audio-v1', 'recorded-audio-v2', 'word-audio-v2', 'sentence-audio-v1']),
+    version: z.enum([
+      'audio-v1',
+      'recorded-audio-v2',
+      'word-audio-v2',
+      'sentence-audio-v1',
+      'sentence-audio-v2',
+    ]),
     status: z.literal('ready'),
     sourceManifestSha256: z.string(),
     statistics: z
@@ -414,15 +421,20 @@ async function main() {
   if (profile !== 'standard') throw new Error('invalid_audio_profile');
   const root = audioCacheRoot();
   await ensureCacheDirectory(root);
-  // Install only the consolidated static word pack and static sentence pack.
+  // Preserve the consolidated words and original sentences, then add the static sentence delta.
   // Neither installation downloads a voice model or invokes a speech engine.
-  for (const filename of ['word-audio-v2.manifest.json', 'sentence-audio.manifest.json']) {
+  for (const filename of [
+    'word-audio-v2.manifest.json',
+    'sentence-audio.manifest.json',
+    'sentence-audio-v2.manifest.json',
+  ]) {
     const source = packSource.parse(
       JSON.parse(await fs.readFile(path.join('data', filename), 'utf8')),
     );
     const manifest = await installAudioFiles(source);
     for (const site of readConfig().sites) {
-      if (source.id === 'sentence-audio-v1') await importSentenceAudioSite(site, manifest, source);
+      if (source.id.startsWith('sentence-audio-'))
+        await importSentenceAudioSite(site, manifest, source);
       else await importAudioSite(site, manifest, source);
     }
   }

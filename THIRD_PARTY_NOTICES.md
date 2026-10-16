@@ -45,9 +45,15 @@
 
 ## 双语内容与例句
 
-新增精选例句来自 Tatoeba 固定英语导出，依据 **CC-BY-2.0-FR**（法国版）逐句保留作者用户名、句子编号、原句链接和许可；中文机器翻译属于改编，保留原来源并说明修改。为准确区分法国版，容器声明使用 `LicenseRef-CC-BY-2.0-FR`，其准确许可全文和来源保存在 [bilingual-licenses](data/bilingual-licenses) 及 [来源manifest](data/bilingual-source.manifest.json)。应用MIT不重新许可社区语料。
+早期 `bilingual-v1` 的精选例句来自 Tatoeba 固定英语导出，依据 **CC-BY-2.0-FR**（法国版）逐句保留作者用户名、句子编号、原句链接和许可；中文机器翻译属于改编，保留原来源并说明修改。为准确区分法国版，容器声明使用 `LicenseRef-CC-BY-2.0-FR`，其准确许可全文和来源保存在 [bilingual-licenses](data/bilingual-licenses) 及 [来源manifest](data/bilingual-source.manifest.json)。应用MIT不重新许可社区语料。
 
-Helsinki-NLP 的中英两个方向模型分别为 CC-BY-4.0 和 Apache-2.0，不混同许可。固定卡片、原始权重SHA和模型作者留存；模型用于独立离线制作任务，发行源码/运行镜像不含这些模型权重，也不以模型许可覆盖原文许可。少量缺口例句是NightStudy贡献者的Codex辅助原创，依据MIT分发，明确生成与待校对。范围、质量边界和逐字段来源见 [双语内容说明](docs/BILINGUAL_CONTENT.md)。
+上述早期制作使用的 Helsinki-NLP 中英两个方向模型分别为 CC-BY-4.0 和 Apache-2.0，不混同许可。固定卡片、原始权重SHA和模型作者留存；模型用于独立离线制作任务，发行源码/运行镜像不含这些模型权重，也不以模型许可覆盖原文许可。少量缺口例句是NightStudy贡献者的Codex辅助原创，依据MIT分发，明确生成与待校对。范围、质量边界和逐字段来源见 [双语内容说明](docs/BILINGUAL_CONTENT.md)。
+
+0.10 的 `bilingual-v2` 使用固定公开语料及 Codex 直接撰写：9,546 条新增独立双语例句中，212 对沿用公开英中句子，5,186 条沿用公开英文并新增中译，4,148 条为 Codex 辅助原创双语用法。公开语料沿用逐句作者、编号、链接与 CC-BY-2.0-FR；新译属于改编，不把公开原文改标 MIT。新增释义对应、学习纠错义项、例句译写及原创内容层由 NightStudy 贡献者制作并按 MIT 分发，原有词典内容仍保留其来源与许可。17 条既有例句的精确更正保留原英中全文和完整原元数据，新的译写与必要的英文更正另记来源。
+
+本轮文本制作不使用付费 API 或本地翻译模型；早期包的模型制作声明不能套用于 v2。新的文字保留待校对状态，结构校验与 Codex 语义抽查不等于逐条专家认证。范围与字段数见 [0.10 内容说明](docs/CONTENT_BILINGUAL_POLISH_010.md)，固定制作清单见 [v2 来源 manifest](data/bilingual-v2.sources.manifest.json)。
+
+制作档案 `bilingual-v2-authoring.tar.gz` 包含公开源投影、候选台账、制作稿和源绑定审核决定，不含用户数据、数据库备份、密钥或模型。档案中的原创层与各公开来源许可分别保留。固定字节数与 SHA-256 见 [v2 来源 manifest](data/bilingual-v2.sources.manifest.json)，本地复现和公开附件验收按交付记录补充。
 
 ## 设计参考
 

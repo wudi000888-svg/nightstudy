@@ -3259,48 +3259,7 @@ td strong {
 .word-card-scroll .word-source-detail {
   overflow-wrap: anywhere;
 }
-.word-card-summary {
-  display: grid;
-  gap: 10px;
-  padding: 12px 20px 14px;
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-}
-.word-card-summary-text {
-  display: grid;
-  gap: 5px;
-}
-.word-card-summary-language {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.word-card-summary-language > p {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  color: var(--ink);
-  font-size: 13px;
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-.word-card-summary-language > .word-card-summary-en {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-.word-card-summary-language > .missing {
-  color: var(--dim);
-  font-size: 11px;
-}
-.word-card-summary-text .content-statuses {
-  flex-shrink: 0;
-  margin: 0;
-}
+
 .word-card-bookmark > .button {
   padding: 9px 12px;
   font-size: 12px;
@@ -3859,8 +3818,7 @@ td strong {
 .word-content .sense:first-child {
   padding-top: 0;
 }
-.word-content .sense-pos,
-.word-card-pos {
+.word-content .sense-pos {
   color: var(--muted);
   font-size: 13px;
   font-style: italic;
@@ -4085,16 +4043,7 @@ td strong {
   font-weight: 700;
   letter-spacing: -0.035em;
 }
-.word-card-summary {
-  padding: 10px 18px 13px;
-}
-.word-card-summary-language > .word-card-summary-zh {
-  font-size: 15px;
-  font-weight: 600;
-}
-.word-card-summary-language > .word-card-summary-en {
-  font-size: 13px;
-}
+
 .word-card-scroll .word-content .word-title-row {
   margin-bottom: 16px;
   gap: 10px;
@@ -4164,9 +4113,7 @@ td strong {
   .word-content .word-collocations {
     padding: 16px;
   }
-  .word-card-summary {
-    padding: 10px 19px 14px;
-  }
+
   .word-card-scroll .word-content .word-title-row {
     margin-bottom: 15px;
   }
@@ -4206,4 +4153,162 @@ td strong {
 .sentence-audio-button:focus-visible {
   outline: 2px solid var(--accent, #308379);
   outline-offset: 3px;
+}
+
+/* Compact, same-sense bilingual reading; expansion never discards the full text. */
+.definition-disclosure {
+  min-width: 0;
+}
+.definition-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.definition-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.definition-preview {
+  display: block;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.definition-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  font-size: 12px;
+  color: var(--study-accent, var(--app-accent, var(--gold)));
+}
+.definition-hide,
+.definition-disclosure[open] > summary .definition-preview,
+.definition-disclosure[open] > summary .definition-show {
+  display: none;
+}
+.definition-disclosure[open] > summary .definition-hide {
+  display: inline;
+}
+.definition-disclosure[open] > summary .definition-toggle > svg {
+  transform: rotate(180deg);
+}
+.definition-disclosure > summary:focus-visible,
+.word-english-explanations > summary:focus-visible {
+  outline: 2px solid var(--app-accent, var(--gold));
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.word-content .word-english-explanations {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.word-english-explanations > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.word-english-explanations > summary > span {
+  font-size: 11px;
+}
+.word-english-explanations[open] > summary {
+  margin-bottom: 12px;
+}
+.pronunciation-control .pronunciation-row {
+  max-width: 100%;
+  align-items: flex-start;
+}
+.pronunciation-control .pronunciation-ipa {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  align-self: center;
+}
+.pronunciation-control .pronunciation-region-label {
+  align-self: center;
+}
+.pronunciation-row .icon-action-tooltip {
+  left: 0;
+  right: auto;
+}
+.icon-action-tooltip {
+  max-width: min(180px, calc(100vw - 32px));
+  background: #17373e;
+  color: #f3f8f9;
+  box-shadow: 0 5px 16px #102b3026;
+  overflow-wrap: anywhere;
+}
+.sentence-audio-controls > small {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--study-muted, var(--muted));
+  line-height: 1.6;
+}
+.books-page .book-description > strong {
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.books-page .book-description > small {
+  font-size: 12px;
+}
+.books-page .book-cover strong {
+  font-size: 13px;
+}
+.books-page .book-cover > span {
+  font-size: 11px;
+}
+.books-page .book-action {
+  font-size: 12px;
+}
+.book-result-count {
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+@media (max-width: 660px) {
+  .books-page .page-heading > div > h1,
+  .books-page .page-heading > div > .eyebrow {
+    display: none;
+  }
+  .books-page .filter-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    padding-block: 3px 7px;
+    scrollbar-width: thin;
+    overscroll-behavior-x: contain;
+  }
+  .books-page .filter-row > button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .books-page .book-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .books-page .book-card {
+    min-width: 0;
+  }
+}
+@media (max-width: 380px) {
+  .pronunciation-control .pronunciation-lines {
+    gap: 8px 12px;
+  }
+  .pronunciation-row .icon-action-tooltip {
+    max-width: 132px;
+  }
+}
+@media (hover: none) {
+  .icon-action-hint > .icon-action-tooltip {
+    display: none;
+  }
+  .book-card:hover {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sentence-audio-button .spin,
+  .pronunciation-speaker .spin {
+    animation: none;
+  }
 }

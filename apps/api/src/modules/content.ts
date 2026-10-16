@@ -21,6 +21,7 @@ import {
 } from './shared.js';
 import { decodeCursor, pageInfo } from './pagination.js';
 import { visibleBookWhere } from './book-access.js';
+import { bookCatalogCounts } from './book-catalog-counts.js';
 import { learningPreferencesInput, updateLearningPreferences } from './learning-preferences.js';
 import { summarySenses } from './content-presentation.js';
 import { collectionState } from './collection-state.js';
@@ -187,51 +188,16 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         ),
       ),
     ];
-    const baseWhere: Prisma.BookItemWhereInput = {
-      bookId: { in: books.map((book) => book.id) },
-      word: { status: 'published' },
-    };
-    const counts = (where: Prisma.BookItemWhereInput) =>
-      ctx.prisma.bookItem.groupBy({ by: ['bookId'], where, _count: { _all: true } });
-    const [totals, learned, covered, known] = await Promise.all([
-      counts(baseWhere),
-      ctx.user
-        ? counts({
-            ...baseWhere,
-            word: {
-              status: 'published',
-              progress: { some: { userId: ctx.user.id, firstLearnedAt: { not: null } } },
-            },
-          })
-        : [],
-      ctx.user
-        ? counts({
-            ...baseWhere,
-            OR: [
-              {
-                word: {
-                  progress: { some: { userId: ctx.user.id, firstLearnedAt: { not: null } } },
-                },
-              },
-              { wordId: { in: verified } },
-            ],
-          })
-        : [],
-      ctx.user
-        ? counts({
-            ...baseWhere,
-            word: {
-              status: 'published',
-              OR: [
-                { claims: { some: { userId: ctx.user.id, import: { status: 'confirmed' } } } },
-                { autoKnownWords: { some: { userId: ctx.user.id, revokedAt: null } } },
-              ],
-            },
-          })
-        : [],
-    ]);
-    const count = (rows: typeof totals, bookId: string) =>
-      rows.find((row) => row.bookId === bookId)?._count._all ?? 0;
+    const counts = new Map(
+      (
+        await bookCatalogCounts(
+          ctx.prisma,
+          books.map((book) => book.id),
+          ctx.user?.id,
+          verified,
+        )
+      ).map((row) => [row.bookId, row]),
+    );
     return {
       items: books.map((b) => ({
         id: b.id,
@@ -241,10 +207,10 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
         goal: b.goal,
         kind: b.kind,
         version: b.version,
-        wordCount: count(totals, b.id),
-        learnedCount: count(learned, b.id),
-        coveredCount: count(covered, b.id),
-        claimedKnownCount: count(known, b.id),
+        wordCount: counts.get(b.id)?.wordCount ?? 0,
+        learnedCount: counts.get(b.id)?.learnedCount ?? 0,
+        coveredCount: counts.get(b.id)?.coveredCount ?? 0,
+        claimedKnownCount: counts.get(b.id)?.claimedKnownCount ?? 0,
         isDemo: b.version.startsWith('demo-'),
         visibility: b.ownerId ? 'private' : 'public',
         ownedByMe: Boolean(ctx.user && b.ownerId === ctx.user.id),

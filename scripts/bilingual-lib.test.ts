@@ -88,4 +88,265 @@ describe('bilingual content pack boundary', () => {
     const bad = fixture({ ...valid, normalizedLemma: ' Window ' });
     expect(() => readBilingualRows(bad.bytes, bad.manifest)).toThrow('unnormalized_word');
   });
+  it('accepts only explicit reviewed surface identity, still requiring its actual occurrence', () => {
+    const targetSurface = {
+      lemma: 'window',
+      form: 'windows',
+      kind: 'inflected-form',
+      review: 'codex-reviewed',
+    };
+    const f = fixture({
+      ...valid,
+      examples: [{ ...valid.examples[0], exampleEn: 'The windows are open.', targetSurface }],
+    });
+    expect(readBilingualRows(f.bytes, f.manifest)[0]!.examples[0]!.targetSurface).toEqual(
+      targetSurface,
+    );
+    for (const changed of [
+      { ...targetSurface, lemma: 'door' },
+      { ...targetSurface, form: 'window' },
+      { ...targetSurface, form: 'doors' },
+      { ...targetSurface, review: 'pending' },
+    ]) {
+      const bad = fixture({
+        ...valid,
+        examples: [
+          { ...valid.examples[0], exampleEn: 'The windows are open.', targetSurface: changed },
+        ],
+      });
+      expect(() => readBilingualRows(bad.bytes, bad.manifest)).toThrow();
+    }
+  });
+  it('binds POS additions to the exact Chinese source and requires attribution', () => {
+    const sense = {
+      ...valid.senses[0],
+      pos: 'n.',
+      sourceDefinitionZhSha256: hash('窗户'),
+      contentMetadata: {
+        ...valid.senses[0]!.contentMetadata,
+        pos: { kind: 'original-authoring', license: 'MIT' },
+      },
+    };
+    const good = fixture({ ...valid, senses: [sense] });
+    expect(readBilingualRows(good.bytes, good.manifest)[0]!.senses[0]!.pos).toBe('n.');
+    const bad = fixture({ ...valid, senses: [{ ...sense, sourceDefinitionZhSha256: undefined }] });
+    expect(() => readBilingualRows(bad.bytes, bad.manifest)).toThrow('pos_source_identity');
+  });
+  it('accepts only dual-source-bound, separately authored Chinese example corrections', () => {
+    const correction = {
+      id: 'published-window-example',
+      sourceExampleEnSha256: hash('Please close the window.'),
+      sourceExampleZhSha256: hash('请打开窗户。'),
+      exampleZh: '请关上窗户。',
+      reason: 'The source Chinese reverses the action.',
+      contentMetadata: {
+        exampleZh: {
+          kind: 'original-authoring',
+          author: 'NightStudy contributors',
+          license: 'MIT',
+          review: 'pending',
+          sourceLanguage: 'en',
+          sourceTextSha256: hash('Please close the window.'),
+          translatedFrom: { kind: 'corpus', source: 'Synthetic source' },
+        },
+      },
+    };
+    const value = { ...valid, exampleCorrections: [correction] };
+    const good = fixture(value);
+    expect(readBilingualRows(good.bytes, good.manifest)[0]!.exampleCorrections).toEqual([
+      correction,
+    ]);
+    for (const changed of [
+      { ...correction, sourceExampleEnSha256: undefined },
+      { ...correction, sourceExampleZhSha256: 'invalid' },
+      { ...correction, exampleEn: 'A replacement English sentence.' },
+      { ...correction, exampleZh: ' ' },
+      { ...correction, reason: ' ' },
+      {
+        ...correction,
+        contentMetadata: {
+          ...correction.contentMetadata,
+          exampleEn: correction.contentMetadata.exampleZh,
+        },
+      },
+      {
+        ...correction,
+        contentMetadata: {
+          exampleZh: { ...correction.contentMetadata.exampleZh, kind: 'machine-translation' },
+        },
+      },
+    ]) {
+      const bad = fixture({ ...valid, exampleCorrections: [changed] });
+      expect(() => readBilingualRows(bad.bytes, bad.manifest)).toThrow();
+    }
+    const duplicate = fixture({ ...valid, exampleCorrections: [correction, correction] });
+    expect(() => readBilingualRows(duplicate.bytes, duplicate.manifest)).toThrow(
+      'duplicate_example_correction',
+    );
+    const newEnglishProvenance = {
+      kind: 'original-authoring',
+      author: 'NightStudy contributors',
+      license: 'MIT',
+      review: 'pending',
+      language: 'en',
+      sourceTextSha256: hash('The window is closed.'),
+    };
+    const paired = {
+      ...correction,
+      exampleEn: 'The window is closed.',
+      exampleZh: '窗户已经关上了。',
+      contentMetadata: {
+        exampleZh: {
+          ...correction.contentMetadata.exampleZh,
+          sourceTextSha256: hash('The window is closed.'),
+          translatedFrom: newEnglishProvenance,
+        },
+        exampleEn: newEnglishProvenance,
+      },
+    };
+    const full = fixture({ ...valid, exampleCorrections: [paired] });
+    expect(readBilingualRows(full.bytes, full.manifest)[0]!.exampleCorrections).toEqual([paired]);
+    for (const changed of [
+      {
+        ...correction,
+        contentMetadata: {
+          exampleZh: { ...correction.contentMetadata.exampleZh, translatedFrom: undefined },
+        },
+      },
+      {
+        ...correction,
+        contentMetadata: {
+          exampleZh: { ...correction.contentMetadata.exampleZh, translatedFrom: [] },
+        },
+      },
+      {
+        ...paired,
+        contentMetadata: {
+          ...paired.contentMetadata,
+          exampleZh: {
+            ...paired.contentMetadata.exampleZh,
+            translatedFrom: correction.contentMetadata.exampleZh.translatedFrom,
+          },
+        },
+      },
+      {
+        ...correction,
+        contentMetadata: {
+          exampleZh: { ...correction.contentMetadata.exampleZh, sourceLanguage: undefined },
+        },
+      },
+      {
+        ...correction,
+        contentMetadata: {
+          exampleZh: { ...correction.contentMetadata.exampleZh, sourceTextSha256: undefined },
+        },
+      },
+      {
+        ...correction,
+        contentMetadata: {
+          exampleZh: { ...correction.contentMetadata.exampleZh, sourceLanguage: 'zh' },
+        },
+      },
+      {
+        ...correction,
+        contentMetadata: {
+          exampleZh: {
+            ...correction.contentMetadata.exampleZh,
+            sourceTextSha256: hash(correction.exampleZh),
+          },
+        },
+      },
+      {
+        ...paired,
+        contentMetadata: {
+          ...paired.contentMetadata,
+          exampleEn: { ...paired.contentMetadata.exampleEn, language: undefined },
+        },
+      },
+      {
+        ...paired,
+        contentMetadata: {
+          ...paired.contentMetadata,
+          exampleEn: { ...paired.contentMetadata.exampleEn, sourceTextSha256: undefined },
+        },
+      },
+      {
+        ...paired,
+        contentMetadata: {
+          ...paired.contentMetadata,
+          exampleEn: { ...paired.contentMetadata.exampleEn, language: 'zh-CN' },
+        },
+      },
+      {
+        ...paired,
+        contentMetadata: {
+          ...paired.contentMetadata,
+          exampleEn: {
+            ...paired.contentMetadata.exampleEn,
+            sourceTextSha256: correction.sourceExampleEnSha256,
+          },
+        },
+      },
+      {
+        ...paired,
+        contentMetadata: {
+          ...paired.contentMetadata,
+          exampleZh: correction.contentMetadata.exampleZh,
+        },
+      },
+    ]) {
+      const bad = fixture({ ...valid, exampleCorrections: [changed] });
+      expect(() => readBilingualRows(bad.bytes, bad.manifest)).toThrow();
+    }
+  });
+  it('requires complete, exact English binding for authored example text and its Chinese translation', () => {
+    const authorship = {
+      kind: 'original-authoring',
+      author: 'NightStudy contributors',
+      license: 'MIT',
+      review: 'pending',
+      sourceTextSha256: hash(valid.examples[0]!.exampleEn),
+    };
+    const metadata = {
+      exampleEn: { ...authorship, language: 'en' },
+      exampleZh: { ...authorship, sourceLanguage: 'en' },
+    };
+    const example = { ...valid.examples[0], contentMetadata: metadata };
+    const good = fixture({ ...valid, examples: [example] });
+    expect(readBilingualRows(good.bytes, good.manifest)[0]!.examples[0]!.contentMetadata).toEqual(
+      metadata,
+    );
+    for (const field of ['exampleEn', 'exampleZh'] as const) {
+      const language = field === 'exampleEn' ? 'language' : 'sourceLanguage';
+      for (const patch of [
+        { sourceTextSha256: undefined },
+        { sourceTextSha256: hash(example.exampleZh!) },
+        { [language]: undefined },
+        { [language]: 'zh' },
+        { author: undefined },
+        { license: undefined },
+        { review: undefined },
+      ]) {
+        const bad = fixture({
+          ...valid,
+          examples: [
+            {
+              ...example,
+              contentMetadata: { ...metadata, [field]: { ...metadata[field], ...patch } },
+            },
+          ],
+        });
+        expect(() => readBilingualRows(bad.bytes, bad.manifest)).toThrow(
+          'authorship_source_mismatch',
+        );
+      }
+      for (const provenance of [{}, [], null, 'not-provenance']) {
+        const bad = fixture({
+          ...valid,
+          examples: [{ ...example, contentMetadata: { ...metadata, [field]: provenance } }],
+        });
+        expect(() => readBilingualRows(bad.bytes, bad.manifest)).toThrow('missing_provenance');
+      }
+    }
+  });
 });

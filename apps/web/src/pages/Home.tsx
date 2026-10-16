@@ -48,9 +48,11 @@ export function BookGrid({
     <div className="book-grid">
       {books.map((book, index) => (
         <button
+          type="button"
           className="book-card"
           key={book.id}
           disabled={!!busyId}
+          aria-busy={busyId === book.id}
           onClick={() => onSelect(book.id)}
         >
           <span className={`book-cover cover-${index % 4}`}>
@@ -281,15 +283,11 @@ export function BooksPage() {
         (kind === 'all' || (book.kind ?? 'vocabulary') === kind),
     ) ?? [];
   return (
-    <div className="page">
+    <div className="page books-page">
       <Heading
-        eyebrow="书架 · 选择你的方向"
-        title={
-          <>
-            让遇见的词，<em>有一条路径。</em>
-          </>
-        }
-        description="选择词书或词组本，再定每天总词数。先复习，后学新词；换书后，已安排的学习组仍可继续。"
+        eyebrow="词汇与词组"
+        title="选择词书"
+        description="按学习目标选书，再设置每日总词数。换书后，已有学习组可以继续。"
         action={
           <div className="action-row">
             <Link className="button ghost" to="/books/mine">
@@ -319,13 +317,18 @@ export function BooksPage() {
           </button>
         ))}
       </div>
-      <div className="filter-row">
-        <button className={goal === 'all' ? 'active' : ''} onClick={() => setGoal('all')}>
+      <div className="filter-row" aria-label="学习目标">
+        <button
+          className={goal === 'all' ? 'active' : ''}
+          aria-pressed={goal === 'all'}
+          onClick={() => setGoal('all')}
+        >
           全部方向
         </button>
         {goalNames.map((value) => (
           <button
             className={goal === value ? 'active' : ''}
+            aria-pressed={goal === value}
             key={value}
             onClick={() => setGoal(value)}
           >
@@ -333,9 +336,12 @@ export function BooksPage() {
           </button>
         ))}
       </div>
-      <p className="content-caption">
-        同一个词在不同书中共享学习进度。书中进度包括学过和测验确认的词，导入熟词不会直接计入。
-      </p>
+      <p className="content-caption">同一个词在不同书中共享学习进度。</p>
+      {books.data && (
+        <p className="book-result-count" role="status">
+          {goal === 'all' ? '全部方向' : goalLabels[goal]} · {filteredBooks.length} 本可选
+        </p>
+      )}
       <ErrorNotice error={books.error} onRetry={() => void books.refetch()} />
       {books.isPending ? (
         <Loading />

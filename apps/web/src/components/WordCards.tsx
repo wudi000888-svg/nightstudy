@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Pin, Star, X } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
 import { api } from '../lib/api';
-import { dictionaryText } from '../lib/dictionary';
 import type { Word } from '../lib/types';
 import { WordCardContext } from '../lib/word-cards';
 import { beforeAppBackEvent, screenDeactivateEvent } from '../lib/screen-lifecycle';
@@ -55,35 +54,6 @@ export function WordCardContent({ word }: { word: Word }) {
     <WordCardContext.Provider value={null}>
       <WordView word={word} interactive={false} />
     </WordCardContext.Provider>
-  );
-}
-
-export function WordCardSummaryText({ word }: { word: Word }) {
-  const sense = word.senses?.find((value) => !!dictionaryText(value.definitionZh));
-  const summarize = (value: string | undefined) => {
-    const text = dictionaryText(value).replace(/\s+/g, ' ').trim();
-    const characters = Array.from(text);
-    return characters.length > 160 ? `${characters.slice(0, 160).join('')}…` : text;
-  };
-  const chinese = summarize(sense?.definitionZh);
-  const english = summarize(sense?.definitionEn);
-  if (!chinese) return null;
-  return (
-    <div className="word-card-summary-text">
-      {sense?.pos && <span className="word-card-pos">{sense.pos}</span>}
-      <div className="word-card-summary-language">
-        <p className="word-card-summary-zh" lang="zh-CN">
-          {chinese}
-        </p>
-      </div>
-      {english && (
-        <div className="word-card-summary-language">
-          <p className="word-card-summary-en" lang="en">
-            {english}
-          </p>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -464,11 +434,6 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
                     error={actionError ?? collection.error}
                     onRetry={collection.error ? () => void collection.refetch() : undefined}
                   />
-                </div>
-              )}
-              {word && (
-                <div className="word-card-summary">
-                  <WordCardSummaryText word={word} />
                 </div>
               )}
               <div className="word-card-scroll">

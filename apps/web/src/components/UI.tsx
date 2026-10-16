@@ -8,6 +8,7 @@ import { SentenceAudioButton } from './SentenceAudio';
 import { dictionaryText } from '../lib/dictionary';
 import { InteractiveEnglish } from './InteractiveEnglish';
 import { StudyWordDetails } from './study/StudyWordDetails';
+import { BilingualDefinition } from './BilingualDefinition';
 import { SentenceSaveButton, type SentenceSaveButtonProps } from './SentenceSaveButton';
 import './study/mobile-study.css';
 import { beforeAppBackEvent, useScreenActive } from '../lib/screen-lifecycle';
@@ -343,9 +344,7 @@ export function WordView({
   // Independent dictionary English senses are kept separate: shared POS does not prove
   // a one-to-one translation relationship with the focused Chinese definition.
   const englishSenses =
-    primarySense &&
-    dictionaryText(primarySense.definitionZh) &&
-    !dictionaryText(primarySense.definitionEn)
+    primarySense && dictionaryText(primarySense.definitionZh)
       ? availableSenses
           .filter((sense) => sense !== primarySense && isNativeEnglishSense(sense))
           .sort(
@@ -364,11 +363,28 @@ export function WordView({
     : [];
   const sourceTranscription =
     word.phonetic || word.phonetics?.find((entry) => entry.region === 'unspecified')?.text;
+  const seenExamples = new Set<string>();
+  if (
+    primarySense &&
+    (dictionaryText(primarySense.exampleEn) || dictionaryText(primarySense.exampleZh))
+  )
+    seenExamples.add(
+      JSON.stringify([
+        dictionaryText(primarySense.exampleEn),
+        dictionaryText(primarySense.exampleZh),
+      ]),
+    );
   const examples = hideMeanings
     ? []
-    : (word.examples ?? []).filter(
-        (example) => dictionaryText(example.exampleEn) || dictionaryText(example.exampleZh),
-      );
+    : (word.examples ?? []).filter((example) => {
+        const en = dictionaryText(example.exampleEn),
+          zh = dictionaryText(example.exampleZh);
+        if (!en && !zh) return false;
+        const key = JSON.stringify([en, zh]);
+        if (seenExamples.has(key)) return false;
+        seenExamples.add(key);
+        return true;
+      });
   const collocations = hideMeanings
     ? []
     : (word.collocations ?? []).filter((entry) => dictionaryText(entry.lemma));
@@ -391,14 +407,14 @@ export function WordView({
     ) : null;
   const englishSection =
     englishSenses.length > 0 ? (
-      <section className="word-english-explanations" aria-label="英文解释">
-        <h3>英文解释</h3>
+      <details className="word-english-explanations" aria-label="英文解释">
+        <summary>
+          更多英文释义 <span>{englishSenses.length} 义</span>
+        </summary>
         {englishSenses.map((sense) => (
           <div className="english-explanation" key={sense.id}>
             {sense.pos && <span className="sense-pos">{sense.pos}</span>}
-            <p className="meaning-en" lang="en">
-              <InteractiveEnglish text={dictionaryText(sense.definitionEn)} enabled={interactive} />
-            </p>
+            <BilingualDefinition english={sense.definitionEn} interactive={interactive} />
             {(dictionaryText(sense.exampleEn) || dictionaryText(sense.exampleZh)) && (
               <BilingualExample
                 english={dictionaryText(sense.exampleEn)}
@@ -409,7 +425,7 @@ export function WordView({
             )}
           </div>
         ))}
-      </section>
+      </details>
     ) : null;
   const collocationSection =
     collocations.length > 0 ? (
@@ -442,7 +458,9 @@ export function WordView({
     <div className={`word-content${presentation === 'study' ? ' word-content-study' : ''}`}>
       <div className="word-title-row">
         <div>
-          <h2 className="word-title">{word.lemma}</h2>
+          <h2 className={`word-title${word.lemma.length > 20 ? ' word-title-long' : ''}`}>
+            {word.lemma}
+          </h2>
           {!!dictionaryText(word.dictionaryName) && (
             <span className="word-dictionary-name">{dictionaryText(word.dictionaryName)}</span>
           )}
@@ -482,29 +500,11 @@ export function WordView({
                 const heading = <span className="sense-pos">{sense.pos || '词义'}</span>;
                 const content = (
                   <>
-                    <div
-                      className="bilingual-definition"
-                      aria-label={
-                        definitionZh && definitionEn
-                          ? '中英释义对照'
-                          : definitionZh
-                            ? '中文释义'
-                            : '英文释义'
-                      }
-                    >
-                      {definitionZh && (
-                        <div className="bilingual-cell" lang="zh-CN">
-                          <p className="meaning-zh">{definitionZh}</p>
-                        </div>
-                      )}
-                      {definitionEn && (
-                        <div className="bilingual-cell" lang="en">
-                          <p className="meaning-en">
-                            <InteractiveEnglish text={definitionEn} enabled={interactive} />
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <BilingualDefinition
+                      chinese={definitionZh}
+                      english={definitionEn}
+                      interactive={interactive}
+                    />
                     {(exampleEn || exampleZh) && (
                       <BilingualExample
                         english={exampleEn}
@@ -521,8 +521,8 @@ export function WordView({
                       {heading}
                       {content}
                     </div>
-                    {englishSection}
                     {exampleSection}
+                    {englishSection}
                     {collocationSection}
                   </Fragment>
                 ) : (

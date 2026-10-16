@@ -76,6 +76,7 @@ jobs:
           python3 scripts/bilingual-compile.test.py
           python3 scripts/bilingual-apply-corrections.test.py
           python3 scripts/bilingual-assemble.test.py
+          python3 scripts/bilingual-author-compile.test.py
           python3 scripts/tatoeba-direct-source.test.py
           python3 scripts/manythings-source.test.py
           python3 scripts/phrase-compile.test.py

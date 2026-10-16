@@ -113,9 +113,17 @@ suite('PostgreSQL audio installer SQL transaction helpers', () => {
   }, 60000);
   afterAll(async () => {
     await db.sentenceAudio.deleteMany({
-      where: { textHash: sentenceTextHash(`Original sentence ${prefix}.`) },
+      where: {
+        textHash: {
+          in: [
+            sentenceTextHash(`Original sentence ${prefix}.`),
+            sentenceTextHash(`Additional sentence ${prefix}.`),
+          ],
+        },
+      },
     });
     await db.contentPack.deleteMany({ where: { id: `${prefix}-sentences` } });
+    await db.contentPack.deleteMany({ where: { id: `${prefix}-sentence-delta` } });
     await db.contentPack.deleteMany({ where: { id: prefix } });
     await db.word.deleteMany({ where: { id: { in: ids } } });
     await db.$disconnect();
@@ -336,5 +344,59 @@ suite('PostgreSQL audio installer SQL transaction helpers', () => {
       ),
     ).rejects.toThrow('sentence_audio_text_binding_mismatch');
     expect(await db.sentenceAudio.count({ where: { textHash } })).toBe(2);
+  });
+  it('adds a v2 sentence delta while preserving every v1 row and timestamp, then replays without writes', async () => {
+    const oldHash = sentenceTextHash(`Original sentence ${prefix}.`),
+      text = `Additional sentence ${prefix}.`,
+      textHash = sentenceTextHash(text);
+    const oldRows = await db.sentenceAudio.findMany({
+      where: { textHash: oldHash },
+      orderBy: { accent: 'asc' },
+    });
+    const oldPack = await db.contentPack.findUniqueOrThrow({
+      where: { id: `${prefix}-sentences` },
+    });
+    const wordRows = await db.wordAudio.findMany({
+      where: { wordId: { in: ids } },
+      orderBy: { id: 'asc' },
+    });
+    const deltaSource = {
+      ...source,
+      id: `${prefix}-sentence-delta` as PackSource['id'],
+      lemmaCount: 1,
+      entryCount: 2,
+    };
+    const delta = {
+      ...manifest,
+      version: 'sentence-audio-v2' as const,
+      entries: entries.slice(0, 2).map((entry) => ({ ...entry, lemma: text, text, textHash })),
+      statistics: { ...manifest.statistics, lemmaCount: 1, entryCount: 2, synthesizedCount: 2 },
+    };
+    await expect(
+      importSentenceAudioSite({ ...site, id: 'wrong-realm' }, delta, deltaSource),
+    ).rejects.toThrow('audio_site_binding_mismatch');
+    expect(await db.sentenceAudio.count({ where: { textHash } })).toBe(0);
+    await importSentenceAudioSite(site, delta, deltaSource);
+    expect(
+      await db.sentenceAudio.findMany({ where: { textHash: oldHash }, orderBy: { accent: 'asc' } }),
+    ).toEqual(oldRows);
+    expect(await db.contentPack.findUniqueOrThrow({ where: { id: oldPack.id } })).toEqual(oldPack);
+    expect(
+      await db.wordAudio.findMany({ where: { wordId: { in: ids } }, orderBy: { id: 'asc' } }),
+    ).toEqual(wordRows);
+    const before = await db.sentenceAudio.findMany({
+      where: { textHash: { in: [oldHash, textHash] } },
+      orderBy: { id: 'asc' },
+    });
+    const pack = await db.contentPack.findUniqueOrThrow({ where: { id: deltaSource.id } });
+    expect(before).toHaveLength(4);
+    await importSentenceAudioSite(site, delta, deltaSource);
+    expect(
+      await db.sentenceAudio.findMany({
+        where: { textHash: { in: [oldHash, textHash] } },
+        orderBy: { id: 'asc' },
+      }),
+    ).toEqual(before);
+    expect(await db.contentPack.findUniqueOrThrow({ where: { id: deltaSource.id } })).toEqual(pack);
   });
 });

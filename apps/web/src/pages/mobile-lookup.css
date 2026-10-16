@@ -11,7 +11,7 @@
   line-height: 1.6;
 }
 @media (max-width: 660px) {
-  .lookup-page.has-mobile-detail > .page-heading,
+  .lookup-page > .page-heading,
   .lookup-page.has-mobile-detail > .tab-row,
   .lookup-page.has-mobile-detail > .search-bar {
     display: none;
@@ -42,5 +42,19 @@
   }
   .lookup-workspace .dictionary-results > button:not(.button) {
     padding: 15px 13px;
+  }
+  .lookup-page .word-link {
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+  }
+  .lookup-page .word-link strong {
+    overflow-wrap: anywhere;
+  }
+  .lookup-page .word-link span {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { LoaderCircle, Square, Volume2 } from 'lucide-react';
+import { LoaderCircle, RefreshCw, Square, Volume2 } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
 import { useLearningPreferences } from '../LearningPreferences';
 import { mountUrl } from '../lib/api';
@@ -15,18 +15,24 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
     screenActive = useScreenActive();
   const { preferences, loaded } = useLearningPreferences();
   const preferred = preferences.accent === 'uk' ? 'UK' : 'US';
+  const validAudio = (entry: WordAudio) =>
+    entry.status === 'ready' &&
+    ['US', 'UK'].includes(entry.accent) &&
+    entry.url === `/api/v2/pronunciation/${encodeURIComponent(word.id)}/audio/${entry.accent}`;
+  const embedded = (word.audio ?? []).filter(validAudio);
+  // Public word/detail/session DTOs already carry ready audio and typed IPA.
+  // Only incomplete DTOs need the separate pronunciation request.
+  const complete =
+    ['US', 'UK'].every((accent) => embedded.some((entry) => entry.accent === accent)) &&
+    !!word.phoneticUs?.trim() &&
+    !!word.phoneticUk?.trim();
   const pronunciation = useRemote<{ pronunciation: PronunciationInfo }>(
     'pronunciation',
     `pronunciation/${encodeURIComponent(word.id)}`,
-    !!word.id,
+    !!word.id && !complete,
   );
-  const info = pronunciation.data?.pronunciation;
-  const entries = (info?.audio ?? word.audio ?? []).filter(
-    (entry) =>
-      entry.status === 'ready' &&
-      ['US', 'UK'].includes(entry.accent) &&
-      entry.url === `/api/v2/pronunciation/${encodeURIComponent(word.id)}/audio/${entry.accent}`,
-  );
+  const info = complete ? undefined : pronunciation.data?.pronunciation;
+  const entries = info ? info.audio.filter(validAudio) : embedded;
   const player = usePackedAudio(`${scope}:${word.id}`);
   const [selection, setSelection] = useState('');
   const attempted = useRef('');
@@ -74,7 +80,17 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
           const entry = entries.find((value) => value.accent === accent),
             name = accent === 'US' ? '美式' : '英式';
           const active = player.playing && selection === accent;
-          const label = !entry ? `暂无${name}发音` : active ? `停止${name}发音` : `播放${name}发音`;
+          const pending = !entry && ((!info && !pronunciation.error) || !!pronunciation.isFetching);
+          const failed = !entry && !!pronunciation.error && !pending;
+          const label = active
+            ? `停止${name}发音`
+            : entry
+              ? `播放${name}发音`
+              : pending
+                ? `正在读取${name}发音`
+                : failed
+                  ? `重新读取${name}发音`
+                  : `暂无${name}发音`;
           const ipa =
             info?.phonetics?.find((value) => value.region === accent)?.ipa ||
             (accent === 'US' ? word.phoneticUs : word.phoneticUk);
@@ -84,22 +100,32 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
                 <button
                   type="button"
                   className="audio-button pronunciation-speaker"
-                  disabled={!entry}
+                  disabled={!entry && !failed}
                   aria-label={
                     active
                       ? `停止 ${word.lemma} ${name}发音`
                       : entry
                         ? `播放 ${word.lemma} ${name}发音`
-                        : `暂无 ${word.lemma} ${name}发音`
+                        : pending
+                          ? `正在读取 ${word.lemma} ${name}发音`
+                          : failed
+                            ? `重新读取 ${word.lemma} ${name}发音`
+                            : `暂无 ${word.lemma} ${name}发音`
                   }
                   title={label}
                   aria-pressed={active}
-                  onClick={() => play(accent)}
+                  aria-busy={pending || (active && player.phase === 'loading')}
+                  onClick={() => {
+                    if (entry) play(accent);
+                    else if (failed) void pronunciation.refetch();
+                  }}
                 >
-                  {active && player.phase === 'loading' ? (
+                  {(active && player.phase === 'loading') || pending ? (
                     <LoaderCircle size={16} className="spin" />
                   ) : active ? (
                     <Square size={14} />
+                  ) : failed ? (
+                    <RefreshCw size={16} />
                   ) : (
                     <Volume2 size={16} />
                   )}
@@ -109,11 +135,14 @@ export function AudioButton({ word, autoPlay = false }: { word: Word; autoPlay?:
                 </span>
               </span>
               <span className="pronunciation-region-label">{accent === 'US' ? '美' : '英'}</span>
-              <span className="pronunciation-ipa">{ipa || '暂无音标'}</span>
+              <span className="pronunciation-ipa">{ipa || (pending ? '读取中…' : '暂无音标')}</span>
             </div>
           );
         })}
       </div>
+      {pronunciation.error && !pronunciation.isFetching && entries.length === 0 && (
+        <small role="status">发音暂未读取，点按重试。</small>
+      )}
       {player.phase === 'error' && (
         <small className="rose-text" role="alert">
           发音未能播放，请检查网络后重试。

@@ -307,20 +307,15 @@
 .study-context-arrows button {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--study-line, var(--line));
   border-radius: 50%;
   background: transparent;
   color: var(--study-text, var(--ink));
 }
 .study-meaning-scroll {
-  max-height: min(34dvh, 310px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 7px;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--study-muted, #778e87) 40%, transparent) transparent;
+  min-width: 0;
 }
 .study-meaning-copy {
   animation: study-meaning-enter 160ms ease both;
@@ -348,6 +343,39 @@
 }
 .study-independent-english > div + div {
   margin-top: 15px;
+}
+.study-independent-english > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 13px;
+  color: var(--study-muted, var(--muted));
+  cursor: pointer;
+  list-style: none;
+}
+.study-independent-english > summary::-webkit-details-marker {
+  display: none;
+}
+.study-independent-english > summary > span {
+  margin-left: auto;
+  font-size: 11px;
+}
+.study-independent-english[open] > summary {
+  margin-bottom: 10px;
+}
+.study-independent-english[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.study-context-chevron {
+  flex-shrink: 0;
+}
+.study-context-card[open] .study-context-chevron {
+  transform: rotate(180deg);
+}
+.study-learning-word .word-content-study .word-title-long {
+  font-size: clamp(30px, 7.4vw, 48px);
+  line-height: 1.2;
 }
 .study-context-card {
   border-radius: 18px;
@@ -748,9 +776,6 @@
     padding-left: 46px;
     padding-right: 46px;
   }
-  .study-meaning-scroll {
-    max-height: 32dvh;
-  }
 }
 @media (max-width: 420px) {
   .study-focus-header {
@@ -783,6 +808,24 @@
   }
   .study-focus-scroll {
     padding-top: 17px;
+  }
+  .word-content-study .word-title-row {
+    margin-block: 14px 18px;
+  }
+  .study-word-details {
+    gap: 14px;
+  }
+  .study-context-card > summary {
+    padding: 13px 14px;
+  }
+  .study-context-body {
+    padding: 0 14px 14px;
+  }
+  .word-content-study .study-word-details .meaning-zh {
+    font-size: calc(20px * var(--learning-scale, 1)) !important;
+  }
+  .word-content-study .study-context-sentence .example-en {
+    font-size: calc(20px * var(--learning-scale, 1)) !important;
   }
   .study-thumb-dock {
     padding-top: 10px;

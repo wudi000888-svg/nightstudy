@@ -22,3 +22,6 @@ data/exam-books.review-queue.json
 data/recorded-audio.manifest.json
 data/word-audio-v2.manifest.json
 data/sentence-audio.manifest.json
+data/bilingual-v2.manifest.json
+data/bilingual-v2.sources.manifest.json
+data/sentence-audio-v2.manifest.json

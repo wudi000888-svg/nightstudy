@@ -5,6 +5,18 @@ import { Client } from 'pg';
 import { z } from 'zod';
 import type { SiteConfig } from '../apps/api/src/config.js';
 import { normalizeContentLemma } from './content-lib.js';
+import {
+  applyExampleTranslationCorrections,
+  applyLexicalCorrections,
+  automaticBookSql,
+  authoredEnglishExampleSchema,
+  authoredExampleTranslationSchema,
+  defaultBookWithdrawalSchema,
+  exampleTranslationCorrectionSchema,
+  lexicalCorrectionSchema,
+  repairHeldDefaultFocus,
+  withdrawDefaultBookEntry,
+} from './lexical-polish-lib.js';
 
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
@@ -21,6 +33,8 @@ const rowSchema = z
             definitionEn: z.string().trim().min(1).max(4000).optional(),
             exampleZh: z.string().trim().min(1).max(4000).optional(),
             exampleEn: z.string().trim().min(1).max(4000).optional(),
+            pos: z.string().trim().min(1).max(100).optional(),
+            sourceDefinitionZhSha256: digest.optional(),
             contentMetadata: metadataSchema,
           })
           .strict(),
@@ -32,11 +46,25 @@ const rowSchema = z
           .object({
             exampleEn: z.string().trim().min(1).max(4000),
             exampleZh: z.string().trim().min(1).max(4000),
+            // Curated pronoun slots/inflections have explicit, reviewed surface
+            // identity. The compiler reviews these; no loose runtime stemmer.
+            targetSurface: z
+              .object({
+                lemma: z.string().min(1).max(500),
+                form: z.string().min(1).max(500),
+                kind: z.enum(['inflected-form', 'pronoun-slot', 'object-insertion']),
+                review: z.literal('codex-reviewed'),
+              })
+              .strict()
+              .optional(),
             contentMetadata: metadataSchema,
           })
           .strict(),
       )
       .max(10),
+    corrections: z.array(lexicalCorrectionSchema).max(10).optional(),
+    exampleCorrections: z.array(exampleTranslationCorrectionSchema).max(20).optional(),
+    defaultBookWithdrawal: defaultBookWithdrawalSchema.optional(),
     warnings: z
       .array(
         z
@@ -65,10 +93,14 @@ export interface BilingualManifest {
   license: string;
   wordCount: number;
   scope: string;
+  publishable?: boolean;
 }
-export function loadBilingualManifest(): BilingualManifest {
+export function loadBilingualManifest(
+  filename:
+    'bilingual-pack.manifest.json' | 'bilingual-v2.manifest.json' = 'bilingual-pack.manifest.json',
+): BilingualManifest {
   const value = JSON.parse(
-    fs.readFileSync(new URL('../data/bilingual-pack.manifest.json', import.meta.url), 'utf8'),
+    fs.readFileSync(new URL('../data/' + filename, import.meta.url), 'utf8'),
   ) as BilingualManifest;
   if (
     value.formatVersion !== 1 ||
@@ -80,6 +112,11 @@ export function loadBilingualManifest(): BilingualManifest {
     value.wordCount < 1
   )
     throw new Error('invalid_bilingual_manifest');
+  if (
+    filename === 'bilingual-v2.manifest.json' &&
+    (value.id !== 'bilingual-v2' || value.publishable !== true)
+  )
+    throw new Error('bilingual_authoring_not_complete');
   return value;
 }
 export function readBilingualRows(bytes: Buffer, manifest: BilingualManifest): BilingualRow[] {
@@ -94,6 +131,7 @@ export function readBilingualRows(bytes: Buffer, manifest: BilingualManifest): B
     .map((line) => rowSchema.parse(JSON.parse(line)));
   if (rows.length !== manifest.wordCount) throw new Error('bilingual_word_count_mismatch');
   const lemmas = new Set<string>();
+  const correctedExampleIds = new Set<string>();
   for (const row of rows) {
     if (
       normalizeContentLemma(row.normalizedLemma) !== row.normalizedLemma ||
@@ -101,6 +139,28 @@ export function readBilingualRows(bytes: Buffer, manifest: BilingualManifest): B
     )
       throw new Error('bilingual_duplicate_or_unnormalized_word');
     lemmas.add(row.normalizedLemma);
+    if (
+      row.defaultBookWithdrawal &&
+      (row.senses.length ||
+        row.examples.length ||
+        row.corrections?.length ||
+        row.exampleCorrections?.length)
+    )
+      throw new Error('bilingual_withdrawal_must_preserve_source');
+    for (const correction of row.exampleCorrections ?? []) {
+      if (correctedExampleIds.has(correction.id))
+        throw new Error('bilingual_duplicate_example_correction');
+      correctedExampleIds.add(correction.id);
+    }
+    for (const sense of row.senses) {
+      if (Boolean(sense.pos) !== Boolean(sense.sourceDefinitionZhSha256))
+        throw new Error('bilingual_missing_pos_source_identity');
+      if (
+        sense.pos &&
+        (!sense.contentMetadata.pos || typeof sense.contentMetadata.pos !== 'object')
+      )
+        throw new Error('bilingual_missing_pos_provenance');
+    }
     for (const sense of row.senses)
       for (const field of ['definitionZh', 'definitionEn', 'exampleZh', 'exampleEn'] as const)
         if (sense[field]) {
@@ -113,14 +173,51 @@ export function readBilingualRows(bytes: Buffer, manifest: BilingualManifest): B
           )
             throw new Error('bilingual_missing_translation_identity');
         }
+    for (const correction of row.corrections ?? []) {
+      if (row.senses.some((sense) => sense.id === correction.replacesSenseId))
+        throw new Error('bilingual_correction_anchor_also_patched');
+      for (const field of ['definitionZh', 'definitionEn'] as const) {
+        const metadata = correction.contentMetadata[field] as Record<string, unknown> | undefined;
+        if (
+          !metadata ||
+          metadata.kind !== 'original-authoring' ||
+          metadata.license !== 'MIT' ||
+          metadata.author !== 'NightStudy contributors' ||
+          metadata.review !== 'pending'
+        )
+          throw new Error('bilingual_correction_missing_authorship');
+      }
+    }
     for (const example of row.examples) {
-      const escaped = row.normalizedLemma.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const surface = example.targetSurface;
+      if (
+        surface &&
+        (surface.lemma !== row.normalizedLemma || surface.form === row.normalizedLemma)
+      )
+        throw new Error('bilingual_invalid_example_surface_identity');
+      const escaped = (surface?.form ?? row.normalizedLemma).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       if (
         !new RegExp(`(?<![\\p{L}\\p{M}])${escaped}(?![\\p{L}\\p{M}])`, 'iu').test(example.exampleEn)
       )
         throw new Error('bilingual_example_missing_exact_word');
-      if (!example.contentMetadata.exampleEn || !example.contentMetadata.exampleZh)
-        throw new Error('bilingual_example_missing_provenance');
+      for (const field of ['exampleEn', 'exampleZh'] as const) {
+        const metadata = example.contentMetadata[field];
+        if (
+          !metadata ||
+          typeof metadata !== 'object' ||
+          Array.isArray(metadata) ||
+          typeof (metadata as Record<string, unknown>).kind !== 'string' ||
+          !String((metadata as Record<string, unknown>).kind).trim()
+        )
+          throw new Error('bilingual_example_missing_provenance');
+        if ((metadata as Record<string, unknown>).kind === 'original-authoring') {
+          const schema =
+            field === 'exampleEn' ? authoredEnglishExampleSchema : authoredExampleTranslationSchema;
+          const parsed = schema.safeParse(metadata);
+          if (!parsed.success || parsed.data.sourceTextSha256 !== hash(example.exampleEn))
+            throw new Error('bilingual_example_authorship_source_mismatch');
+        }
+      }
     }
   }
   return rows;
@@ -130,7 +227,9 @@ export async function importBilingualRows(
   site: Pick<SiteConfig, 'id' | 'databaseUrl'>,
   rows: BilingualRow[],
   manifest: BilingualManifest,
+  options: { strict?: boolean } = {},
 ) {
+  const strict = options.strict ?? manifest.id === 'bilingual-v2';
   const client = new Client({ connectionString: site.databaseUrl, connectionTimeoutMillis: 10000 });
   await client.connect();
   const result = {
@@ -140,7 +239,12 @@ export async function importBilingualRows(
     matchedWords: 0,
     translatedFields: 0,
     examples: 0,
+    exampleTranslations: 0,
     conflicts: 0,
+    posFields: 0,
+    correctedSenses: 0,
+    focusItems: 0,
+    withdrawnBookItems: 0,
   };
   try {
     await client.query('BEGIN');
@@ -153,12 +257,15 @@ export async function importBilingualRows(
     );
     if (state.rows[0]?.siteId !== site.id)
       throw new Error('bilingual_database_site_binding_mismatch');
-    const previous = await client.query(`SELECT status,sha256 FROM "ContentPack" WHERE id=$1`, [
-      manifest.id,
-    ]);
+    const previous = await client.query(
+      `SELECT status,sha256,"tagCounts" FROM "ContentPack" WHERE id=$1`,
+      [manifest.id],
+    );
     if (previous.rows.length) {
       if (previous.rows[0].status !== 'ready' || previous.rows[0].sha256 !== manifest.sha256)
         throw new Error('bilingual_conflicting_installed_pack');
+      if (strict && Number(previous.rows[0].tagCounts?.conflicts ?? 0) > 0)
+        throw new Error('bilingual_installed_pack_has_conflicts');
       result.alreadyInstalled = true;
       await client.query('COMMIT');
       return result;
@@ -248,7 +355,9 @@ export async function importBilingualRows(
           "contentMetadata"=s."contentMetadata" || jsonb_build_object($2::text,x.metadata) || jsonb_build_object('packId',$3::text)
           FROM jsonb_to_recordset($1::jsonb) AS x(id text,"wordId" text,value text,metadata jsonb)
           WHERE s.id=x.id AND s."wordId"=x."wordId" AND s."${field}"=''
-            AND encode(sha256(convert_to(s."${sourceField}",'UTF8')),'hex')=x.metadata->>'sourceTextSha256'`,
+            AND encode(sha256(convert_to(s."${sourceField}",'UTF8')),'hex')=x.metadata->>'sourceTextSha256'
+            AND COALESCE(s."contentMetadata"->$2::text->>'kind','')<>'site-authored'
+            AND COALESCE(s."contentMetadata"->$4::text->>'kind','')<>'site-authored'`,
           [
             JSON.stringify(
               selected.map((sense) => ({
@@ -260,11 +369,78 @@ export async function importBilingualRows(
             ),
             field,
             manifest.id,
+            sourceField,
           ],
         );
         result.translatedFields += updated.rowCount ?? 0;
         result.conflicts += selected.length - (updated.rowCount ?? 0);
       }
+      const positions = patches.filter((sense) => sense.pos);
+      if (positions.length) {
+        const updated = await client.query(
+          `UPDATE "Sense" s SET pos=x.pos,"contentMetadata"=s."contentMetadata" ||
+             jsonb_build_object('pos',x.metadata,'packId',$2::text)
+           FROM jsonb_to_recordset($1::jsonb) x(id text,"wordId" text,pos text,sha text,metadata jsonb)
+           WHERE s.id=x.id AND s."wordId"=x."wordId" AND s.pos=''
+             AND encode(sha256(convert_to(s."definitionZh",'UTF8')),'hex')=x.sha
+             AND COALESCE(s."contentMetadata"->'definitionZh'->>'kind','')<>'site-authored'
+             AND COALESCE(s."contentMetadata"->'definitionEn'->>'kind','')<>'site-authored'
+             AND COALESCE(s."contentMetadata"->'pos'->>'kind','')<>'site-authored'`,
+          [
+            JSON.stringify(
+              positions.map((sense) => ({
+                id: sense.id,
+                wordId: sense.wordId,
+                pos: sense.pos,
+                sha: sense.sourceDefinitionZhSha256,
+                metadata: sense.contentMetadata.pos,
+              })),
+            ),
+            manifest.id,
+          ],
+        );
+        result.posFields += updated.rowCount ?? 0;
+        result.conflicts += positions.length - (updated.rowCount ?? 0);
+      }
+      const edits = await applyLexicalCorrections(
+        client,
+        batch.flatMap((row) =>
+          byLemma.has(row.normalizedLemma)
+            ? (row.corrections ?? []).map((item) => ({
+                ...item,
+                wordId: byLemma.get(row.normalizedLemma)!,
+              }))
+            : [],
+        ),
+        manifest.id,
+      );
+      result.correctedSenses += edits.correctedSenses;
+      result.conflicts += edits.conflicts;
+      result.focusItems += edits.focusItems;
+      const exampleEdits = await applyExampleTranslationCorrections(
+        client,
+        batch.flatMap((row) =>
+          byLemma.has(row.normalizedLemma)
+            ? (row.exampleCorrections ?? []).map((item) => ({
+                ...item,
+                wordId: byLemma.get(row.normalizedLemma)!,
+              }))
+            : [],
+        ),
+        manifest.id,
+      );
+      result.exampleTranslations += exampleEdits.exampleTranslations;
+      result.conflicts += exampleEdits.conflicts;
+      for (const row of batch)
+        if (row.defaultBookWithdrawal && byLemma.has(row.normalizedLemma)) {
+          const withdrawn = await withdrawDefaultBookEntry(
+            client,
+            byLemma.get(row.normalizedLemma)!,
+            row.defaultBookWithdrawal,
+          );
+          result.withdrawnBookItems += withdrawn.withdrawnBookItems;
+          result.conflicts += withdrawn.conflicts;
+        }
       const examples = batch
         .flatMap((row) =>
           row.examples.map((example, ordinal) => ({
@@ -272,7 +448,11 @@ export async function importBilingualRows(
             wordId: byLemma.get(row.normalizedLemma),
             ...example,
             ordinal,
-            contentMetadata: { ...example.contentMetadata, packId: manifest.id },
+            contentMetadata: {
+              ...example.contentMetadata,
+              packId: manifest.id,
+              ...(example.targetSurface ? { targetSurface: example.targetSurface } : {}),
+            },
           })),
         )
         .filter((example) => example.wordId);
@@ -285,10 +465,17 @@ export async function importBilingualRows(
           [JSON.stringify(examples)],
         );
         result.examples += inserted.rowCount ?? 0;
+        if (strict && inserted.rowCount !== examples.length)
+          throw new Error('bilingual_example_identity_conflict');
       }
+      if (manifest.id === 'bilingual-v2')
+        result.focusItems += await repairHeldDefaultFocus(client, [...byLemma.values()]);
     }
     if (result.matchedWords !== rows.length)
       throw new Error('bilingual_pack_words_missing_from_site');
+    // A strict package is one atomic content change. Never seal a partial,
+    // conflicted installation as ready and make its next attempt a no-op.
+    if (strict && result.conflicts > 0) throw new Error('bilingual_strict_source_conflict');
     const coverage = await client.query<{
       zh: number;
       en: number;
@@ -318,7 +505,7 @@ export async function importBilingualRows(
        FROM "BookItem" bi JOIN "Book" b ON b.id=bi."bookId"
        JOIN "Word" w ON w.id=bi."wordId" AND w.status='published'
        LEFT JOIN "Sense" s ON s.id=bi."focusSenseId" AND s."wordId"=bi."wordId"
-       WHERE b."ownerId" IS NULL AND b.status='published' AND b.version LIKE 'ecdict-%'
+       WHERE ${automaticBookSql} AND b.status='published'
          AND w."normalizedLemma"=ANY($1::text[])`,
       [rows.map((row) => row.normalizedLemma)],
     );
@@ -339,7 +526,12 @@ export async function importBilingualRows(
           scope: manifest.scope,
           translatedFields: result.translatedFields,
           examples: result.examples,
+          exampleTranslations: result.exampleTranslations,
           conflicts: result.conflicts,
+          posFields: result.posFields,
+          correctedSenses: result.correctedSenses,
+          focusItems: result.focusItems,
+          withdrawnBookItems: result.withdrawnBookItems,
           review: 'pending',
           pairedDefinitionWords: coverage.rows[0]!.paired,
           primaryPairedDefinitionWords: coverage.rows[0]!.primaryPairedWords,

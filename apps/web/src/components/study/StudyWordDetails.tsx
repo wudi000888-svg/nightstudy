@@ -1,10 +1,11 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, MessageCircle } from 'lucide-react';
 import type { Sense, Word } from '../../lib/types';
 import { dictionaryText } from '../../lib/dictionary';
 import { InteractiveEnglish } from '../InteractiveEnglish';
 import { SentenceSaveButton } from '../SentenceSaveButton';
 import { SentenceAudioButton } from '../SentenceAudio';
+import { BilingualDefinition } from '../BilingualDefinition';
 
 export interface StudyExample {
   id: string;
@@ -62,16 +63,17 @@ function ExampleContext({
   const bodyId = useId();
   if (!example) return null;
   return (
-    <details className="study-context-card">
+    <details className="study-context-card" open>
       <summary>
         <span className="study-section-label">
           <MessageCircle size={16} /> 语境 <span>{examples.length} 条例句</span>
+          <ChevronDown size={15} className="study-context-chevron" aria-hidden="true" />
         </span>
         <span className="study-context-preview" lang={example.english ? 'en' : 'zh-CN'}>
           {example.english || example.chinese}
         </span>
         <span className="study-context-open">
-          展开读一读 <ChevronDown size={15} />
+          展开例句 <ChevronDown size={15} />
         </span>
       </summary>
       <div className="study-context-body" id={bodyId}>
@@ -142,7 +144,6 @@ export function StudyWordDetails({
   interactive: boolean;
 }) {
   const [index, setIndex] = useState(0);
-  const scroller = useRef<HTMLDivElement>(null);
   const meaningId = useId();
   const activeIndex = Math.max(0, Math.min(index, senses.length - 1));
   const sense = senses[activeIndex];
@@ -150,7 +151,6 @@ export function StudyWordDetails({
   const collocations = (word.collocations ?? []).filter((entry) => dictionaryText(entry.lemma));
   function select(next: number) {
     setIndex(next);
-    scroller.current?.scrollTo({ top: 0, behavior: 'instant' });
   }
   return (
     <div className="study-word-details">
@@ -184,43 +184,13 @@ export function StudyWordDetails({
               </div>
             )}
           </div>
-          <div
-            ref={scroller}
-            className="study-meaning-scroll"
-            id={meaningId}
-            tabIndex={0}
-            aria-label="完整释义，可上下滚动"
-          >
+          <div className="study-meaning-scroll" id={meaningId}>
             <div className="study-meaning-copy" key={sense.id}>
-              {dictionaryText(sense.definitionZh) && (
-                <p className="meaning-zh" lang="zh-CN">
-                  {dictionaryText(sense.definitionZh)}
-                </p>
-              )}
-              {dictionaryText(sense.definitionEn) && (
-                <p className="meaning-en" lang="en">
-                  <InteractiveEnglish
-                    text={dictionaryText(sense.definitionEn)}
-                    enabled={interactive}
-                  />
-                </p>
-              )}
-              {activeIndex === 0 && englishSenses.length > 0 && (
-                <section className="study-independent-english" aria-label="这个词的独立英文解释">
-                  <h3>英文解释</h3>
-                  {englishSenses.map((entry) => (
-                    <div key={entry.id}>
-                      {entry.pos && <span className="sense-pos">{entry.pos}</span>}
-                      <p className="meaning-en" lang="en">
-                        <InteractiveEnglish
-                          text={dictionaryText(entry.definitionEn)}
-                          enabled={interactive}
-                        />
-                      </p>
-                    </div>
-                  ))}
-                </section>
-              )}
+              <BilingualDefinition
+                chinese={sense.definitionZh}
+                english={sense.definitionEn}
+                interactive={interactive}
+              />
             </div>
           </div>
         </section>
@@ -234,6 +204,20 @@ export function StudyWordDetails({
           examples={examples}
           interactive={interactive}
         />
+      )}
+      {englishSenses.length > 0 && (
+        <details className="study-independent-english" aria-label="这个词的独立英文解释">
+          <summary>
+            更多英文释义 <span>{englishSenses.length} 义</span>
+            <ChevronDown size={16} aria-hidden="true" />
+          </summary>
+          {englishSenses.map((entry) => (
+            <div key={entry.id}>
+              {entry.pos && <span className="sense-pos">{entry.pos}</span>}
+              <BilingualDefinition english={entry.definitionEn} interactive={interactive} />
+            </div>
+          ))}
+        </details>
       )}
       {collocations.length > 0 && (
         <details className="study-collocations">

@@ -4,6 +4,14 @@ import crypto from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { parseArgs, isDeepStrictEqual } from 'node:util';
 import assert from 'node:assert/strict';
+import {
+  readPolishedContent,
+  verifyPolishedContent,
+  verifyHistoricalTargets,
+  polishSelfTest,
+  learningSense,
+  PolishVerificationError,
+} from './check-lexical-polish.mjs';
 
 const fields = ['definitionZh', 'definitionEn', 'exampleZh', 'exampleEn'];
 const exceptions = new Set([
@@ -82,6 +90,9 @@ function snapshot(data) {
       books: data.books.length,
     },
     identity: identity(data),
+    sourceBindings: sorted(data.words.flatMap((word) => word.senses)).map(
+      ({ id, wordId, pos, ordinal }) => ({ id, wordId, pos, ordinal }),
+    ),
     sourceSenses: sorted(data.words.flatMap((word) => word.senses)).map((sense) => ({
       id: sense.id,
       wordId: sense.wordId,
@@ -147,6 +158,77 @@ function verifyBaseline(data, baseline) {
         .map((sense) => sense.wordId),
     ).size,
     identityPreserved: true,
+  };
+}
+function verifyPolishedBaseline(data, baseline, bundle) {
+  requireCheck(
+    baseline?.formatVersion === 1 &&
+      Array.isArray(baseline.sourceSenses) &&
+      Array.isArray(baseline.sourceBindings),
+    'invalid_polish_source_baseline',
+  );
+  requireCheck(
+    baseline.siteId === data.siteId && baseline.instanceId === data.instanceId,
+    'bilingual_baseline_realm_mismatch',
+  );
+  const wordIds = new Set(baseline.sourceSenses.map((sense) => sense.wordId));
+  const originalScope = {
+    ...data,
+    words: data.words.filter((word) => wordIds.has(word.id)),
+    books: data.books.filter((book) => book.version.startsWith('ecdict-')),
+  };
+  const now = identity(originalScope);
+  requireCheck(
+    now.words === baseline.identity.words && now.books === baseline.identity.books,
+    'polish_original_word_or_book_identity_changed',
+  );
+  const senses = new Map(
+    data.words.flatMap((word) => word.senses).map((sense) => [sense.id, sense]),
+  );
+  const posPatches = new Map(
+    bundle.rows
+      .flatMap((row) => row.senses)
+      .filter((patch) => patch.pos)
+      .map((patch) => [patch.id, patch]),
+  );
+  for (const old of baseline.sourceBindings) {
+    const sense = senses.get(old.id),
+      patch = posPatches.get(old.id);
+    requireCheck(
+      sense?.wordId === old.wordId &&
+        sense.ordinal === old.ordinal &&
+        sense.pos === (old.pos || patch?.pos || ''),
+      'polish_original_sense_binding_changed',
+    );
+  }
+  let preserved = 0,
+    filled = 0;
+  for (const old of baseline.sourceSenses) {
+    const sense = senses.get(old.id);
+    requireCheck(sense?.wordId === old.wordId, 'polish_original_sense_missing');
+    for (const field of fields) {
+      if (old.fields[field]) {
+        requireCheck(
+          sha(sense[field]) === old.fields[field],
+          'polish_original_source_text_changed',
+        );
+        preserved++;
+      } else if (present(sense[field])) {
+        const other = field.slice(0, -2) + (field.endsWith('En') ? 'Zh' : 'En');
+        requireCheck(
+          old.fields[other] &&
+            object(object(sense.contentMetadata)[field]).sourceTextSha256 === old.fields[other],
+          'polish_filled_field_source_hash',
+        );
+        filled++;
+      }
+    }
+  }
+  return {
+    originalFieldsPreserved: preserved,
+    filledFieldsChecked: filled,
+    originalSenseBindings: baseline.sourceBindings.length,
+    originalWordIdentities: wordIds.size,
   };
 }
 function verifyBilingual(data, bundle, limits = expected) {
@@ -509,9 +591,12 @@ async function verifyAudio(db, data, verifiedAudioBytes) {
     sampleFiles: media.length,
   };
 }
-async function verifyPrebuiltAdditions(db, verifiedAudioBytes) {
+async function verifyPrebuiltAdditions(db, verifiedAudioBytes, polishedCatalog) {
   const summary = {};
-  for (const filename of ['word-audio-v2.manifest.json', 'sentence-audio.manifest.json']) {
+  const pins = ['word-audio-v2.manifest.json', 'sentence-audio.manifest.json'];
+  if (polishedCatalog) pins.push('sentence-audio-v2.manifest.json');
+  const sentenceIdentities = new Set();
+  for (const filename of pins) {
     const file = new URL('../data/' + filename, import.meta.url);
     requireCheck(fs.existsSync(file), 'prebuilt_audio_manifest_missing', { filename });
     const pin = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -561,17 +646,48 @@ async function verifyPrebuiltAdditions(db, verifiedAudioBytes) {
       requireCheck(samples.length > 0, 'recorded_audio_overlay_missing');
       for (const entry of samples) await verifiedAudioBytes(entry);
     }
-    if (pin.id === 'sentence-audio-v1') {
-      const count = await db.sentenceAudio.count({ where: { status: 'ready' } });
-      requireCheck(count === pin.entryCount, 'sentence_audio_coverage_incomplete', {
-        count,
-        expected: pin.entryCount,
+    if (pin.id.startsWith('sentence-audio-')) {
+      const manifestFile = path.join(
+        process.env.AUDIO_CACHE_DIR || '.local/audio',
+        pin.id + '.manifest.json',
+      );
+      const manifestBytes = fs.readFileSync(manifestFile);
+      requireCheck(
+        sha(manifestBytes) === pin.manifestSha256,
+        'sentence_audio_manifest_hash_mismatch',
+      );
+      const entries = JSON.parse(manifestBytes).entries;
+      requireCheck(entries.length === pin.entryCount, 'sentence_audio_pinned_entry_count');
+      const installed = await db.sentenceAudio.findMany({
+        where: { textHash: { in: [...new Set(entries.map((entry) => entry.textHash))] } },
       });
-      const samples = await db.sentenceAudio.findMany({
-        where: { status: 'ready' },
-        take: 8,
-        orderBy: { id: 'asc' },
-      });
+      const actualByIdentity = new Map(
+        installed.map((entry) => [entry.textHash + '\0' + entry.accent, entry]),
+      );
+      for (const expectedEntry of entries) {
+        const identity = expectedEntry.textHash + '\0' + expectedEntry.accent;
+        requireCheck(!sentenceIdentities.has(identity), 'sentence_audio_packs_overlap');
+        sentenceIdentities.add(identity);
+        const entry = actualByIdentity.get(identity);
+        requireCheck(
+          entry?.status === 'ready' &&
+            [
+              'text',
+              'textHash',
+              'accent',
+              'kind',
+              'sourceName',
+              'sourceUrl',
+              'license',
+              'attribution',
+              'fileKey',
+              'fileSha256',
+              'mimeType',
+            ].every((field) => entry[field] === expectedEntry[field]),
+          'sentence_audio_target_or_attribution_changed',
+        );
+      }
+      const samples = entries.slice(0, 8);
       const normalize = (value) =>
         value
           .normalize('NFKC')
@@ -593,6 +709,11 @@ async function verifyPrebuiltAdditions(db, verifiedAudioBytes) {
       synthesized: pin.synthesizedCount,
     };
   }
+  const sentenceCount = await db.sentenceAudio.count({ where: { status: 'ready' } });
+  requireCheck(sentenceCount === sentenceIdentities.size, 'sentence_audio_coverage_incomplete', {
+    count: sentenceCount,
+    expected: sentenceIdentities.size,
+  });
   const exam = JSON.parse(
     fs.readFileSync(new URL('../data/exam-books.manifest.json', import.meta.url), 'utf8'),
   );
@@ -604,7 +725,9 @@ async function verifyPrebuiltAdditions(db, verifiedAudioBytes) {
   for (const book of books)
     requireCheck(
       book._count.items ===
-        exam.books.find((entry) => book.id === `content-${exam.id}-${entry.id}`)?.wordCount,
+        (polishedCatalog
+          ? polishedCatalog.books.find((entry) => entry.id === book.id)?.wordCount
+          : exam.books.find((entry) => book.id === `content-${exam.id}-${entry.id}`)?.wordCount),
       'exam_book_count_mismatch',
       {
         id: book.id,
@@ -1174,9 +1297,78 @@ function selfTest() {
     () => verifyPhrases(scopeWarning.data, scopeWarning.bundle, phraseLimits),
     (error) => error.code === 'phrase_quality_exclusion_not_applied',
   );
-  console.log(
-    JSON.stringify({ action: 'install.verify.self-test', passed: 31, databaseUsed: false }),
+  const polishSource = fixture();
+  polishSource.data.books[0].version = 'ecdict-synthetic';
+  const polishBaseline = snapshot(polishSource.data);
+  assert.equal(
+    verifyPolishedBaseline(polishSource.data, polishBaseline, polishSource.bundle)
+      .originalSenseBindings,
+    1,
   );
+  for (const [mutate, code] of [
+    [
+      (data) => {
+        data.words[0].senses[0].ordinal = 4;
+      },
+      'polish_original_sense_binding_changed',
+    ],
+    [
+      (data) => {
+        data.words[0].senses[0].definitionZh = '源文被改';
+      },
+      'polish_original_source_text_changed',
+    ],
+    [
+      (data) => {
+        data.words[0].id = 'replacement';
+      },
+      'polish_original_word_or_book_identity_changed',
+    ],
+  ]) {
+    const copied = structuredClone(polishSource.data);
+    mutate(copied);
+    assert.throws(
+      () => verifyPolishedBaseline(copied, polishBaseline, polishSource.bundle),
+      (error) => error.code === code,
+    );
+  }
+  console.log(
+    JSON.stringify({
+      action: 'install.verify.self-test',
+      passed: 35 + polishSelfTest(),
+      databaseUsed: false,
+    }),
+  );
+}
+async function verifyPolishedSentences(db, data, bundle, verifiedAudioBytes) {
+  const withdrawn = new Set(
+    bundle.rows.filter((row) => row.defaultBookWithdrawal).map((row) => row.normalizedLemma),
+  );
+  const normalize = (value) =>
+    value.normalize('NFKC').replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
+  const texts = new Map(
+    data.words
+      .filter((word) => !withdrawn.has(word.normalizedLemma))
+      .flatMap((word) => [...word.senses.filter(learningSense), ...word.examples])
+      .filter((entry) => paired(entry, 'example'))
+      .map((entry) => [sha(normalize(entry.exampleEn)), entry.exampleEn]),
+  );
+  const entries = await db.sentenceAudio.findMany({
+    where: { textHash: { in: [...texts.keys()] }, status: 'ready' },
+  });
+  const identities = new Set(entries.map((entry) => entry.textHash + '\0' + entry.accent));
+  for (const [hash] of texts)
+    for (const accent of ['US', 'UK'])
+      requireCheck(identities.has(hash + '\0' + accent), 'polish_sentence_dual_accent_missing', {
+        textHash: hash,
+        accent,
+      });
+  for (const entry of entries.slice(0, 12)) await verifiedAudioBytes(entry);
+  return {
+    uniqueBilingualSentences: texts.size,
+    dualAccentSentenceEntries: entries.length,
+    sampleFiles: Math.min(12, entries.length),
+  };
 }
 async function main() {
   const { values } = parseArgs({
@@ -1200,6 +1392,63 @@ async function main() {
   ]);
   const sites = readConfig().sites,
     snapshots = { formatVersion: 1, sites: {} };
+  if (
+    !values.snapshot &&
+    fs.existsSync(new URL('../data/bilingual-v2.manifest.json', import.meta.url))
+  ) {
+    const polish = readPinnedBundle('bilingual-v2.manifest.json', 18775);
+    let sourceBaseline;
+    if (values['bilingual-baseline']) {
+      const file = path.resolve(values['bilingual-baseline']);
+      requireCheck(fs.statSync(file).size <= 32 * 1024 * 1024, 'bilingual_baseline_too_large');
+      sourceBaseline = JSON.parse(fs.readFileSync(file, 'utf8'));
+    }
+    const historical = [readBundle(), readPinnedBundle('phrase-books.manifest.json', 437)];
+    for (const site of sites) {
+      const db = createDatabase(site.databaseUrl);
+      try {
+        const state = await db.siteState.findUniqueOrThrow({ where: { id: 'singleton' } });
+        requireCheck(state.siteId === site.id, 'verification_database_realm_mismatch');
+        const data = {
+            siteId: site.id,
+            instanceId: state.instanceId,
+            ...(await readPolishedContent(db, polish)),
+          },
+          content = verifyPolishedContent(data, polish);
+        const original = sourceBaseline
+          ? verifyPolishedBaseline(data, sourceBaseline.sites?.[site.id], polish)
+          : null;
+        const originalTargets = historical.map((bundle) => ({
+          id: bundle.manifest.id,
+          ...verifyHistoricalTargets(data.words, bundle, polish),
+        }));
+        const prebuiltAudio = await verifyPrebuiltAdditions(
+          db,
+          verifiedAudioBytes,
+          polish.manifest.catalog,
+        );
+        const sentences = await verifyPolishedSentences(db, data, polish, verifiedAudioBytes);
+        console.log(
+          JSON.stringify({
+            action: 'install.verify',
+            verified: true,
+            siteId: site.id,
+            mode: 'complete-built-in-learning-content',
+            content,
+            original,
+            originalTargets,
+            prebuiltAudio,
+            sentences,
+            scope:
+              'Pristine pinned built-in catalog; independently authored fields and exact source attribution checked. Learner and administrator edits are never repaired by verification.',
+          }),
+        );
+      } finally {
+        await db.$disconnect();
+      }
+    }
+    return;
+  }
   let baseline;
   if (values['bilingual-baseline']) {
     const file = path.resolve(values['bilingual-baseline']);
@@ -1264,13 +1513,13 @@ async function main() {
   }
 }
 main().catch((error) => {
+  const verificationError =
+    error instanceof VerificationError || error instanceof PolishVerificationError;
   console.error(
     JSON.stringify({
       action: 'install.verify.failed',
-      code: error instanceof VerificationError ? error.code : 'verification_runtime_failed',
-      ...(error instanceof VerificationError
-        ? { details: error.details }
-        : { errorType: error.name }),
+      code: verificationError ? error.code : 'verification_runtime_failed',
+      ...(verificationError ? { details: error.details } : { errorType: error.name }),
     }),
   );
   process.exitCode = 1;

@@ -13,7 +13,9 @@
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**当前版本：[`0.9.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.9.0-alpha.1)。** 扩展考试词书、单词与句子成品朗读、原创雨夜动态和管理员自定义壁纸。继续使用单屏H5首页、模块独立页面栈、真实签到和Learn / Review，支持主屏幕安装与用户确认的安全更新。详见 [本轮交付](docs/CONTENT_AUDIO_PERFORMANCE_09.md)、[开放内容与代码复用](docs/OPEN_CONTENT_REUSE.md) 和 [雨夜外观](docs/RAIN_NIGHT_UI.md)。
+**当前源码：`0.10.0-alpha.1`。** 补齐18本内置词书的成对释义、词性和双语例句，扩充静态英美句音，精修小屏阅读、词卡和音频反馈，并优化书架查询。本机完整内容安装及回归检查已通过，发行镜像与线上升级结果见 [0.10交付记录](https://github.com/wudi000888-svg/nightstudy/blob/main/docs/CONTENT_BILINGUAL_POLISH_010.md)。
+
+保留单屏H5首页、独立页面栈、Learn / Review、雨夜动态和管理员自定义壁纸，支持主屏幕安装与用户确认的安全更新。早期交付及来源说明见 [0.9记录](docs/CONTENT_AUDIO_PERFORMANCE_09.md)、[开放内容与代码复用](docs/OPEN_CONTENT_REUSE.md) 和 [雨夜外观](docs/RAIN_NIGHT_UI.md)。
 
 每日目标按复习与新学的不同词总数计算，先复习，再分配新词。释义和例句支持英文点词卡；美式、英式各一个发音入口，星星和固定按钮有明确提示。词书支持标准 TXT、DOCX、PDF 导入，提供 [TXT](docs/templates/nightstudy-wordbook-template.txt)、[Word](docs/templates/nightstudy-wordbook-template.docx)、[PDF](docs/templates/nightstudy-wordbook-template.pdf) 模板。学习正文保持简洁，词典名称可以查看，来源与许可集中在独立说明。
 
@@ -40,11 +42,13 @@
 
 统一技术栈：React + TypeScript + Vite、Fastify、Prisma 7、Better Auth、Postgres 17、Node.js 24 与 pnpm 11 workspace。同一 Node 容器提供 Web/API；默认学习体验无需付费 AI、OAuth 或对象存储。
 
-完整初次安装下载固定版本的独立内容包，校验 SHA-256，再在各站数据库事务内发布。词典有 770,611 条词目、768,739 条上游中文释义和 160,884 条英文释义；0.2/0.3本机/VPS查询现代美音 IPA 匹配 83,424 个词、英音匹配 64,321 个词，至少一种匹配 104,261 个词。原音标保真保留，原词典地区IPA优先。0.4仅为五书范围的缺失字段补充147个美式、719个英式算法音标，并标记Piper/eSpeak-NG来源；不是专家逐词审核，不等于覆盖全词典。0.6五书例句准备采用ManyThings的4,128个词级英中原句对与4,658个原创用法；12个源词形保留待校对警告和空例句。中英文释义可以来自同词的独立义项，不宣称全770,611词已有成对释义或例句。
+完整初次安装下载固定版本的独立内容包，校验 SHA-256，再在各站数据库事务内发布。基础词典有 770,611 条词目、768,739 条上游中文释义和 160,884 条英文释义；原始中英字段可能来自独立义项。现代美音 IPA 匹配 83,424 个词、英音匹配 64,321 个词，至少一种匹配 104,261 个词；原词典地区 IPA 优先保留，五本基础词书的算法补缺另有来源标记。这些历史基础覆盖不是逐词专家审核，也不代表全词典已有成对双语释义、双语例句或双口音音频。
+
+0.10 文本制作范围为 18 本默认词书的 18,775 个源词目，撤出 8 个待核源词形的自动书成员后为 18,767 个有效词目。本版文本包补充 17,983 个释义字段及缺失词性，新增 293 条纠错义项、9,546 条独立双语例句，并精确更正 17 条既有例句。原始义项和学习身份保留；这不是将 77 万词的所有义项全部重译。当前制作统计、公开语料归因与严格安装边界见 [0.10 说明](docs/CONTENT_BILINGUAL_POLISH_010.md)。
 
 词书覆盖雅思、托福、大学四级/六级、专四/专八、考研、GRE、高考和日常英语。原有五本基础词书继续可用，本轮新增11本、48,162条成员关系，复用17,348个不同规范词目；另有四级、六级词组本。社区词表不等同当前官方完整大纲，未准入成员单独列入复核清单。具体每本条数、固定源版本、加工许可与未匹配原因见 [开放词书](docs/OPEN_CONTENT_REUSE.md)。早期演示词书保持归档，不重新展示为正式书。
 
-四级词组本236项、六级词组本201项，与本轮新增专四817项、专八1,075项词组独立选用。词组继续使用规范学习身份，不建立第二套熟练度和复习历史。
+当前精修目录含四级词组236项、六级词组201项、专四词组816项、专八词组1,074项，均可独立选用。词组继续使用规范学习身份，不建立第二套熟练度和复习历史。
 
 发音采用发布前构建的独立内容包：单词优先匹配有明确口音和授权证据的现成真人录音，缺音单词及例句由Codex在本机离线生成、验证、编码后打包。英美各一个播放入口，句卡、句库和学堂可朗读；运行中的VPS不下载模型、不即时合成，不使用浏览器设备声音兜底。缺失或失败的文件保持不可播放，不伪称生成成功。类型、口音、来源、声线与SHA校验保留在内容记录中；真实覆盖数和限定范围见 [音标与音源](docs/PHONETICS.md)。
 
@@ -60,9 +64,9 @@ Docker Compose首次安装可使用脚本生成私有配置并启动。已有 `.
 bash scripts/install.sh
 ```
 
-默认访问 `http://127.0.0.1:5198`。新站用户名为admin，密码为本站随机值；脚本将初始凭据从仅init挂载的私密卷导出到服务器 `.local/admin/credentials.json`（目录0700、文件0600），只由部署者读取和保管。文件不会通过Web下载，不放入Git。它记录创建时的初始密码，之后改密不会更新此明文记录。既有管理员继续使用原登录方式；`ADMIN_BOOTSTRAP=manual` 保留初始化口令/setup流程。`init` 负责迁移、种子、首次管理员与完整内容安装，PG/内容缓存/音频缓存/私密凭据分别持久化。默认完整配置准备源词典、IPA、考试词书、词组、词级双语补充与成品词音/句音；安装和运行不下载语音模型或执行即时合成。`CONTENT_PACK=demo` 可显式选40词最小体验。完整变量、凭据备份、HTTPS与多站见 [部署文档](docs/DEPLOYMENT.md)。不要对需保留数据的安装使用 `down --volumes`。
+默认访问 `http://127.0.0.1:5198`。新站用户名为admin，密码为本站随机值；脚本将初始凭据从仅init挂载的私密卷导出到服务器 `.local/admin/credentials.json`（目录0700、文件0600），只由部署者读取和保管。文件不会通过Web下载，不放入Git。它记录创建时的初始密码，之后改密不会更新此明文记录。既有管理员继续使用原登录方式；`ADMIN_BOOTSTRAP=manual` 保留初始化口令/setup流程。`init` 负责迁移、种子、首次管理员与完整内容安装，PG/内容缓存/音频缓存/私密凭据分别持久化。当前源码的默认完整配置准备源词典、IPA、考试词书、词组，并依次安装 v1、v2 双语文本包及所锁定的成品音包；公开 Release 仍按对应版本的内容清单安装。安装和运行不下载语音模型或执行即时合成。`CONTENT_PACK=demo` 可显式选40词最小体验。完整变量、凭据备份、HTTPS与多站见 [部署文档](docs/DEPLOYMENT.md)。不要对需保留数据的安装使用 `down --volumes`。
 
-Native 开发使用 Node 24、pnpm 11.25.0和Python 3.11以上，并自行准备可访问的 PG 数据库；完整音频安装需在隔离venv中安装scripts/audio-requirements.txt，并将私有.env的AUDIO_PYTHON指向该venv的python。在 `.env` 填入真实 DATABASE_URL 与两个随机密钥后：
+Native 开发使用 Node 24、pnpm 11.25.0 和 Python 3.11 以上，并自行准备可访问的 PG 数据库。成品音包只需 Python 标准库进行受限解包，无需语音模型或推理依赖；Python 不在 PATH 中时可设置私有 `.env` 的 `AUDIO_PYTHON` 为解释器路径。在 `.env` 填入真实 DATABASE_URL 与两个随机密钥后：
 
 ```sh
 pnpm install --frozen-lockfile
@@ -78,6 +82,8 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 架构约定见 [架构](docs/architecture/ARCHITECTURE.md)、[多站与并发方案](docs/architecture/MULTISITE_AND_SCALING.md)。PgBouncer、Redis provider、跨主机 HA 和实测高并发容量仍待完成。当前 API 契约见 [API.md](docs/API.md)。词典/词书分页和学习选词不再被前 500/1,000 词截断；熟词导出以游标分批流式输出全部记录。
 
 ## 验证记录
+
+0.10 的文本制作复现、隔离浏览器检查及本机只读性能对照见 [本轮记录](docs/CONTENT_BILINGUAL_POLISH_010.md#验收与发布状态)。书架接口在 25 并发的单次本机对照中，p95 从 3,175.37 ms 降至 180.20 ms；两次使用同一数据库内容和六个并行离线语音工作进程。测试没有 TCP/TLS，也未完全控制系统缓存；未改动的查词接口也变快，因此不将全部差值归因于 SQL，更不作为 VPS 容量承诺。全量源码回归与成品音包验收已通过；发行CI及实际站点升级结果见该记录。
 
 0.8 本机通过 75 份测试文件、642 项真实双 PostgreSQL 与前端回归，以及格式、类型检查和生产构建。独立测试站点完成手机视口的三词回忆、拼写、保存、签到和收藏；模块重开恢复分类，PWA 只在用户确认后更新。完整范围见 [H5 应用改造](docs/H5_APP_REDESIGN.md#本轮实现与验收)。运行源码为 [`1fc25da`](https://github.com/wudi000888-svg/nightstudy/commit/1fc25daf4a15322c2a3b445d4ed4fa4119f22dbf)，[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38769072734) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38769173777) 均通过 PostgreSQL 17 与完整 Compose 首装。本机 Native、VPS 已升级；两端各34项接口与静态资源检查通过，线上首页已在浏览器核对。VPS 新备份在独立测试库实际恢复，44表及14条迁移记录一致，测试库已清理。
 

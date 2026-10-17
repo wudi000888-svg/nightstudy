@@ -27,6 +27,8 @@ VERSION = 'sentence-audio-v3'
 COLLECTION_MAX_DECODED_BYTES = 512 * 1024 * 1024
 MAX_DELTA_SENTENCES = 10000
 MAX_DELTA_CLIPS = 20000
+WORKER_EXECUTION_POLICY = 'bounded-spawn-tasks-v1'
+DEFAULT_WORKER_BATCH_SIZE = 128
 BASELINE_PINS = {'sentence-audio-v1': 'sentence-audio.manifest.json',
                  'sentence-audio-v2': 'sentence-audio-v2.manifest.json',
                  'sentence-audio-v3': 'sentence-audio-v3.manifest.json'}
@@ -38,6 +40,82 @@ def pack_id(value):
     if re.fullmatch(r'sentence-audio-v4-[0-9]{4}', value) and not value.endswith('-0000'):
         return value
     raise argparse.ArgumentTypeError('Use a fixed sentence-audio-v3/v4 or sentence-audio-v4-0001..9999 ID')
+
+
+def worker_batch_size(value):
+    try:
+        size = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError('worker batch size must be an integer from 1 to 512') from None
+    if not 1 <= size <= 512:
+        raise argparse.ArgumentTypeError('worker batch size must be an integer from 1 to 512')
+    return size
+
+
+def bounded_worker_tasks(pending_by_accent, batch_size):
+    """Partition each accent once; IDs do not depend on worker concurrency.
+
+    The full ordered-text digest prevents unrelated chunks from sharing a
+    journal filename. Existing journals remain separate, identity-checked
+    cache inputs; they are never copied or concatenated into a new journal.
+    """
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or not 1 <= batch_size <= 512:
+        raise ValueError('invalid_worker_batch_size')
+    if set(pending_by_accent) != {'US', 'UK'}:
+        raise ValueError('invalid_worker_accents')
+    tasks = []
+    for accent in ('US', 'UK'):
+        ordered = sorted(pending_by_accent[accent], key=lambda row: row['textHash'])
+        if len({row['textHash'] for row in ordered}) != len(ordered):
+            raise ValueError('duplicate_worker_text_hash')
+        for ordinal, start in enumerate(range(0, len(ordered), batch_size)):
+            rows = ordered[start:start+batch_size]
+            identity = json.dumps({'policy': WORKER_EXECUTION_POLICY, 'accent': accent,
+                                   'textHashes': [row['textHash'] for row in rows]},
+                                  sort_keys=True, separators=(',', ':')).encode()
+            task_id = f'bounded-v1-{accent}-{ordinal:06d}-{hashlib.sha256(identity).hexdigest()}'
+            tasks.append({'id': task_id, 'accent': accent, 'rows': rows})
+    return tasks
+
+
+def worker_execution_metadata(tasks, batch_size, workers):
+    return {'policy': WORKER_EXECUTION_POLICY, 'workerBatchSize': batch_size,
+            'maxTasksPerChild': 1, 'maxWorkers': workers,
+            'maximumInFlightTasks': min(workers, len(tasks)),
+            'poolLifecycle': 'new-spawn-pool-per-wave; join-before-next-wave',
+            'taskOrder': 'US-then-UK-textHash-contiguous-v1',
+            'taskIdentity': 'sha256-of-policy-accent-ordered-textHashes-v1',
+            'taskCount': len(tasks), 'tasks': [
+                {'id': task['id'], 'accent': task['accent'], 'sentenceCount': len(task['rows'])}
+                for task in tasks]}
+
+
+def execute_worker_tasks(tasks, output, models, workers, worker_fn=None):
+    """At most one in-flight task per worker, each in a fresh spawned process.
+
+    A wave is fully collected and its pool joined before another is submitted.
+    This avoids relying on persistent-pool worker replacement across many
+    waves, which older Python versions can mishandle. In particular,
+    workers=1 never queues a second inference task alongside the current one.
+    If a result fails, later waves are not submitted. Executor teardown joins
+    only the processes created by this pool.
+    """
+    if workers not in (1, 2, 4, 6, 8):
+        raise ValueError('invalid_audio_worker_count')
+    if not tasks:
+        return []
+    run_worker = worker_fn or worker
+    entries = []
+    for start in range(0, len(tasks), workers):
+        wave = tasks[start:start+workers]
+        with concurrent.futures.ProcessPoolExecutor(
+                max_workers=len(wave), mp_context=multiprocessing.get_context('spawn'),
+                max_tasks_per_child=1) as pool:
+            futures = [pool.submit(run_worker, task['accent'], task['rows'],
+                                   str(output), str(models), task['id']) for task in wave]
+            for future in futures:
+                entries.extend(future.result())
+    return entries
 
 
 def write_build_json(module, file, value, immutable=False):
@@ -439,6 +517,7 @@ def check_existing_hold_scope(output, hold_pin):
                  'fileName': 'pronunciation-holds.json'} if hold_pin else None)
     if previous.get('pronunciationHolds') != expected:
         raise ValueError('existing_audio_output_hold_scope_mismatch')
+    return previous
 
 
 def main():
@@ -449,6 +528,8 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--model-dir',type=Path,required=True)
     parser.add_argument('--workers',type=int,choices=(1,2,4,6,8),default=1)
+    parser.add_argument('--worker-batch-size', type=worker_batch_size,
+                        help='v4 only: sentences per fresh spawned worker task, 1..512 (default 128)')
     parser.add_argument('--pack-id', type=pack_id, default=VERSION,
                         help='v3 reproduces the original pack; v4 builds an accent-level delta')
     parser.add_argument('--plan-only', action='store_true',
@@ -463,6 +544,8 @@ def main():
     parser.add_argument('--pronunciation-holds-sha256')
     parser.add_argument('--release-url',required=True)
     args = parser.parse_args()
+    if args.pack_id == VERSION and args.worker_batch_size is not None:
+        raise ValueError('incremental_pack_required_for_worker_batch_size')
     if not args.release_url.startswith('https://github.com/wudi000888-svg/nightstudy/releases/download/') or args.release_url.endswith('/'):
         raise ValueError('explicit_release_url_required')
     output = external(args.output, True)
@@ -525,12 +608,16 @@ def main():
                 pending.append(row)
         rows = pending
         pending_by_accent = {accent: rows for accent in ('US', 'UK')}
+    batch_size = args.worker_batch_size or DEFAULT_WORKER_BATCH_SIZE
+    tasks = bounded_worker_tasks(pending_by_accent, batch_size) if incremental else None
+    execution = worker_execution_metadata(tasks, batch_size, args.workers) if incremental else None
     if args.plan_only:
         if not incremental:
             raise ValueError('incremental_pack_required_for_plan')
         print(json.dumps({'phase': 'plan', 'version': args.pack_id,
                           'meaningPackId': manifest['id'], 'meaningPackSha256': manifest['sha256'],
                           'baselinePacks': baseline_references, 'coverage': coverage,
+                          'buildExecution': execution,
                           **({'pronunciationHolds': hold_pin} if hold_pin else {}),
                           'pendingByAccent': {accent: len(items) for accent, items in pending_by_accent.items()}}),
               flush=True)
@@ -545,8 +632,11 @@ def main():
     if incremental and (len(rows) > MAX_DELTA_SENTENCES
                         or sum(len(items) for items in pending_by_accent.values()) > MAX_DELTA_CLIPS):
         raise ValueError('incremental_audio_scope_requires_sharding')
+    previous_sources = None
     if incremental:
-        check_existing_hold_scope(output, hold_pin)
+        previous_sources = check_existing_hold_scope(output, hold_pin)
+        if previous_sources is not None and previous_sources.get('buildExecution') != execution:
+            raise ValueError('existing_audio_output_worker_execution_mismatch')
     review_file = None
     hold_file = None
     if hold_pin:
@@ -574,6 +664,7 @@ def main():
         sources.update({'requestedSentences': requested_rows, 'baselinePacks': baseline_references,
                         'reusedMediaReferences': media_references, 'coverage': coverage})
         sources['buildRuntime'] = build_runtime()
+        sources['buildExecution'] = execution
         if review_pin:
             sources['pronunciationReviews'] = {**review_pin, 'sourceFileName': review_pin['fileName'],
                                                'fileName': 'pronunciation-reviews.json'}
@@ -595,22 +686,31 @@ def main():
                 for notice in manifest['_audioLicenseNotices']]
         existing = output/'manifest.json'
         if existing.exists():
-            previous = json.loads(existing.read_text())
-            previous_sources = output/'sources.manifest.json'
-            if (previous.get('version') != args.pack_id or not previous_sources.is_file()
-                or json.loads(previous_sources.read_text()).get('meaningPackSha256') != manifest['sha256']):
+            previous = json.loads(pinned_bytes(existing, 64*1024*1024))
+            previous_sources_file = output/'sources.manifest.json'
+            if previous_sources is None:
+                previous_sources = json.loads(pinned_bytes(previous_sources_file, 64*1024*1024))
+            if (previous.get('version') != args.pack_id or not previous_sources_file.is_file()
+                or previous_sources.get('meaningPackSha256') != manifest['sha256']):
                 raise ValueError('existing_audio_output_scope_mismatch')
-            if json.loads(previous_sources.read_text()).get('pronunciationReviews') != sources.get('pronunciationReviews'):
+            if previous_sources.get('pronunciationReviews') != sources.get('pronunciationReviews'):
                 raise ValueError('existing_audio_output_pronunciation_scope_mismatch')
-            if json.loads(previous_sources.read_text()).get('pronunciationHolds') != sources.get('pronunciationHolds'):
+            if previous_sources.get('pronunciationHolds') != sources.get('pronunciationHolds'):
                 raise ValueError('existing_audio_output_hold_scope_mismatch')
+            if previous_sources.get('buildExecution') != execution:
+                raise ValueError('existing_audio_output_worker_execution_mismatch')
     expected_pairs = {(row['textHash'], accent) for accent, items in pending_by_accent.items() for row in items}
     print(json.dumps({'phase':'scope','sentences':len(rows),'clips':len(expected_pairs),
                       **({'coverage': coverage} if incremental else {})}),flush=True)
-    shards = max(1, args.workers//2)
-    with concurrent.futures.ProcessPoolExecutor(max_workers=args.workers,mp_context=multiprocessing.get_context('spawn')) as pool:
-        futures = [pool.submit(worker,accent,pending_by_accent[accent][shard::shards],str(output),str(args.model_dir.resolve()),shard) for accent in ('US','UK') for shard in range(shards) if pending_by_accent[accent][shard::shards]]
-        entries = sorted([entry for future in futures for entry in future.result()],key=lambda entry:(entry['textHash'],entry['accent']))
+    if incremental:
+        entries = execute_worker_tasks(tasks, output, args.model_dir.resolve(), args.workers)
+    else:
+        # Historical v3 execution and source shape stay reproducible.
+        shards = max(1, args.workers//2)
+        with concurrent.futures.ProcessPoolExecutor(max_workers=args.workers,mp_context=multiprocessing.get_context('spawn')) as pool:
+            futures = [pool.submit(worker,accent,pending_by_accent[accent][shard::shards],str(output),str(args.model_dir.resolve()),shard) for accent in ('US','UK') for shard in range(shards) if pending_by_accent[accent][shard::shards]]
+            entries = [entry for future in futures for entry in future.result()]
+    entries = sorted(entries, key=lambda entry:(entry['textHash'],entry['accent']))
     if len(entries) != len(expected_pairs) or {(entry['textHash'],entry['accent']) for entry in entries} != expected_pairs:
         raise ValueError('sentence_accent_coverage_mismatch')
     if any((entry['textHash'], entry['accent']) in holds for entry in [*entries, *media_references]):

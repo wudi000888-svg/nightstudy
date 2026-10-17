@@ -7,7 +7,10 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import signal
+import subprocess
 import tempfile
 import sys
 import unittest
@@ -437,6 +440,39 @@ class MeaningSentenceAudioBoundaries(unittest.TestCase):
         pool.assert_not_called()
         self.assertFalse((output/'manifest.json').exists())
 
+    def test_fixed_ready_execution_mismatch_precedes_sidecar_writes_and_worker_access(self):
+        _, _, module = self.baseline()
+        manifest_file, content = self.pinned()
+        manifest, rows = audio.collect(manifest_file, content)
+        _, hold_pin, hold_file = self.publication_hold(rows, 'UK')
+        output = self.root/'fixed-old-execution'; output.mkdir()
+        (output/'progress').mkdir()
+        (output/'manifest.json').write_text(json.dumps({'version': 'sentence-audio-v4', 'status': 'ready'}))
+        (output/'sources.manifest.json').write_text(json.dumps({
+            'meaningPackSha256': manifest['sha256'],
+            'pronunciationHolds': {**hold_pin, 'sourceFileName': hold_file.name,
+                                   'fileName': 'pronunciation-holds.json'},
+            'buildExecution': {'policy': 'previous-build-policy', 'workerBatchSize': 64}}))
+        before = {file.name: file.read_bytes() for file in output.iterdir() if file.is_file()}
+        argv = ['learning-senses-audio.py', '--manifest', str(manifest_file), '--content', str(content),
+                '--output', str(output), '--model-dir', str(self.root/'unused-models'),
+                '--pack-id', 'sentence-audio-v4', '--pronunciation-holds', str(hold_file),
+                '--pronunciation-holds-sha256', hold_pin['sha256'], '--release-url',
+                'https://github.com/wudi000888-svg/nightstudy/releases/download/v-test']
+        with patch.object(audio, 'REPO', self.root), patch.object(sys, 'argv', argv), \
+                patch.object(audio, 'collect', return_value=(manifest, rows)), \
+                patch.object(audio, 'pipeline_module', return_value=module), \
+                patch.object(audio, 'external', side_effect=lambda directory, create=False: Path(directory).resolve()), \
+                patch.object(audio.concurrent.futures, 'ProcessPoolExecutor') as pool, \
+                patch.object(module.pack, 'make_voice') as make_voice:
+            with self.assertRaisesRegex(ValueError, 'existing_audio_output_worker_execution_mismatch'):
+                audio.main()
+        pool.assert_not_called()
+        make_voice.assert_not_called()
+        self.assertFalse((output/'pronunciation-holds.json').exists())
+        self.assertFalse((output/'pronunciation-reviews.json').exists())
+        self.assertEqual(before, {file.name: file.read_bytes() for file in output.iterdir() if file.is_file()})
+
     def test_v3_explicit_hold_is_rejected_without_workers_or_output_metadata(self):
         manifest, content = self.pinned()
         output = self.root/'v3-held'; output.mkdir()
@@ -637,6 +673,7 @@ class MeaningSentenceAudioBoundaries(unittest.TestCase):
         (self.root/'LICENSE').write_text('Original test content license\n')
         calls = []
         worker_limits = []
+        recycling_limits = []
 
         def synthesize(accent, rows, output_string, model_string, shard):
             calls.append((accent, len(rows)))
@@ -649,6 +686,7 @@ class MeaningSentenceAudioBoundaries(unittest.TestCase):
         class InlinePool:
             def __init__(self, **kwargs):
                 worker_limits.append(kwargs['max_workers'])
+                recycling_limits.append(kwargs['max_tasks_per_child'])
             def __enter__(self):
                 return self
             def __exit__(self, *args):
@@ -670,6 +708,7 @@ class MeaningSentenceAudioBoundaries(unittest.TestCase):
             audio.main()
         make_voice.assert_not_called()
         self.assertEqual(worker_limits, [1])
+        self.assertEqual(recycling_limits, [1])
         self.assertEqual(calls, [('UK', 1)])
         built = json.loads((output/'manifest.json').read_text())
         sources = json.loads((output/'sources.manifest.json').read_text())
@@ -681,9 +720,201 @@ class MeaningSentenceAudioBoundaries(unittest.TestCase):
         self.assertEqual(built['statistics']['reusedClipCount'], 1)
         self.assertEqual(built['statistics']['generatedClipCount'], 1)
         self.assertEqual(sources['reusedMediaReferences'][0]['baseline']['id'], 'sentence-audio-v3')
+        self.assertEqual(sources['buildExecution']['workerBatchSize'], 128)
+        self.assertEqual(sources['buildExecution']['taskCount'], 1)
+        self.assertEqual(sources['buildExecution']['tasks'][0]['accent'], 'UK')
         self.assertEqual([entry['accent'] for entry in built['entries']], ['UK'])
         self.assertTrue((self.root/'nightstudy-sentence-audio-v4.tar.gz').is_file())
         self.assertFalse((self.root/'nightstudy-sentence-audio-v3.tar.gz').exists())
+
+
+class BoundedFreshProcessTasks(unittest.TestCase):
+    def rows(self, count):
+        return [{'textHash': f'{index:064x}', 'text': f'Private mock row {index}.',
+                 'references': [{'exampleId': f'example-{index}'}]} for index in range(count)]
+
+    def test_worker_batch_size_cli_accepts_only_bounded_integer_values(self):
+        self.assertEqual(audio.worker_batch_size('1'), 1)
+        self.assertEqual(audio.worker_batch_size('128'), 128)
+        self.assertEqual(audio.worker_batch_size('512'), 512)
+        for value in ('0', '513', '-1', '1.5', 'True', ''):
+            with self.subTest(value=value), self.assertRaises(argparse.ArgumentTypeError):
+                audio.worker_batch_size(value)
+
+    def test_chunks_are_exhaustive_disjoint_bounded_and_reference_preserving(self):
+        us, uk = self.rows(257), self.rows(130)
+        tasks = audio.bounded_worker_tasks({'US': us, 'UK': uk}, 128)
+        self.assertEqual([(task['accent'], len(task['rows'])) for task in tasks],
+                         [('US', 128), ('US', 128), ('US', 1), ('UK', 128), ('UK', 2)])
+        for accent, expected in [('US', us), ('UK', uk)]:
+            actual = [row for task in tasks if task['accent'] == accent for row in task['rows']]
+            self.assertEqual(actual, expected)
+            self.assertEqual(len({row['textHash'] for row in actual}), len(expected))
+            self.assertTrue(all(a is b for a, b in zip(actual, expected)))
+        self.assertEqual(len({task['id'] for task in tasks}), len(tasks))
+        for task in tasks:
+            self.assertRegex(task['id'], r'^bounded-v1-(US|UK)-[0-9]{6}-[a-f0-9]{64}$')
+
+    def test_task_ids_are_deterministic_and_do_not_alias_old_journals_or_other_scopes(self):
+        rows = self.rows(5)
+        tasks = audio.bounded_worker_tasks({'US': rows, 'UK': rows}, 2)
+        reversed_tasks = audio.bounded_worker_tasks({'UK': list(reversed(rows)), 'US': list(reversed(rows))}, 2)
+        self.assertEqual(tasks, reversed_tasks)
+        self.assertNotEqual(tasks[0]['id'], tasks[3]['id'])
+        changed = audio.bounded_worker_tasks({'US': self.rows(6), 'UK': []}, 3)
+        self.assertNotEqual(tasks[0]['id'], changed[0]['id'])
+        self.assertNotEqual('US-'+tasks[0]['id']+'.jsonl', 'US-0.jsonl')
+        with self.assertRaisesRegex(ValueError, 'duplicate_worker_text_hash'):
+            audio.bounded_worker_tasks({'US': [rows[0], rows[0]], 'UK': []}, 2)
+        for size in (0, 513, True, 2.5):
+            with self.subTest(size=size), self.assertRaisesRegex(ValueError, 'invalid_worker_batch_size'):
+                audio.bounded_worker_tasks({'US': rows, 'UK': []}, size)
+        with self.assertRaisesRegex(ValueError, 'invalid_worker_accents'):
+            audio.bounded_worker_tasks({'US': rows}, 2)
+
+    def run_mock(self, workers, failure_at=None):
+        tasks = audio.bounded_worker_tasks({'US': self.rows(5), 'UK': self.rows(3)}, 1)
+        calls, kwargs_seen, in_flight = [], [], []
+        outstanding = 0
+
+        class Pool:
+            def __init__(self, **kwargs):
+                kwargs_seen.append(kwargs)
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def submit(self, fn, accent, assigned, output, models, task_id):
+                nonlocal outstanding
+                index = len(calls)
+                calls.append((accent, assigned[0]['textHash'], task_id, fn))
+                outstanding += 1
+                in_flight.append(outstanding)
+                def result():
+                    nonlocal outstanding
+                    outstanding -= 1
+                    if index == failure_at:
+                        raise RuntimeError('mock_worker_failed')
+                    return [{'textHash': assigned[0]['textHash'], 'accent': accent, 'taskId': task_id}]
+                return SimpleNamespace(result=result)
+
+        sentinel = object()
+        with patch.object(audio.concurrent.futures, 'ProcessPoolExecutor', Pool):
+            if failure_at is not None:
+                with self.assertRaisesRegex(RuntimeError, 'mock_worker_failed'):
+                    audio.execute_worker_tasks(tasks, '/mock/output', '/mock/models', workers, sentinel)
+                result = None
+            else:
+                result = audio.execute_worker_tasks(tasks, '/mock/output', '/mock/models', workers, sentinel)
+        self.assertEqual(kwargs_seen[0]['max_workers'], workers)
+        self.assertEqual(len(kwargs_seen), (len(calls)+workers-1)//workers)
+        self.assertTrue(all(item['max_tasks_per_child'] == 1 for item in kwargs_seen))
+        self.assertTrue(all(item['mp_context'].get_start_method() == 'spawn' for item in kwargs_seen))
+        self.assertLessEqual(max(in_flight), workers)
+        self.assertTrue(all(call[3] is sentinel for call in calls))
+        return tasks, calls, result, in_flight
+
+    def test_single_worker_submits_only_after_the_prior_result_and_keeps_order(self):
+        tasks, calls, result, in_flight = self.run_mock(1)
+        self.assertEqual(in_flight, [1]*len(tasks))
+        self.assertEqual([entry['taskId'] for entry in result], [task['id'] for task in tasks])
+        self.assertEqual(len(calls), len(tasks))
+
+    def test_multiple_workers_keep_only_a_bounded_wave_in_flight(self):
+        tasks, calls, result, in_flight = self.run_mock(2)
+        self.assertEqual(in_flight, [1, 2]*4)
+        self.assertEqual([entry['taskId'] for entry in result], [task['id'] for task in tasks])
+        self.assertEqual(len(calls), len(tasks))
+
+    def test_failed_result_stops_submission_of_later_waves(self):
+        _, calls, _, _ = self.run_mock(2, failure_at=0)
+        self.assertEqual(len(calls), 2)
+
+    def test_empty_tasks_do_not_start_a_pool_and_metadata_reports_real_partition(self):
+        with patch.object(audio.concurrent.futures, 'ProcessPoolExecutor') as pool:
+            self.assertEqual(audio.execute_worker_tasks([], '/unused', '/unused', 1), [])
+        pool.assert_not_called()
+        tasks = audio.bounded_worker_tasks({'US': self.rows(129), 'UK': []}, 128)
+        metadata = audio.worker_execution_metadata(tasks, 128, 1)
+        self.assertEqual(metadata['policy'], 'bounded-spawn-tasks-v1')
+        self.assertEqual(metadata['taskCount'], 2)
+        self.assertEqual(metadata['maxTasksPerChild'], 1)
+        self.assertEqual(metadata['maximumInFlightTasks'], 1)
+        self.assertEqual(metadata['poolLifecycle'], 'new-spawn-pool-per-wave; join-before-next-wave')
+        self.assertEqual([task['sentenceCount'] for task in metadata['tasks']], [128, 1])
+
+    def test_v3_explicit_batch_flag_fails_before_output_or_worker_access(self):
+        argv = ['learning-senses-audio.py', '--manifest', '/unused/manifest',
+                '--output', '/unused/output', '--model-dir', '/unused/models',
+                '--worker-batch-size', '128', '--release-url',
+                'https://github.com/wudi000888-svg/nightstudy/releases/download/v-test']
+        with patch.object(sys, 'argv', argv), patch.object(audio, 'external') as external, \
+                patch.object(audio.concurrent.futures, 'ProcessPoolExecutor') as pool:
+            with self.assertRaisesRegex(ValueError, 'incremental_pack_required_for_worker_batch_size'):
+                audio.main()
+        external.assert_not_called()
+        pool.assert_not_called()
+
+    @unittest.skipUnless(os.name == 'posix', 'isolated spawn probe uses its own POSIX process group')
+    def test_real_spawn_recycles_every_task_without_loading_any_model(self):
+        # Run in a tiny independent entry point so spawn imports __mp_main__
+        # naturally even when this suite is executed by the pinned test launcher.
+        with tempfile.TemporaryDirectory(prefix='nightstudy-fresh-process-test-') as directory:
+            script = Path(directory)/'probe.py'
+            module_path = Path(audio.__file__).resolve()
+            script.write_text('''import importlib.util,json,os
+from pathlib import Path
+spec=importlib.util.spec_from_file_location('fresh_process_audio', '''+repr(str(module_path))+''')
+audio=importlib.util.module_from_spec(spec);spec.loader.exec_module(audio)
+def probe(accent,rows,output,models,task_id):
+    record=Path(output)/'own-probe-pids.json'
+    prior=json.loads(record.read_text()) if record.exists() else []
+    still_alive=[]
+    for pid in prior:
+        try:os.kill(pid,0)
+        except ProcessLookupError:pass
+        else:still_alive.append(pid)
+    record.write_text(json.dumps(prior+[os.getpid()]))
+    return [dict(textHash=row['textHash'],accent=accent,pid=os.getpid(),taskId=task_id,previousPidsStillAlive=still_alive) for row in rows]
+if __name__=='__main__':
+    rows=[dict(textHash=f'{i:064x}') for i in range(6)]
+    tasks=audio.bounded_worker_tasks(dict(US=rows,UK=[]),1)
+    entries=audio.execute_worker_tasks(tasks,str(Path(__file__).parent),'unused-models',1,probe)
+    print(json.dumps(dict(entries=entries,parentPid=os.getpid())),flush=True)
+''')
+            child = subprocess.Popen([sys.executable, str(script)], stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE, text=True, start_new_session=True)
+            timed_out = False
+            try:
+                try:
+                    stdout, stderr = child.communicate(timeout=30)
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+                    os.killpg(child.pid, signal.SIGTERM)
+                    try:
+                        stdout, stderr = child.communicate(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(child.pid, signal.SIGKILL)
+                        stdout, stderr = child.communicate(timeout=3)
+            finally:
+                # This session belongs only to this test. Never find/kill by
+                # executable name or touch a different pool/application.
+                try:
+                    os.killpg(child.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                if child.poll() is None:
+                    child.wait(timeout=3)
+            self.assertFalse(timed_out, 'six-task no-model spawn probe exceeded 30 seconds')
+            self.assertEqual(child.returncode, 0, stderr[-4000:])
+            result = json.loads(stdout)
+            entries = result['entries']
+            self.assertEqual([entry['textHash'] for entry in entries], [f'{i:064x}' for i in range(6)])
+            self.assertEqual(len({entry['pid'] for entry in entries}), 6)
+            self.assertNotIn(result['parentPid'], {entry['pid'] for entry in entries})
+            self.assertEqual(len({entry['taskId'] for entry in entries}), 6)
+            self.assertTrue(all(entry['accent'] == 'US' for entry in entries))
+            self.assertTrue(all(entry['previousPidsStillAlive'] == [] for entry in entries))
 
 
 if __name__ == '__main__':

@@ -6,6 +6,14 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { parseArgs, isDeepStrictEqual } from 'node:util';
+import {
+  readSentenceAudioPolicy,
+  emptySentenceAudioPolicy,
+  learningSentenceAudioTargets,
+  bindSentenceAudioHoldReferences,
+  sentenceAudioIdentity,
+  SentenceAudioPolicyError,
+} from './check-sentence-audio-policy.mjs';
 
 const sha = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const canonical = (value) =>
@@ -54,23 +62,122 @@ function meaningHash(sense) {
 }
 
 export function readLearningSensesBundle(
-  manifestPath = new URL('../data/learning-senses-v1.manifest.json', import.meta.url),
+  manifestPath = fs.existsSync(
+    new URL('../data/learning-senses-collection-v2.manifest.json', import.meta.url),
+  )
+    ? new URL('../data/learning-senses-collection-v2.manifest.json', import.meta.url)
+    : new URL('../data/learning-senses-v1.manifest.json', import.meta.url),
+  budget = { remaining: 512 * 1024 * 1024 },
 ) {
   const filename =
     manifestPath instanceof URL ? fileURLToPath(manifestPath) : path.resolve(manifestPath);
-  const manifest = JSON.parse(fs.readFileSync(filename, 'utf8'));
+  const manifestBytes = pinnedFile(filename, 1024 * 1024);
+  const manifest = JSON.parse(manifestBytes.toString('utf8'));
+  if (manifest.formatVersion === 2) {
+    check(
+      manifest.kind === 'learning-senses-collection' &&
+        /^learning-senses-collection-[a-z0-9-]+$/.test(manifest.id) &&
+        Number.isSafeInteger(manifest.requiredWordCount) &&
+        manifest.requiredWordCount > 0 &&
+        manifest.requiredWordCount <= 100000 &&
+        manifest.requiredWordCount === manifest.wordCount &&
+        /^[a-f0-9]{64}$/.test(manifest.requiredWordsSha256) &&
+        manifest.editorialReview === 'codex-reviewed' &&
+        manifest.semanticQualityCertified === false &&
+        manifest.exhaustiveBookCoverage === false &&
+        Array.isArray(manifest.shards) &&
+        manifest.shards.length > 0 &&
+        manifest.shards.length <= 1000,
+      'invalid_learning_senses_collection',
+    );
+    for (const field of ['wordCount', 'senseCount', 'exampleCount'])
+      check(
+        manifest.shards.reduce((n, pin) => n + pin[field], 0) === manifest[field],
+        'learning_senses_collection_pin_totals',
+      );
+    const ids = new Set(),
+      files = new Set(),
+      identities = new Set(),
+      wordIds = new Set(),
+      lemmas = new Set();
+    const bundles = manifest.shards.map((pin) => {
+      check(
+        /^learning-senses-[a-z0-9.-]+\.manifest\.json$/.test(pin.manifestFileName) &&
+          !ids.has(pin.id) &&
+          !files.has(pin.manifestFileName),
+        'learning_senses_collection_shard_identity',
+      );
+      ids.add(pin.id);
+      files.add(pin.manifestFileName);
+      const shardPath = path.join(path.dirname(filename), pin.manifestFileName);
+      const bytes = pinnedFile(shardPath, 1024 * 1024);
+      check(
+        bytes.length === pin.bytes && sha(bytes) === pin.sha256,
+        'learning_senses_collection_shard_checksum',
+      );
+      const shardManifest = JSON.parse(bytes.toString('utf8'));
+      check(shardManifest.formatVersion === 1, 'learning_senses_nested_collection');
+      const bundle = readLearningSensesBundle(shardPath, budget);
+      check(
+        ['id', 'wordCount', 'senseCount', 'exampleCount'].every(
+          (field) => bundle.manifest[field] === pin[field],
+        ) &&
+          bundle.manifest.sourceExportSha256 === manifest.sourceExportSha256 &&
+          bundle.manifest.bilingualOverlaySha256 === manifest.bilingualOverlaySha256,
+        'learning_senses_collection_shard_scope',
+      );
+      for (const source of bundle.sourceRows || []) {
+        check(!identities.has(source.id), 'learning_senses_collection_record_overlap');
+        identities.add(source.id);
+      }
+      for (const row of bundle.rows) {
+        check(
+          !wordIds.has(row.wordId) && !lemmas.has(row.normalizedLemma),
+          'learning_senses_collection_word_overlap',
+        );
+        wordIds.add(row.wordId);
+        lemmas.add(row.normalizedLemma);
+        for (const sense of row.senses)
+          for (const record of [sense, ...sense.sourceBindings, ...sense.examples]) {
+            check(!identities.has(record.id), 'learning_senses_collection_record_overlap');
+            identities.add(record.id);
+          }
+      }
+      return bundle;
+    });
+    const rows = bundles.flatMap((bundle) => bundle.rows);
+    const union = rows
+      .map(({ wordId, normalizedLemma }) => ({ wordId, normalizedLemma }))
+      .sort((a, b) => (a.wordId < b.wordId ? -1 : a.wordId > b.wordId ? 1 : 0));
+    check(
+      rows.length === manifest.requiredWordCount &&
+        sha(canonical(union)) === manifest.requiredWordsSha256,
+      'learning_senses_collection_required_union',
+    );
+    return { manifest, rows, bundles };
+  }
   check(
     manifest.formatVersion === 1 &&
       /^learning-senses-[a-z0-9-]+$/.test(manifest.id) &&
-      /^[a-z0-9.-]+\.jsonl\.gz$/.test(manifest.fileName),
+      /^[a-z0-9.-]+\.jsonl\.gz$/.test(manifest.fileName) &&
+      Number.isSafeInteger(manifest.wordCount) &&
+      manifest.wordCount > 0 &&
+      manifest.wordCount <= 1000 &&
+      Number.isSafeInteger(manifest.bytes) &&
+      manifest.bytes > 0 &&
+      manifest.bytes <= 64 * 1024 * 1024,
     'invalid_learning_senses_manifest',
   );
-  const bytes = fs.readFileSync(path.join(path.dirname(filename), manifest.fileName));
+  const bytes = pinnedFile(path.join(path.dirname(filename), manifest.fileName), 64 * 1024 * 1024);
   check(
     bytes.length === manifest.bytes && sha(bytes) === manifest.sha256,
     'learning_senses_pack_checksum',
   );
-  const decoded = gunzipSync(bytes, { maxOutputLength: 64 * 1024 * 1024 });
+  check(budget.remaining > 0, 'learning_senses_collection_decoded_budget');
+  const decoded = gunzipSync(bytes, {
+    maxOutputLength: Math.min(64 * 1024 * 1024, budget.remaining),
+  });
+  budget.remaining -= decoded.length;
   check(sha(decoded) === manifest.jsonlSha256, 'learning_senses_decoded_checksum');
   const rows = new TextDecoder('utf-8', { fatal: true })
     .decode(decoded)
@@ -84,7 +191,185 @@ export function readLearningSensesBundle(
         manifest.exampleCount,
     'learning_senses_pack_counts',
   );
-  return { manifest, rows };
+  let sourceRows = [];
+  if (manifest.sourceAdditions) {
+    const pin = manifest.sourceAdditions;
+    check(
+      /^learning-sense-sources-[a-z0-9.-]+\.jsonl\.gz$/.test(pin.fileName) &&
+        Number.isSafeInteger(pin.rowCount) &&
+        pin.rowCount > 0 &&
+        pin.rowCount <= 1000 &&
+        Number.isSafeInteger(pin.bytes) &&
+        pin.bytes > 0 &&
+        pin.bytes <= 64 * 1024 * 1024,
+      'learning_senses_source_addition_pin',
+    );
+    const bytes = pinnedFile(path.join(path.dirname(filename), pin.fileName), 64 * 1024 * 1024);
+    check(
+      bytes.length === pin.bytes && sha(bytes) === pin.sha256,
+      'learning_senses_source_addition_checksum',
+    );
+    check(
+      budget.remaining > 0 && decoded.length < 64 * 1024 * 1024,
+      'learning_senses_collection_decoded_budget',
+    );
+    const raw = gunzipSync(bytes, {
+      maxOutputLength: Math.min(64 * 1024 * 1024 - decoded.length, budget.remaining),
+    });
+    budget.remaining -= raw.length;
+    check(sha(raw) === pin.jsonlSha256, 'learning_senses_source_addition_decoded_checksum');
+    sourceRows = new TextDecoder('utf-8', { fatal: true })
+      .decode(raw)
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  }
+  verifyOriginalSourceAdditions(sourceRows, rows, manifest.sourceAdditions);
+  return { manifest, rows, ...(sourceRows.length ? { sourceRows } : {}) };
+}
+
+const sourcePos = new Set([
+  'n.',
+  'v.',
+  'vt.',
+  'vi.',
+  'adj.',
+  'adv.',
+  'prep.',
+  'pron.',
+  'det.',
+  'art.',
+  'conj.',
+  'interj.',
+  'num.',
+  'aux.',
+  'modal v.',
+  'abbr.',
+  'phr. v.',
+  'n. phr.',
+  'prep. phr.',
+  'adv. phr.',
+  'adj. phr.',
+  'conj. phr.',
+  'pron. phr.',
+  'det. phr.',
+  'modal phr.',
+  'idiom',
+]);
+export function verifyOriginalSourceAdditions(sourceRows, rows, pin) {
+  check(
+    Array.isArray(sourceRows) &&
+      sourceRows.length === (pin?.rowCount || 0) &&
+      sourceRows.length <= 1000,
+    'learning_senses_source_addition_count',
+  );
+  const words = new Map(rows.map((row) => [row.wordId, row.normalizedLemma])),
+    sources = new Map(),
+    used = new Set();
+  for (const source of sourceRows) {
+    check(
+      Object.keys(source).sort().join(',') ===
+        [
+          'id',
+          'wordId',
+          'normalizedLemma',
+          'pos',
+          'definitionZh',
+          'definitionEn',
+          'exampleEn',
+          'exampleZh',
+          'ordinal',
+          'contentMetadata',
+        ]
+          .sort()
+          .join(','),
+      'learning_senses_source_addition_fields',
+    );
+    const meta = source.contentMetadata,
+      review = meta?.editorialReview;
+    check(
+      typeof meta?.semanticKey === 'string' &&
+        /^[a-z0-9-]+$/.test(meta.semanticKey) &&
+        source.id === 'learning-source-' + sha(source.wordId + '\0' + meta.semanticKey) &&
+        !sources.has(source.id) &&
+        words.get(source.wordId) === source.normalizedLemma &&
+        sourcePos.has(source.pos) &&
+        source.ordinal === 1000000 + parseInt(sha(meta.semanticKey).slice(0, 7), 16) &&
+        typeof source.definitionZh === 'string' &&
+        source.definitionZh.length <= 4000 &&
+        /[\u4e00-\u9fff]/u.test(source.definitionZh) &&
+        typeof source.definitionEn === 'string' &&
+        source.definitionEn.length <= 4000 &&
+        /[A-Za-z]/u.test(source.definitionEn) &&
+        !/[\u4e00-\u9fff]/u.test(source.definitionEn) &&
+        source.exampleEn === '' &&
+        source.exampleZh === '',
+      'learning_senses_source_addition_identity',
+    );
+    check(
+      review?.decision === 'publish' &&
+        review.reviewer === 'Codex' &&
+        review.expertCertified === false &&
+        typeof review.semanticRationale === 'string' &&
+        review.semanticRationale.length >= 15 &&
+        review.semanticRationale.length <= 4000 &&
+        Object.keys(review).sort().join(',') ===
+          ['decision', 'reviewer', 'expertCertified', 'semanticRationale'].sort().join(','),
+      'learning_senses_source_addition_review',
+    );
+    check(
+      isDeepStrictEqual(meta, {
+        kind: 'original-authoring',
+        evidenceKind: 'codex-original-source-addition',
+        author: 'NightStudy contributors',
+        license: 'MIT',
+        authoringMethod: 'Direct Codex bilingual writing',
+        review: 'codex-reviewed',
+        expertCertified: false,
+        sourceAdditionVersion: 'codex-original-source-v1',
+        semanticKey: meta.semanticKey,
+        definitionZhSha256: sha(source.definitionZh),
+        definitionEnSha256: sha(source.definitionEn),
+        editorialReview: review,
+      }),
+      'learning_senses_source_addition_authorship',
+    );
+    sources.set(source.id, source);
+  }
+  for (const row of rows)
+    for (const sense of row.senses)
+      for (const binding of sense.sourceBindings) {
+        const source = sources.get(binding.sourceSenseId);
+        if (source) {
+          check(
+            source.wordId === binding.wordId &&
+              binding.wordId === row.wordId &&
+              sha(source.pos) === binding.sourcePosSha256 &&
+              sha(source.definitionZh) === binding.sourceDefinitionZhSha256 &&
+              sha(source.definitionEn) === binding.sourceDefinitionEnSha256,
+            'learning_senses_source_addition_binding',
+          );
+          used.add(source.id);
+        } else
+          check(
+            !binding.sourceSenseId.startsWith('learning-source-'),
+            'learning_senses_source_addition_missing',
+          );
+      }
+  check(used.size === sources.size, 'learning_senses_source_addition_unbound');
+  return sourceRows;
+}
+
+const additionsOf = (bundle) =>
+  (bundle.bundles || [bundle]).flatMap((leaf) => leaf.sourceRows || []);
+
+function pinnedFile(filename, maximum) {
+  const stat = fs.lstatSync(filename);
+  check(
+    stat.isFile() && !stat.isSymbolicLink() && stat.size <= maximum,
+    'learning_senses_unsafe_or_oversized_file',
+  );
+  return fs.readFileSync(filename);
 }
 
 function exactRecord(actual, expected, code) {
@@ -99,26 +384,47 @@ function exactRecord(actual, expected, code) {
 export function verifyLearningSenses(data, bundle, baseline = null) {
   const { manifest, rows } = bundle;
   check(data.siteId && data.siteId === data.expectedSiteId, 'learning_senses_realm_mismatch');
-  check(
-    data.pack?.status === 'ready' &&
-      data.pack.sha256 === manifest.sha256 &&
-      data.pack.version === manifest.version &&
-      data.pack.entryCount === manifest.wordCount &&
-      data.pack.definitionZhCount === manifest.senseCount &&
-      data.pack.definitionEnCount === manifest.senseCount,
-    'learning_senses_installed_pin',
-  );
-  check(
-    data.pack.tagCounts?.kind === 'learning-senses' &&
-      data.pack.tagCounts.learningSenses === manifest.senseCount &&
-      data.pack.tagCounts.contextExamples === manifest.exampleCount &&
-      data.pack.tagCounts.exhaustiveBookCoverage === false,
-    'learning_senses_installed_scope',
-  );
+  for (const leaf of bundle.bundles || [bundle]) {
+    const manifest = leaf.manifest;
+    const pack = bundle.bundles ? data.packs?.find((pack) => pack.id === manifest.id) : data.pack;
+    check(
+      pack?.status === 'ready' &&
+        pack.sha256 === manifest.sha256 &&
+        pack.version === manifest.version &&
+        pack.entryCount === manifest.wordCount &&
+        pack.definitionZhCount === manifest.senseCount &&
+        pack.definitionEnCount === manifest.senseCount,
+      'learning_senses_installed_pin',
+    );
+    check(
+      pack.tagCounts?.kind === 'learning-senses' &&
+        pack.tagCounts.learningSenses === manifest.senseCount &&
+        pack.tagCounts.contextExamples === manifest.exampleCount &&
+        pack.tagCounts.exhaustiveBookCoverage === false,
+      'learning_senses_installed_scope',
+    );
+    verifyOriginalSourceAdditions(leaf.sourceRows || [], leaf.rows, manifest.sourceAdditions);
+    if (manifest.sourceAdditions)
+      check(
+        pack.tagCounts.sourceAdditionsSha256 === manifest.sourceAdditions.sha256 &&
+          pack.tagCounts.sourceAdditionCount === leaf.sourceRows.length,
+        'learning_senses_installed_source_addition_pin',
+      );
+  }
   const words = new Map(data.words.map((word) => [word.id, word]));
   const raw = new Map(data.rawSenses.map((sense) => [sense.id, sense]));
+  for (const source of additionsOf(bundle)) {
+    const { normalizedLemma, ...record } = source;
+    exactRecord(raw.get(source.id), record, 'learning_senses_original_source_addition_changed');
+  }
   const meanings = new Map(data.learningSenses.map((sense) => [sense.id, sense]));
   const bindings = new Map(data.bindings.map((binding) => [binding.id, binding]));
+  const bindingsByMeaning = new Map();
+  for (const binding of data.bindings) {
+    const values = bindingsByMeaning.get(binding.learningSenseId) || [];
+    values.push(binding);
+    bindingsByMeaning.set(binding.learningSenseId, values);
+  }
   const examples = new Map(data.examples.map((example) => [example.id, example]));
   check(
     words.size === rows.length &&
@@ -152,9 +458,7 @@ export function verifyLearningSenses(data, bundle, baseline = null) {
         meaning.wordId === row.wordId && meaning.status === 'published',
         'learning_senses_meaning_cross_word',
       );
-      const actualBindings = data.bindings.filter(
-        (binding) => binding.learningSenseId === meaning.id,
-      );
+      const actualBindings = bindingsByMeaning.get(meaning.id) || [];
       check(
         actualBindings.length === expectedBindings.length &&
           meaning.bindingHash === meaningHash({ ...meaning, sourceBindings: actualBindings }),
@@ -224,7 +528,17 @@ export function verifyLearningSenses(data, bundle, baseline = null) {
         baseline.instanceId === data.instanceId,
       'learning_senses_baseline_realm',
     );
-    const current = sourceSnapshot(data);
+    const expectedNewIds = new Set(additionsOf(bundle).map((source) => source.id));
+    const allowedNewIds = new Set(baseline.allowedNewSourceIds || []);
+    check(
+      allowedNewIds.size === (baseline.allowedNewSourceIds || []).length &&
+        [...allowedNewIds].every((id) => expectedNewIds.has(id)),
+      'learning_senses_baseline_unpinned_source_exclusion',
+    );
+    const current = sourceSnapshot({
+      ...data,
+      rawSenses: data.rawSenses.filter((source) => !allowedNewIds.has(source.id)),
+    });
     check(
       isDeepStrictEqual(current.words, baseline.words) &&
         isDeepStrictEqual(current.rawSenses, baseline.rawSenses),
@@ -243,11 +557,17 @@ export function verifyLearningSenses(data, bundle, baseline = null) {
   };
 }
 
-export function sourceSnapshot(data) {
+export function sourceSnapshot(data, expectedNewSources = []) {
+  const present = new Set(data.rawSenses.map((source) => source.id));
+  const allowedNewSourceIds = expectedNewSources
+    .filter((source) => !present.has(source.id))
+    .map((source) => source.id)
+    .sort();
   return {
     formatVersion: 1,
     siteId: data.siteId,
     instanceId: data.instanceId,
+    ...(allowedNewSourceIds.length ? { allowedNewSourceIds } : {}),
     words: data.words
       .map((word) =>
         Object.fromEntries(
@@ -264,6 +584,7 @@ export function sourceSnapshot(data) {
         wordId: sense.wordId,
         pos: sense.pos,
         ordinal: sense.ordinal,
+        contentMetadataSha256: sha(canonical(sense.contentMetadata ?? {})),
         fieldHashes: Object.fromEntries(
           ['definitionZh', 'definitionEn', 'exampleZh', 'exampleEn'].map((field) => [
             field,
@@ -275,7 +596,13 @@ export function sourceSnapshot(data) {
   };
 }
 
-export async function verifyLearningSentenceAudio(rows, audioRows, audioRoot) {
+export async function verifyLearningSentenceAudio(
+  rows,
+  audioRows,
+  audioRoot,
+  policy = emptySentenceAudioPolicy(),
+) {
+  const held = bindSentenceAudioHoldReferences(policy, learningSentenceAudioTargets(rows));
   const targets = new Map(
     rows
       .flatMap((row) => row.senses.flatMap((sense) => sense.examples))
@@ -287,10 +614,17 @@ export async function verifyLearningSentenceAudio(rows, audioRows, audioRoot) {
   const missing = [];
   const verifiedFiles = new Set();
   const problems = [];
-  let readyTargets = 0;
+  let readyTargets = 0,
+    heldTargets = 0;
   for (const [textHash, text] of targets)
     for (const accent of ['US', 'UK']) {
       const entry = installed.get(textHash + '\0' + accent);
+      if (held.has(sentenceAudioIdentity(textHash, accent))) {
+        if (entry?.status === 'ready')
+          problems.push({ textHash, accent, error: 'held_sentence_audio_ready' });
+        else heldTargets++;
+        continue;
+      }
       if (!entry || entry.status !== 'ready') {
         missing.push({ textHash, accent });
         continue;
@@ -346,6 +680,8 @@ export async function verifyLearningSentenceAudio(rows, audioRows, audioRoot) {
     sentences: targets.size,
     targets: targets.size * 2,
     readyTargets,
+    heldTargets,
+    accountedTargets: readyTargets + heldTargets,
     missingCount: missing.length,
     integrityProblemCount: problems.length,
     verifiedFiles: verifiedFiles.size,
@@ -355,13 +691,16 @@ export async function verifyLearningSentenceAudio(rows, audioRows, audioRoot) {
 }
 
 async function selfTest() {
-  const bundle = readLearningSensesBundle();
+  const bundle = readLearningSensesBundle(
+    new URL('../data/learning-senses-v1.manifest.json', import.meta.url),
+  );
   const { rows, manifest } = bundle;
   const data = {
     expectedSiteId: 'fixture',
     siteId: 'fixture',
     instanceId: 'original-fixture',
     pack: {
+      id: manifest.id,
       status: 'ready',
       sha256: manifest.sha256,
       version: manifest.version,
@@ -419,6 +758,75 @@ async function selfTest() {
       .find((item) => item.id === sense.id).bindingHash;
   const baseline = sourceSnapshot(data);
   assert.equal(verifyLearningSenses(data, bundle, baseline).learningSenses, manifest.senseCount);
+  const collectionDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'nightstudy-sense-collection-'),
+  );
+  try {
+    const leafFile = new URL('../data/learning-senses-v1.manifest.json', import.meta.url);
+    const leafBytes = fs.readFileSync(leafFile);
+    const leafName = 'learning-senses-v1.manifest.json';
+    fs.writeFileSync(path.join(collectionDirectory, leafName), leafBytes);
+    fs.copyFileSync(
+      new URL('../data/' + manifest.fileName, import.meta.url),
+      path.join(collectionDirectory, manifest.fileName),
+    );
+    const collection = {
+      formatVersion: 2,
+      kind: 'learning-senses-collection',
+      id: 'learning-senses-collection-test',
+      version: 'test',
+      sourceExportSha256: manifest.sourceExportSha256,
+      bilingualOverlaySha256: manifest.bilingualOverlaySha256,
+      requiredWordCount: rows.length,
+      wordCount: rows.length,
+      senseCount: manifest.senseCount,
+      exampleCount: manifest.exampleCount,
+      editorialReview: 'codex-reviewed',
+      semanticQualityCertified: false,
+      exhaustiveBookCoverage: false,
+      requiredWordsSha256: sha(
+        canonical(
+          rows
+            .map(({ wordId, normalizedLemma }) => ({ wordId, normalizedLemma }))
+            .sort((a, b) => (a.wordId < b.wordId ? -1 : 1)),
+        ),
+      ),
+      shards: [
+        {
+          id: manifest.id,
+          manifestFileName: leafName,
+          bytes: leafBytes.length,
+          sha256: sha(leafBytes),
+          wordCount: manifest.wordCount,
+          senseCount: manifest.senseCount,
+          exampleCount: manifest.exampleCount,
+        },
+      ],
+    };
+    const collectionFile = path.join(collectionDirectory, 'collection.json');
+    const write = () => fs.writeFileSync(collectionFile, JSON.stringify(collection));
+    write();
+    const all = readLearningSensesBundle(collectionFile);
+    // The read-side pin test uses real bytes; DB assertions retain the explicit synthetic source fixture above.
+    const fixtureCollection = { ...all, rows };
+    assert.equal(
+      verifyLearningSenses({ ...data, packs: [data.pack] }, fixtureCollection, baseline).words,
+      rows.length,
+    );
+    assert.throws(() => verifyLearningSenses({ ...data, packs: [] }, all), /installed_pin/);
+    collection.requiredWordsSha256 = '0'.repeat(64);
+    write();
+    assert.throws(() => readLearningSensesBundle(collectionFile), /required_union/);
+    collection.shards[0].sha256 = '0'.repeat(64);
+    write();
+    assert.throws(() => readLearningSensesBundle(collectionFile), /shard_checksum/);
+    collection.shards[0].manifestFileName = '../learning-senses-v1.manifest.json';
+    write();
+    assert.throws(() => readLearningSensesBundle(collectionFile), /shard_identity/);
+    assert.throws(() => readLearningSensesBundle(leafFile, { remaining: 1 }));
+  } finally {
+    fs.rmSync(collectionDirectory, { recursive: true, force: true });
+  }
   let changed = structuredClone(data);
   changed.rawSenses[0].pos = 'v.';
   assert.throws(() => verifyLearningSenses(changed, bundle), /source_byte_drift/);
@@ -463,6 +871,53 @@ async function selfTest() {
     audio = await verifyLearningSentenceAudio(selected, audioRows, scratch);
     assert.equal(audio.readyTargets, 4);
     assert.equal(audio.verifiedFiles, 1);
+    const firstExample = selected[0].senses[0].examples[0];
+    const hold = {
+      textHash: firstExample.contentMetadata.textHash,
+      accent: 'UK',
+      text: normalizeAudioText(firstExample.exampleEn),
+      learningSenseId: selected[0].senses[0].id,
+      exampleId: firstExample.id,
+    };
+    const policy = {
+      entries: [hold],
+      byIdentity: new Map([[sentenceAudioIdentity(hold.textHash, 'UK'), hold]]),
+    };
+    const unavailable = audioRows.map((row) =>
+      row.textHash === hold.textHash && row.accent === 'UK' ? { ...row, status: 'held' } : row,
+    );
+    audio = await verifyLearningSentenceAudio(selected, unavailable, scratch, policy);
+    assert.equal(audio.readyTargets, 3);
+    assert.equal(audio.heldTargets, 1);
+    assert.equal(audio.accountedTargets, 4);
+    assert.equal(audio.missingCount, 0);
+    assert.equal(audio.integrityProblemCount, 0);
+    audio = await verifyLearningSentenceAudio(selected, audioRows, scratch, policy);
+    assert.equal(audio.integrityProblemCount, 1);
+    assert.equal(audio.heldTargets, 0);
+    assert.equal(audio.problems[0].error, 'held_sentence_audio_ready');
+    audio = await verifyLearningSentenceAudio(
+      selected,
+      unavailable.filter((row) => !(row.textHash === hold.textHash && row.accent === 'US')),
+      scratch,
+      policy,
+    );
+    assert.equal(audio.heldTargets, 1);
+    assert.equal(audio.missingCount, 1);
+    await assert.rejects(
+      verifyLearningSentenceAudio(selected, unavailable, scratch, {
+        entries: [{ ...hold, exampleId: 'wrong-example' }],
+        byIdentity: policy.byIdentity,
+      }),
+      /meaning_mismatch/,
+    );
+    await assert.rejects(
+      verifyLearningSentenceAudio(selected, unavailable, scratch, {
+        entries: [{ ...hold, textHash: '0'.repeat(64) }],
+        byIdentity: policy.byIdentity,
+      }),
+      /scope_missing/,
+    );
     fs.writeFileSync(path.join(scratch, 'corrupt.mp3'), Buffer.alloc(128, 8));
     audioRows[1].fileKey = 'corrupt.mp3';
     audio = await verifyLearningSentenceAudio(selected, audioRows, scratch);
@@ -503,7 +958,7 @@ async function selfTest() {
     /single_site_database_url_missing/,
   );
   return {
-    checks: 17,
+    checks: 35,
     realPackWords: manifest.wordCount,
     realPackMeanings: manifest.senseCount,
     realPackExamples: manifest.exampleCount,
@@ -583,7 +1038,21 @@ async function main() {
     !(values.snapshot && (values.baseline || values.audio)),
     'snapshot_verification_flags_are_exclusive',
   );
-  const bundle = readLearningSensesBundle(values.manifest);
+  const dataDirectory = fileURLToPath(new URL('../data/', import.meta.url));
+  const policy = values.audio ? readSentenceAudioPolicy(dataDirectory) : emptySentenceAudioPolicy();
+  const manifestFile =
+    values.manifest ||
+    (policy.manifest
+      ? path.join(dataDirectory, policy.manifest.learningSensesManifestFileName)
+      : undefined);
+  if (values.audio && policy.manifest)
+    check(
+      sha(pinnedFile(manifestFile, 1024 * 1024)) === policy.manifest.learningSensesManifestSha256,
+      'sentence_audio_policy_verification_manifest_mismatch',
+    );
+  const bundle = readLearningSensesBundle(manifestFile);
+  if (values.audio)
+    bindSentenceAudioHoldReferences(policy, learningSentenceAudioTargets(bundle.rows));
   const sites = verificationSites(values);
   const { Client } = await import('pg');
   const baseline = values.baseline ? JSON.parse(fs.readFileSync(values.baseline, 'utf8')) : null;
@@ -618,6 +1087,13 @@ async function main() {
         instanceId: state.instanceId,
         pack: (await client.query(`SELECT * FROM "ContentPack" WHERE id=$1`, [bundle.manifest.id]))
           .rows[0],
+        packs: bundle.bundles
+          ? (
+              await client.query(`SELECT * FROM "ContentPack" WHERE id=ANY($1::text[])`, [
+                bundle.bundles.map((leaf) => leaf.manifest.id),
+              ])
+            ).rows
+          : undefined,
         words: (
           await client.query(
             `SELECT id,lemma,"normalizedLemma","sourceRef","contentVersion",status FROM "Word" WHERE id=ANY($1::text[])`,
@@ -626,7 +1102,7 @@ async function main() {
         ).rows,
         rawSenses: (
           await client.query(
-            `SELECT id,"wordId",pos,"definitionZh","definitionEn","exampleZh","exampleEn",ordinal FROM "Sense" WHERE "wordId"=ANY($1::text[])`,
+            `SELECT id,"wordId",pos,"definitionZh","definitionEn","exampleZh","exampleEn",ordinal,"contentMetadata" FROM "Sense" WHERE "wordId"=ANY($1::text[])`,
             [wordIds],
           )
         ).rows,
@@ -652,10 +1128,12 @@ async function main() {
           'learning_senses_snapshot_scope_incomplete',
         );
         const sourceById = new Map(data.rawSenses.map((sense) => [sense.id, sense]));
+        const newById = new Map(additionsOf(bundle).map((source) => [source.id, source]));
         for (const row of bundle.rows)
           for (const sense of row.senses)
             for (const binding of sense.sourceBindings) {
-              const raw = sourceById.get(binding.sourceSenseId);
+              const raw =
+                sourceById.get(binding.sourceSenseId) ?? newById.get(binding.sourceSenseId);
               check(
                 raw?.wordId === row.wordId &&
                   sha(raw.pos) === binding.sourcePosSha256 &&
@@ -664,7 +1142,16 @@ async function main() {
                 'learning_senses_snapshot_source_drift',
               );
             }
-        snapshots.sites[state.siteId] = sourceSnapshot(data);
+        for (const source of additionsOf(bundle))
+          if (sourceById.has(source.id)) {
+            const { normalizedLemma, ...record } = source;
+            exactRecord(
+              sourceById.get(source.id),
+              record,
+              'learning_senses_snapshot_new_source_changed',
+            );
+          }
+        snapshots.sites[state.siteId] = sourceSnapshot(data, additionsOf(bundle));
         summaries.push({
           siteId: state.siteId,
           snapshotWords: data.words.length,
@@ -687,6 +1174,7 @@ async function main() {
             bundle.rows,
             audioRows,
             values['audio-root'] || process.env.AUDIO_CACHE_DIR || '.local/audio',
+            policy,
           );
           if (audio.missingCount || audio.integrityProblemCount) process.exitCode = 1;
         }
@@ -719,7 +1207,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error(
       JSON.stringify({
         ok: false,
-        error: error instanceof VerificationError ? error.code : 'verification_runtime_failure',
+        error:
+          error instanceof VerificationError || error instanceof SentenceAudioPolicyError
+            ? error.code
+            : 'verification_runtime_failure',
         details: error instanceof VerificationError ? error.details : {},
       }),
     );

@@ -149,6 +149,60 @@ it('renders the selected bilingual meaning and only its own context with English
   expect(markup).toContain('class="word-token"');
 });
 
+it('displays the focused case-sensitive spelling and its matching meaning', () => {
+  const value: Word = {
+    ...word,
+    lemma: 'Polish',
+    pronunciationCompatible: false,
+    senses: [
+      {
+        id: 'surface',
+        displayLemma: 'polish',
+        pos: 'v.',
+        definitionZh: '擦亮',
+        definitionEn: 'To make a surface shine.',
+      },
+      {
+        id: 'country',
+        displayLemma: 'Polish',
+        pos: 'adj.',
+        definitionZh: '波兰的',
+        definitionEn: 'Relating to Poland.',
+      },
+    ],
+  };
+  const lower = render(
+    h(WordView, {
+      word: value,
+      focusSenseId: 'surface',
+      presentation: 'study',
+      interactive: false,
+    }),
+  );
+  expect(lower).toContain('class="word-title">polish</h2>');
+  expect(lower).toContain('To make a surface shine.');
+  expect(lower).not.toContain('Relating to Poland.');
+  const upper = render(
+    h(WordView, {
+      word: value,
+      focusSenseId: 'country',
+      presentation: 'study',
+      interactive: false,
+    }),
+  );
+  expect(upper).toContain('class="word-title">Polish</h2>');
+  expect(upper).toContain('Relating to Poland.');
+  const hidden = render(
+    h(WordView, {
+      word: { id: 'am', lemma: 'AM', displayLemma: 'am' },
+      hideMeanings: true,
+      presentation: 'study',
+    }),
+  );
+  expect(hidden).toContain('class="word-title">am</h2>');
+  expect(hidden).not.toContain('meaning-zh');
+});
+
 it('word-card content cannot trigger another card even within an active outer context', () => {
   const markup = render(h(WordCardContent, { word }));
   expect(markup).not.toContain('class="word-token"');

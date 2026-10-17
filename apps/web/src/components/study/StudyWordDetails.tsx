@@ -7,6 +7,7 @@ import { SentenceSaveButton } from '../SentenceSaveButton';
 import { SentenceAudioButton } from '../SentenceAudio';
 import { BilingualDefinition } from '../BilingualDefinition';
 import { stopApplicationAudio } from '../../lib/audio-manager';
+import { senseDisplayLemma, wordSpellingVariants } from '../../lib/word-spelling';
 
 export interface StudyExample {
   id: string;
@@ -160,6 +161,7 @@ export function StudyWordDetails({
     : -1;
   const activeIndex = Math.max(0, Math.min(selectedIndex, senses.length - 1));
   const sense = senses[activeIndex];
+  const showSpelling = wordSpellingVariants(word).length > 1;
   useEffect(() => () => stopApplicationAudio(), [word.id, sense?.id]);
   const examples = studyExamples(word, sense);
   const collocations = (word.collocations ?? []).filter((entry) => dictionaryText(entry.lemma));
@@ -184,7 +186,12 @@ export function StudyWordDetails({
               aria-pressed={entry.id === sense?.id}
               onClick={() => select(order)}
             >
-              <span>{entry.pos || '词义'}</span>
+              <span>
+                {showSpelling && senseDisplayLemma(word, entry)
+                  ? `${senseDisplayLemma(word, entry)} · `
+                  : ''}
+                {entry.pos || '词义'}
+              </span>
               <span className="lookup-sense-label">
                 {dictionaryText(entry.definitionZh) || dictionaryText(entry.definitionEn)}
               </span>
@@ -195,7 +202,12 @@ export function StudyWordDetails({
       {sense ? (
         <section className="study-meaning-browser" aria-label="词义">
           <div className="study-meaning-topline">
-            <span className="sense-pos">{sense.pos || '词义'}</span>
+            <span className="sense-pos">
+              {showSpelling && senseDisplayLemma(word, sense)
+                ? `${senseDisplayLemma(word, sense)} · `
+                : ''}
+              {sense.pos || '词义'}
+            </span>
             {senses.length > 1 && (
               <div className="study-meaning-controls">
                 <span>

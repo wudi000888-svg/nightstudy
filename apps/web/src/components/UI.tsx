@@ -1,8 +1,9 @@
-import { type ReactNode, useEffect, useId, useRef } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { AlertCircle, ArrowRight, LoaderCircle, Star, X, MoonStar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { errorText } from '../lib/api';
 import type { Word } from '../lib/types';
+import { wordDisplayLemma } from '../lib/word-spelling';
 import { AudioButton } from './Pronunciation';
 import { dictionaryText } from '../lib/dictionary';
 import { StudyWordDetails } from './study/StudyWordDetails';
@@ -291,6 +292,22 @@ export function WordView({
   const senses = available.filter((sense) =>
     [sense.definitionZh, sense.definitionEn].some((value) => !!dictionaryText(value)),
   );
+  const [selection, setSelection] = useState({
+    wordId: word.id,
+    focusSenseId,
+    senseId: focusSenseId,
+  });
+  const currentSenseId = onSenseChange
+    ? focusSenseId
+    : selection.wordId === word.id && selection.focusSenseId === focusSenseId
+      ? selection.senseId
+      : focusSenseId;
+  const selectedSense = senses.find((sense) => sense.id === currentSenseId) ?? senses[0];
+  const lemma = wordDisplayLemma(word, selectedSense);
+  function selectSense(id: string) {
+    setSelection({ wordId: word.id, focusSenseId, senseId: id });
+    onSenseChange?.(id);
+  }
   const sourceTranscription =
     word.pronunciationCompatible !== false &&
     (word.phonetic || word.phonetics?.find((entry) => entry.region === 'unspecified')?.text);
@@ -300,9 +317,7 @@ export function WordView({
     >
       <div className="word-title-row">
         <div>
-          <h2 className={`word-title${word.lemma.length > 20 ? ' word-title-long' : ''}`}>
-            {word.lemma}
-          </h2>
+          <h2 className={`word-title${lemma.length > 20 ? ' word-title-long' : ''}`}>{lemma}</h2>
           {!!dictionaryText(word.dictionaryName) && (
             <span className="word-dictionary-name">{dictionaryText(word.dictionaryName)}</span>
           )}
@@ -312,7 +327,7 @@ export function WordView({
             </div>
           )}
         </div>
-        <AudioButton word={word} autoPlay={presentation === 'study'} />
+        <AudioButton word={{ ...word, lemma }} autoPlay={presentation === 'study'} />
         {headerAction && <div className="word-header-action">{headerAction}</div>}
       </div>
       {!hideMeanings && (
@@ -322,8 +337,8 @@ export function WordView({
           senses={senses}
           englishSenses={[]}
           interactive={interactive}
-          selectedSenseId={focusSenseId}
-          onSenseChange={onSenseChange}
+          selectedSenseId={selectedSense?.id}
+          onSenseChange={selectSense}
           showDirectory={presentation === 'reading'}
         />
       )}

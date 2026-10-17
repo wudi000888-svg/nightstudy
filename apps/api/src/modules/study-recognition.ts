@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import { verifiedLearningSenses } from './learning-sense-view.js';
-import { normalize, obj, type WordWithSenses } from './shared.js';
+import { verifiedLearningSenses, type VerifiableLearningSense } from './learning-sense-view.js';
+import { normalize, obj } from './shared.js';
+import { recognitionWordsConfusable } from './recognition-confusables.js';
 
 export interface RecognitionQuestion {
   options: { id: string; text: string; pos: string }[];
@@ -13,6 +14,11 @@ const tokens = (text: string) =>
     .split(/[，,；;、。.!！?？（）()\s]+/)
     .filter((t) => t.length > 1 || /[\u3400-\u9fff]/u.test(t));
 const part = (pos: string) => pos.replace(/[.\s]/g, '').replace(/^v[ti]$/, 'v');
+export type RecognitionWord = {
+  id: string;
+  lemma: string;
+  learningSenses?: VerifiableLearningSense[];
+};
 const usable = (sense: { definitionZh: string; definitionEn: string; pos: string }) =>
   sense.pos.trim() &&
   sense.definitionEn.trim() &&
@@ -20,20 +26,32 @@ const usable = (sense: { definitionZh: string; definitionEn: string; pos: string
   clean(sense.definitionZh).length <= 120 &&
   !/待补|待审核|暂无|TODO/i.test(sense.definitionZh);
 
+export function recognitionFocus(word: RecognitionWord, focusId: string | null) {
+  return verifiedLearningSenses(word).find(
+    (sense) =>
+      usable(sense) &&
+      (sense.id === focusId ||
+        sense.sourceBindings.some((binding) => binding.sourceSenseId === focusId)),
+  );
+}
+
+export function recognitionPosVariants(pos: string) {
+  return part(pos) === 'v' ? ['v.', 'vt.', 'vi.'] : [pos];
+}
+
 /** Only verified, source-bound meanings may enter an issued recognition question. */
 export function createRecognitionQuestion(
-  word: WordWithSenses,
+  word: RecognitionWord,
   focusId: string | null,
-  pool: WordWithSenses[],
+  pool: RecognitionWord[],
 ): RecognitionQuestion | null {
   const meanings = verifiedLearningSenses(word);
-  const focus = meanings.find(
-    (s) => s.id === focusId || s.sourceBindings.some((b) => b.sourceSenseId === focusId),
-  );
+  const focus = recognitionFocus(word, focusId);
   if (!focus || !usable(focus)) return null;
   const forbidden = meanings.flatMap((s) => [clean(s.definitionZh), ...tokens(s.definitionZh)]);
   const targetLemma = normalize(word.lemma);
   const candidates: { id: string; text: string; pos: string }[] = [];
+  const chosenLemmas: string[] = [];
   const option = (sense: { id: string; definitionZh: string; pos: string }) => ({
     id: randomUUID(),
     text: clean(sense.definitionZh),
@@ -49,6 +67,11 @@ export function createRecognitionQuestion(
     const lemma = normalize(candidate.lemma);
     if (candidate.id === word.id || lemma.includes(targetLemma) || targetLemma.includes(lemma))
       continue;
+    if (
+      recognitionWordsConfusable(targetLemma, lemma) ||
+      chosenLemmas.some((previous) => recognitionWordsConfusable(previous, lemma))
+    )
+      continue;
     for (const sense of verifiedLearningSenses(candidate)) {
       if (!usable(sense) || part(sense.pos) !== part(focus.pos)) continue;
       const value = option(sense),
@@ -61,6 +84,7 @@ export function createRecognitionQuestion(
       )
         continue;
       candidates.push(value);
+      chosenLemmas.push(lemma);
       break;
     }
     if (candidates.length === 3) break;

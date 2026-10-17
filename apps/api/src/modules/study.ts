@@ -30,6 +30,8 @@ import { applyCurrentPronunciationPolicy, supplementIssuedWord } from './content
 import { wordPronunciationCompatible } from './learning-sense-view.js';
 import { applyFamiliarityPolicy, collectionState } from './collection-state.js';
 import { createRecognitionQuestion, readRecognitionQuestion } from './study-recognition.js';
+import { loadRecognitionPool } from './study-recognition-pool.js';
+import { isBuiltInDefaultBook, loadAcceptedReviewFocusIds } from './study-learning-focus.js';
 import {
   ensureDailyPlan,
   planView,
@@ -64,6 +66,21 @@ export function spellingQuestion(word: ReturnType<typeof wordDto>, focusSenseId?
     explanation: sense?.definitionZh ?? '',
   };
 }
+
+/** Freeze only the spelling of the actual issued meaning; canonical identity stays unchanged. */
+export function studyWordSnapshot(word: ReturnType<typeof wordDto>, focusSenseId: string | null) {
+  const focus = focusSenseId
+    ? word.senses.find(
+        (sense) => sense.id === focusSenseId || sense.sourceSenseIds.includes(focusSenseId),
+      )
+    : word.senses[0];
+  const displayLemma =
+    focus && 'displayLemma' in focus && typeof focus.displayLemma === 'string'
+      ? focus.displayLemma
+      : undefined;
+  return { ...word, ...(displayLemma ? { displayLemma } : {}) };
+}
+
 export function sessionDto(
   session: FullSession,
   progress: StudyProgress[] = [],
@@ -119,6 +136,9 @@ export function sessionDto(
         : {
             id: item.wordId,
             lemma: snapshot.lemma,
+            ...(typeof snapshot.displayLemma === 'string'
+              ? { displayLemma: snapshot.displayLemma }
+              : {}),
             phonetic: snapshot.phonetic,
             phoneticUs: snapshot.phoneticUs,
             phoneticUk: snapshot.phoneticUk,
@@ -387,12 +407,15 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
         bucket: 'new' | 'review';
         focusSenseId: string | null;
       }> = [];
+      let newFocusPolicy: 'explicit' | 'built-in-default' = 'explicit';
       const append = (
         word: Prisma.WordGetPayload<{ include: typeof wordInclude }>,
         bucket: 'new' | 'review',
         focusSenseId: string | null = null,
       ) => {
-        const focus = selectWordLearningSense(word, focusSenseId);
+        const focus = selectWordLearningSense(word, focusSenseId, {
+          focusPolicy: bucket === 'new' ? newFocusPolicy : 'explicit',
+        });
         if (focus && chosen.length < size && !chosen.some((item) => item.word.id === word.id))
           chosen.push({
             word,
@@ -469,6 +492,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
         const free = Math.min(size - chosen.length, Math.max(0, plan.targetTotal - planned.length));
         const bookId = input.bookId ?? plan.sourceBookId;
         if (free && bookId && input.mode !== 'review') {
+          if (await isBuiltInDefaultBook(tx, bookId)) newFocusPolicy = 'built-in-default';
           const profile = await tx.masteryProfile.findUnique({
             where: { userId_goal: { userId: user.id, goal: plan.goal } },
           });
@@ -556,6 +580,18 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
           });
         return response;
       }
+      const reviewFocus = await loadAcceptedReviewFocusIds(
+        tx,
+        user.id,
+        chosen.filter((item) => item.bucket === 'review').map((item) => item.word.id),
+      );
+      for (const item of chosen) {
+        if (item.bucket !== 'review' || !reviewFocus.has(item.word.id)) continue;
+        // A historical focus must still pass the current source-binding proof.
+        // Never revive held content or rewrite an already-issued snapshot.
+        const focus = selectWordLearningSense(item.word, reviewFocus.get(item.word.id));
+        if (focus) item.focusSenseId = focus.id;
+      }
       const progress = await tx.studyProgress.findMany({
         where: { userId: user.id, wordId: { in: chosen.map((item) => item.word.id) } },
       });
@@ -566,18 +602,13 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
       const recognitionPool =
         learningPreference?.meaningChoiceEnabled !== false &&
         chosen.some((item) => item.bucket === 'new')
-          ? await tx.word.findMany({
-              where: {
-                status: 'published',
-                learningSenses: { some: { status: 'published' } },
-                ...((input.bookId ?? plan.sourceBookId)
-                  ? { bookItems: { some: { bookId: (input.bookId ?? plan.sourceBookId)! } } }
-                  : { id: { in: chosen.map((item) => item.word.id) } }),
-              },
-              orderBy: { id: 'asc' },
-              take: 160,
-              include: wordInclude,
-            })
+          ? await loadRecognitionPool(
+              tx,
+              input.bookId ?? plan.sourceBookId,
+              chosen
+                .filter((item) => item.bucket === 'new')
+                .map((item) => ({ word: item.word, focusId: item.focusSenseId })),
+            )
           : [];
       const session = await tx.studySession.create({
         data: {
@@ -590,7 +621,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
             : null,
           items: {
             create: chosen.map((item, ordinal) => {
-              const snapshot = wordDto(item.word);
+              const snapshot = studyWordSnapshot(wordDto(item.word), item.focusSenseId);
               return {
                 wordId: item.word.id,
                 focusSenseId: item.focusSenseId,
@@ -793,6 +824,7 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
           : null;
         const outcome = scheduler.next(before, now, rating);
         const wasNew = !current.firstLearnedAt;
+        const ratedFocusId = item.focusSenseId?.trim() ? item.focusSenseId : null;
         nextProgress = await tx.studyProgress.update({
           where: { id: current.id },
           data: {
@@ -801,6 +833,8 @@ export async function registerStudy(app: FastifyInstance, getContext: ContextRes
             lastReviewAt: now,
             firstLearnedAt: current.firstLearnedAt ?? now,
             revision: { increment: 1 },
+            reviewFocusSenseId: ratedFocusId,
+            reviewFocusRevision: ratedFocusId ? current.revision + 1 : 0,
           },
         });
         const ratingPlan = await recordPlanRating(

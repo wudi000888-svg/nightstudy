@@ -1,9 +1,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import os from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import { parseArgs, isDeepStrictEqual } from 'node:util';
 import assert from 'node:assert/strict';
+import { readLearningSensesBundle } from './check-learning-senses-install.mjs';
+import {
+  readSentenceAudioPolicy,
+  emptySentenceAudioPolicy,
+  learningSentenceAudioTargets,
+  bindSentenceAudioHoldReferences,
+  sentenceAudioIdentity,
+  assertHeldSentenceAudioUnavailable,
+  verifySentenceAudioPackHolds,
+  SentenceAudioPolicyError,
+} from './check-sentence-audio-policy.mjs';
 import {
   readPolishedContent,
   verifyPolishedContent,
@@ -602,16 +615,166 @@ async function verifyAudio(db, data, verifiedAudioBytes) {
     sampleFiles: media.length,
   };
 }
+export function readSentenceAudioCollectionPins(filename) {
+  requireCheck(
+    path.basename(filename) === 'sentence-audio-v4.collection.json',
+    'sentence_audio_collection_filename_invalid',
+  );
+  const read = (file) => {
+    const stat = fs.lstatSync(file);
+    requireCheck(
+      stat.isFile() && !stat.isSymbolicLink() && stat.size <= 1024 * 1024,
+      'sentence_audio_collection_unsafe_file',
+    );
+    return fs.readFileSync(file);
+  };
+  const collection = JSON.parse(read(filename));
+  requireCheck(
+    Object.keys(collection).length === 9 &&
+      collection.formatVersion === 1 &&
+      collection.kind === 'sentence-audio-collection' &&
+      collection.id === 'sentence-audio-v4' &&
+      Array.isArray(collection.packs) &&
+      collection.packs.length > 0 &&
+      collection.packs.length <= 1000 &&
+      Number.isSafeInteger(collection.entryCount) &&
+      collection.entryCount > 0 &&
+      collection.entryCount <= 2000000 &&
+      /^learning-senses-collection-[a-z0-9-]+\.manifest\.json$/.test(
+        collection.learningSensesManifestFileName,
+      ) &&
+      /^[a-f0-9]{64}$/.test(collection.learningSensesManifestSha256),
+    'sentence_audio_collection_invalid',
+  );
+  const directory = path.dirname(filename);
+  const policy = readSentenceAudioPolicy(directory);
+  requireCheck(
+    policy.manifestSha256 === collection.pronunciationHoldsManifestSha256 &&
+      collection.pronunciationHoldsManifestFileName === 'sentence-audio-holds-v1.manifest.json',
+    'sentence_audio_collection_policy_pin_mismatch',
+  );
+  requireCheck(
+    sha(read(path.join(directory, collection.learningSensesManifestFileName))) ===
+      collection.learningSensesManifestSha256,
+    'sentence_audio_collection_meaning_pin_mismatch',
+  );
+  const ids = new Set();
+  let entries = 0;
+  const pins = collection.packs.map((item) => {
+    requireCheck(
+      /^sentence-audio-v4(?:-(?!0000)[0-9]{4})?$/.test(item.id) &&
+        Object.keys(item).length === 6 &&
+        item.fileName === item.id + '.manifest.json' &&
+        !ids.has(item.id) &&
+        Number.isSafeInteger(item.entryCount) &&
+        item.entryCount > 0 &&
+        item.entryCount <= 20000 &&
+        Number.isSafeInteger(item.lemmaCount) &&
+        item.lemmaCount > 0 &&
+        item.lemmaCount <= 10000,
+      'sentence_audio_collection_scope_mismatch',
+    );
+    ids.add(item.id);
+    entries += item.entryCount;
+    const bytes = read(path.join(directory, item.fileName));
+    requireCheck(
+      bytes.length === item.bytes && sha(bytes) === item.sha256,
+      'sentence_audio_collection_pin_mismatch',
+    );
+    const pin = JSON.parse(bytes);
+    requireCheck(
+      pin.id === item.id &&
+        pin.entryCount === item.entryCount &&
+        pin.lemmaCount === item.lemmaCount,
+      'sentence_audio_collection_pin_scope_mismatch',
+    );
+    return pin;
+  });
+  requireCheck(entries === collection.entryCount, 'sentence_audio_collection_total_mismatch');
+  return pins;
+}
+
+export function verifyPinnedSentenceEntries(
+  entries,
+  installed,
+  policy = emptySentenceAudioPolicy(),
+  identities = new Set(),
+) {
+  const actual = new Map(
+    installed.map((entry) => [sentenceAudioIdentity(entry.textHash, entry.accent), entry]),
+  );
+  assertHeldSentenceAudioUnavailable(policy, installed);
+  let held = 0;
+  for (const expected of entries) {
+    const identity = sentenceAudioIdentity(expected.textHash, expected.accent);
+    requireCheck(
+      ['US', 'UK'].includes(expected.accent) &&
+        typeof expected.text === 'string' &&
+        sha(
+          expected.text
+            .normalize('NFKC')
+            .replace(/[‘’]/g, "'")
+            .replace(/[“”]/g, '"')
+            .replace(/\s+/gu, ' ')
+            .trim(),
+        ) === expected.textHash,
+      'sentence_audio_hash_binding_mismatch',
+    );
+    if (policy.byIdentity.has(identity)) {
+      held++;
+      continue;
+    }
+    requireCheck(!identities.has(identity), 'sentence_audio_packs_overlap');
+    identities.add(identity);
+    const entry = actual.get(identity);
+    requireCheck(
+      entry?.status === 'ready' &&
+        [
+          'text',
+          'textHash',
+          'accent',
+          'kind',
+          'sourceName',
+          'sourceUrl',
+          'license',
+          'attribution',
+          'fileKey',
+          'fileSha256',
+          'mimeType',
+        ].every((field) => entry[field] === expected[field]),
+      'sentence_audio_target_or_attribution_changed',
+    );
+  }
+  return { held, eligible: entries.length - held };
+}
+
 async function verifyPrebuiltAdditions(db, verifiedAudioBytes, polishedCatalog) {
   const summary = {};
+  const dataDirectory = fileURLToPath(new URL('../data/', import.meta.url));
+  const policy = readSentenceAudioPolicy(dataDirectory);
+  let meaningTargets = [];
+  if (policy.manifest) {
+    const meaning = readLearningSensesBundle(
+      path.join(dataDirectory, policy.manifest.learningSensesManifestFileName),
+    );
+    meaningTargets = learningSentenceAudioTargets(meaning.rows);
+    bindSentenceAudioHoldReferences(policy, meaningTargets);
+  }
   const pins = ['word-audio-v2.manifest.json', 'sentence-audio.manifest.json'];
   if (polishedCatalog)
     pins.push('sentence-audio-v2.manifest.json', 'sentence-audio-v3.manifest.json');
-  const sentenceIdentities = new Set();
-  for (const filename of pins) {
+  const sources = pins.map((filename) => {
     const file = new URL('../data/' + filename, import.meta.url);
     requireCheck(fs.existsSync(file), 'prebuilt_audio_manifest_missing', { filename });
-    const pin = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  });
+  const collectionFile = fileURLToPath(
+    new URL('../data/sentence-audio-v4.collection.json', import.meta.url),
+  );
+  if (polishedCatalog && fs.existsSync(collectionFile))
+    sources.push(...readSentenceAudioCollectionPins(collectionFile));
+  const sentenceIdentities = new Set();
+  for (const pin of sources) {
     const pack = await db.contentPack.findUnique({ where: { id: pin.id } });
     requireCheck(
       pack?.status === 'ready' &&
@@ -625,8 +788,14 @@ async function verifyPrebuiltAdditions(db, verifiedAudioBytes, polishedCatalog) 
       process.env.AUDIO_CACHE_DIR || '.local/audio',
       pin.id + '.sources.manifest.json',
     );
+    const sourceStat = fs.lstatSync(sourceFile);
     requireCheck(
-      sha(fs.readFileSync(sourceFile)) === pin.sourceManifestSha256,
+      sourceStat.isFile() && !sourceStat.isSymbolicLink() && sourceStat.size <= 32 * 1024 * 1024,
+      'prebuilt_audio_source_file_invalid',
+    );
+    const sourceBytes = fs.readFileSync(sourceFile);
+    requireCheck(
+      sha(sourceBytes) === pin.sourceManifestSha256,
       'prebuilt_audio_source_hash_mismatch',
       { id: pin.id },
     );
@@ -668,38 +837,28 @@ async function verifyPrebuiltAdditions(db, verifiedAudioBytes, polishedCatalog) 
         sha(manifestBytes) === pin.manifestSha256,
         'sentence_audio_manifest_hash_mismatch',
       );
-      const entries = JSON.parse(manifestBytes).entries;
+      const built = JSON.parse(manifestBytes),
+        entries = built.entries;
       requireCheck(entries.length === pin.entryCount, 'sentence_audio_pinned_entry_count');
+      if (/^sentence-audio-v4(?:-(?!0000)[0-9]{4})?$/.test(pin.id))
+        verifySentenceAudioPackHolds(
+          policy,
+          JSON.parse(sourceBytes),
+          built,
+          process.env.AUDIO_CACHE_DIR || '.local/audio',
+          pin.id,
+          meaningTargets,
+        );
       const installed = await db.sentenceAudio.findMany({
         where: { textHash: { in: [...new Set(entries.map((entry) => entry.textHash))] } },
       });
-      const actualByIdentity = new Map(
-        installed.map((entry) => [entry.textHash + '\0' + entry.accent, entry]),
-      );
-      for (const expectedEntry of entries) {
-        const identity = expectedEntry.textHash + '\0' + expectedEntry.accent;
-        requireCheck(!sentenceIdentities.has(identity), 'sentence_audio_packs_overlap');
-        sentenceIdentities.add(identity);
-        const entry = actualByIdentity.get(identity);
-        requireCheck(
-          entry?.status === 'ready' &&
-            [
-              'text',
-              'textHash',
-              'accent',
-              'kind',
-              'sourceName',
-              'sourceUrl',
-              'license',
-              'attribution',
-              'fileKey',
-              'fileSha256',
-              'mimeType',
-            ].every((field) => entry[field] === expectedEntry[field]),
-          'sentence_audio_target_or_attribution_changed',
-        );
-      }
-      const samples = entries.slice(0, 8);
+      const coverage = verifyPinnedSentenceEntries(entries, installed, policy, sentenceIdentities);
+      summary[pin.id] = { heldUnavailable: coverage.held };
+      const samples = entries
+        .filter(
+          (entry) => !policy.byIdentity.has(sentenceAudioIdentity(entry.textHash, entry.accent)),
+        )
+        .slice(0, 8);
       const normalize = (value) =>
         value
           .normalize('NFKC')
@@ -716,10 +875,17 @@ async function verifyPrebuiltAdditions(db, verifiedAudioBytes, polishedCatalog) 
       }
     }
     summary[pin.id] = {
+      ...summary[pin.id],
       entries: pin.entryCount,
       recorded: pin.recordedCount,
       synthesized: pin.synthesizedCount,
     };
+  }
+  if (policy.entries.length) {
+    const holdRows = await db.sentenceAudio.findMany({
+      where: { textHash: { in: [...new Set(policy.entries.map((entry) => entry.textHash))] } },
+    });
+    assertHeldSentenceAudioUnavailable(policy, holdRows);
   }
   const sentenceCount = await db.sentenceAudio.count({ where: { status: 'ready' } });
   requireCheck(sentenceCount === sentenceIdentities.size, 'sentence_audio_coverage_incomplete', {
@@ -972,6 +1138,139 @@ async function verifyPhraseAudio(db, data, verifiedAudioBytes) {
   return { phraseMediaFilesVerified: entries.length };
 }
 function selfTest() {
+  const sentenceText = 'The original sentence has a pending British reading.';
+  const testEntries = ['US', 'UK'].map((accent) => ({
+    text: sentenceText,
+    textHash: sha(sentenceText),
+    accent,
+    status: 'ready',
+    kind: 'synthesized',
+    sourceName: 'Original fixture',
+    sourceUrl: 'https://example.invalid/test',
+    license: 'MIT',
+    attribution: 'Original fixture',
+    fileKey: 'files/test.mp3',
+    fileSha256: 'a'.repeat(64),
+    mimeType: 'audio/mpeg',
+  }));
+  const hold = { textHash: sha(sentenceText), accent: 'UK' };
+  const policy = {
+    entries: [hold],
+    byIdentity: new Map([[sentenceAudioIdentity(hold.textHash, 'UK'), hold]]),
+  };
+  assert.deepEqual(
+    verifyPinnedSentenceEntries(
+      testEntries,
+      testEntries.map((entry) => (entry.accent === 'UK' ? { ...entry, status: 'held' } : entry)),
+      policy,
+    ),
+    { eligible: 1, held: 1 },
+  );
+  assert.throws(
+    () => verifyPinnedSentenceEntries(testEntries, testEntries, policy),
+    /held_sentence_audio_ready/,
+  );
+  assert.throws(
+    () => verifyPinnedSentenceEntries(testEntries, [], policy),
+    /target_or_attribution_changed/,
+  );
+  assert.deepEqual(verifyPinnedSentenceEntries(testEntries, testEntries), { eligible: 2, held: 0 });
+  const previouslyReady = new Set([sentenceAudioIdentity(hold.textHash, 'US')]);
+  assert.throws(
+    () =>
+      verifyPinnedSentenceEntries(
+        testEntries,
+        testEntries,
+        emptySentenceAudioPolicy(),
+        previouslyReady,
+      ),
+    /packs_overlap/,
+  );
+  assert.throws(
+    () =>
+      verifyPinnedSentenceEntries(
+        [{ ...testEntries[0], text: 'A changed sentence.' }],
+        testEntries,
+      ),
+    /hash_binding_mismatch/,
+  );
+  const collectionDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'nightstudy-audio-pins-'));
+  try {
+    const meaningName = 'learning-senses-collection-test.manifest.json',
+      meaningBytes = Buffer.from('{}');
+    fs.writeFileSync(path.join(collectionDirectory, meaningName), meaningBytes);
+    const policyBytes = Buffer.from(
+      JSON.stringify({ formatVersion: 1, id: 'sentence-audio-holds-v1', entries: [] }),
+    );
+    fs.writeFileSync(path.join(collectionDirectory, 'sentence-audio-holds-v1.json'), policyBytes);
+    const policyManifest = Buffer.from(
+      JSON.stringify({
+        formatVersion: 1,
+        id: 'sentence-audio-holds-v1',
+        fileName: 'sentence-audio-holds-v1.json',
+        bytes: policyBytes.length,
+        sha256: sha(policyBytes),
+        holdCount: 0,
+        learningSensesManifestFileName: meaningName,
+        learningSensesManifestSha256: sha(meaningBytes),
+      }),
+    );
+    fs.writeFileSync(
+      path.join(collectionDirectory, 'sentence-audio-holds-v1.manifest.json'),
+      policyManifest,
+    );
+    const id = 'sentence-audio-v4-0001',
+      pinBytes = Buffer.from(JSON.stringify({ id, entryCount: 3, lemmaCount: 2 }));
+    const pinName = id + '.manifest.json',
+      pinPath = path.join(collectionDirectory, pinName);
+    fs.writeFileSync(pinPath, pinBytes);
+    const collection = {
+      formatVersion: 1,
+      kind: 'sentence-audio-collection',
+      id: 'sentence-audio-v4',
+      learningSensesManifestSha256: sha(meaningBytes),
+      learningSensesManifestFileName: meaningName,
+      pronunciationHoldsManifestFileName: 'sentence-audio-holds-v1.manifest.json',
+      pronunciationHoldsManifestSha256: sha(policyManifest),
+      entryCount: 3,
+      packs: [
+        {
+          id,
+          fileName: pinName,
+          bytes: pinBytes.length,
+          sha256: sha(pinBytes),
+          entryCount: 3,
+          lemmaCount: 2,
+        },
+      ],
+    };
+    const filename = path.join(collectionDirectory, 'sentence-audio-v4.collection.json');
+    const write = () => fs.writeFileSync(filename, JSON.stringify(collection));
+    write();
+    assert.equal(readSentenceAudioCollectionPins(filename)[0].id, id);
+    collection.entryCount = 4;
+    write();
+    assert.throws(() => readSentenceAudioCollectionPins(filename), /total_mismatch/);
+    collection.entryCount = 3;
+    collection.packs.push(collection.packs[0]);
+    write();
+    assert.throws(() => readSentenceAudioCollectionPins(filename), /scope_mismatch/);
+    collection.packs.pop();
+    collection.packs[0].sha256 = '0'.repeat(64);
+    write();
+    assert.throws(() => readSentenceAudioCollectionPins(filename), /pin_mismatch/);
+    collection.packs[0].sha256 = sha(pinBytes);
+    collection.learningSensesManifestSha256 = '0'.repeat(64);
+    write();
+    assert.throws(() => readSentenceAudioCollectionPins(filename), /meaning_pin_mismatch/);
+    collection.learningSensesManifestSha256 = sha(meaningBytes);
+    write();
+    fs.renameSync(pinPath, pinPath + '.original');
+    fs.symlinkSync(pinPath + '.original', pinPath);
+    assert.throws(() => readSentenceAudioCollectionPins(filename), /unsafe_file/);
+  } finally {
+    fs.rmSync(collectionDirectory, { recursive: true, force: true });
+  }
   const fixture = () => {
     const sense = {
       id: 'sense',
@@ -1366,12 +1665,13 @@ function selfTest() {
   console.log(
     JSON.stringify({
       action: 'install.verify.self-test',
-      passed: 39 + polishSelfTest(),
+      passed: 51 + polishSelfTest(),
       databaseUsed: false,
     }),
   );
 }
 async function verifyPolishedSentences(db, data, bundle, verifiedAudioBytes) {
+  const policy = readSentenceAudioPolicy(fileURLToPath(new URL('../data/', import.meta.url)));
   const withdrawn = new Set(
     bundle.rows.filter((row) => row.defaultBookWithdrawal).map((row) => row.normalizedLemma),
   );
@@ -1388,16 +1688,29 @@ async function verifyPolishedSentences(db, data, bundle, verifiedAudioBytes) {
     where: { textHash: { in: [...texts.keys()] }, status: 'ready' },
   });
   const identities = new Set(entries.map((entry) => entry.textHash + '\0' + entry.accent));
+  assertHeldSentenceAudioUnavailable(policy, entries);
+  let heldSentenceEntries = 0;
   for (const [hash] of texts)
-    for (const accent of ['US', 'UK'])
+    for (const accent of ['US', 'UK']) {
+      if (policy.byIdentity.has(sentenceAudioIdentity(hash, accent))) {
+        heldSentenceEntries++;
+        continue;
+      }
       requireCheck(identities.has(hash + '\0' + accent), 'polish_sentence_dual_accent_missing', {
         textHash: hash,
         accent,
       });
+    }
+  requireCheck(
+    entries.length + heldSentenceEntries === texts.size * 2,
+    'polish_sentence_coverage_mismatch',
+  );
   for (const entry of entries.slice(0, 12)) await verifiedAudioBytes(entry);
   return {
     uniqueBilingualSentences: texts.size,
     dualAccentSentenceEntries: entries.length,
+    heldSentenceEntries,
+    accountedSentenceEntries: entries.length + heldSentenceEntries,
     sampleFiles: Math.min(12, entries.length),
   };
 }
@@ -1543,15 +1856,18 @@ async function main() {
     fs.renameSync(temporary, destination);
   }
 }
-main().catch((error) => {
-  const verificationError =
-    error instanceof VerificationError || error instanceof PolishVerificationError;
-  console.error(
-    JSON.stringify({
-      action: 'install.verify.failed',
-      code: verificationError ? error.code : 'verification_runtime_failed',
-      ...(verificationError ? { details: error.details } : { errorType: error.name }),
-    }),
-  );
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
+  main().catch((error) => {
+    const verificationError =
+      error instanceof VerificationError ||
+      error instanceof PolishVerificationError ||
+      error instanceof SentenceAudioPolicyError;
+    console.error(
+      JSON.stringify({
+        action: 'install.verify.failed',
+        code: verificationError ? error.code : 'verification_runtime_failed',
+        ...(verificationError ? { details: error.details } : { errorType: error.name }),
+      }),
+    );
+    process.exitCode = 1;
+  });

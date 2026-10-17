@@ -114,6 +114,8 @@ function progress(id: string, content: LearningEligibilityWord): EligibleProgres
     lastReviewAt: now,
     firstLearnedAt: now,
     revision: 0,
+    reviewFocusSenseId: null,
+    reviewFocusRevision: 0,
     algorithmVersion: 'fixture',
     paramVersion: 'fixture',
     updatedAt: now,

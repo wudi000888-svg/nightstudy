@@ -473,6 +473,8 @@ model StudyProgress {
   lastReviewAt     DateTime?
   firstLearnedAt   DateTime?
   revision         Int       @default(0)
+  reviewFocusSenseId String?
+  reviewFocusRevision Int    @default(0)
   algorithmVersion String    @default("ts-fsrs-5.4.2")
   paramVersion     String    @default("retention-0.9-v1")
   updatedAt        DateTime  @updatedAt

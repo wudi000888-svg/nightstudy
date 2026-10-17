@@ -1,0 +1,18 @@
+{
+  "bytes": 634222,
+  "directedExclusionCount": 185414,
+  "fileName": "recognition-confusables-v1.json.gz",
+  "formatVersion": 1,
+  "id": "recognition-confusables-v1",
+  "indexedWordCount": 16090,
+  "jsonSha256": "9d0ebec7addfd6c4808908fafea593f63eecb52182999b29e5860fdf97a69b7d",
+  "license": "WordNet-3.0",
+  "licenseNoticeFileName": "recognition-wordnet.LICENSE.txt",
+  "licenseNoticeSha256": "7731175a77952e259390b496fab905e57118b8d19ad3a8383c67eee724ff443f",
+  "requiredWordCount": 18767,
+  "requiredWordsSha256": "579abfa55768c0065426bb525742081a6f0f6dd0e32d55689b0e316f6db6051b",
+  "semanticQualityCertified": false,
+  "sha256": "e384637564c9d1dd18fffd80324db1595bc73802557ba92da5797b3ecf52fe1e",
+  "sourceUrl": "https://wordnet.princeton.edu/download/current-version",
+  "wordnetSha256": "cbda5ea6eef7f36a97a43d4a75f85e07fccbb4f23657d27b4ccbc93e2646ab59"
+}

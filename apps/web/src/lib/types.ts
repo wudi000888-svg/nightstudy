@@ -143,6 +143,7 @@ export interface ContentAttribution {
 }
 export interface Sense {
   id: string;
+  displayLemma?: string;
   kind?: 'learning' | 'dictionary';
   sourceSenseIds?: string[];
   pos?: string;
@@ -182,6 +183,7 @@ export interface Word {
   id: string;
   status?: string;
   lemma: string;
+  displayLemma?: string;
   phonetic?: string;
   phoneticUs?: string;
   phoneticUk?: string;

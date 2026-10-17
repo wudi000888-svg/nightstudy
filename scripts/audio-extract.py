@@ -121,6 +121,8 @@ def validate_entry(info, name, size):
         maximum = 128 * 1024 * 1024
     elif name == "sources.manifest.json":
         maximum = 32 * 1024 * 1024
+    elif name in {"pronunciation-reviews.json", "pronunciation-holds.json"}:
+        maximum = 4 * 1024 * 1024
     elif LICENSE_NAME.fullmatch(name):
         maximum = 1024 * 1024
     elif AUDIO_NAME.fullmatch(name):

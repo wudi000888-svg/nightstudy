@@ -2,11 +2,37 @@ import type { LearningSense, SenseSourceBinding, Sense, WordExample } from '@pri
 import {
   learningSenseBindingHash,
   learningSenseSourceMatches,
+  learningSenseTextHash,
 } from './learning-sense-integrity.js';
 
 export type AtomicLearningSense = LearningSense & {
   sourceBindings: (SenseSourceBinding & { sourceSense: Sense })[];
   examples: WordExample[];
+};
+/** The proof needed to verify a meaning, without loading editorial metadata or examples. */
+export type VerifiableLearningSense = Pick<
+  LearningSense,
+  | 'id'
+  | 'wordId'
+  | 'pos'
+  | 'definitionZh'
+  | 'definitionEn'
+  | 'contentVersion'
+  | 'status'
+  | 'bindingHash'
+> & {
+  sourceBindings: (Pick<
+    SenseSourceBinding,
+    | 'wordId'
+    | 'learningSenseId'
+    | 'sourceSenseId'
+    | 'relation'
+    | 'sourcePosSha256'
+    | 'sourceDefinitionZhSha256'
+    | 'sourceDefinitionEnSha256'
+  > & {
+    sourceSense: Pick<Sense, 'id' | 'wordId' | 'pos' | 'definitionZh' | 'definitionEn'>;
+  })[];
 };
 export const learningSensesInclude = {
   orderBy: [{ ordinal: 'asc' as const }, { id: 'asc' as const }],
@@ -32,9 +58,9 @@ export function wordPronunciationCompatible(word: {
 }
 
 /** Invalid source evidence cannot be turned into current learning content. */
-export function verifiedLearningSenses(word: {
+export function verifiedLearningSenses<T extends VerifiableLearningSense>(word: {
   id: string;
-  learningSenses?: AtomicLearningSense[];
+  learningSenses?: T[];
 }) {
   return (word.learningSenses ?? []).filter(
     (sense) =>
@@ -51,9 +77,43 @@ export function verifiedLearningSenses(word: {
   );
 }
 
-export function atomicSenseView(sense: AtomicLearningSense) {
+/** Reviewed case variants remain the same lexical identity; no title-casing inference. */
+export function reviewedSenseDisplayLemma(
+  sense: { contentMetadata?: unknown },
+  lemma: string,
+): string | undefined {
+  const metadata = sense.contentMetadata as Record<string, unknown> | null;
+  const raw = metadata?.orthography;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const orthography = raw as Record<string, unknown>;
+  const normalizedLemma = lemma.normalize('NFKC').trim().toLowerCase().replace(/\s+/gu, ' ');
+  const display = orthography.displayLemma;
+  if (
+    Object.keys(orthography).sort().join('|') !==
+      'decision|displayLemma|displayLemmaSha256|expertCertified|normalizedLemma|reason|reviewer' ||
+    typeof display !== 'string' ||
+    !display.length ||
+    display.length > 500 ||
+    display !== display.normalize('NFKC').trim().replace(/\s+/gu, ' ') ||
+    display.toLowerCase() !== normalizedLemma ||
+    orthography.normalizedLemma !== normalizedLemma ||
+    orthography.displayLemmaSha256 !== learningSenseTextHash(display) ||
+    orthography.reviewer !== 'Codex' ||
+    orthography.decision !== 'publish' ||
+    orthography.expertCertified !== false ||
+    typeof orthography.reason !== 'string' ||
+    orthography.reason.length < 15 ||
+    orthography.reason.length > 4000
+  )
+    return undefined;
+  return display;
+}
+
+export function atomicSenseView(sense: AtomicLearningSense, lemma?: string) {
+  const displayLemma = lemma ? reviewedSenseDisplayLemma(sense, lemma) : undefined;
   return {
     ...sense,
+    ...(displayLemma ? { displayLemma } : {}),
     kind: 'learning' as const,
     exampleEn: '',
     exampleZh: '',

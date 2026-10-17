@@ -27,6 +27,12 @@ SPEC.loader.exec_module(pack)
 CODEC_SPEC = importlib.util.spec_from_file_location("offline_audio_codec", Path(__file__).with_name("offline-audio-codec.py"))
 codec = importlib.util.module_from_spec(CODEC_SPEC)
 CODEC_SPEC.loader.exec_module(codec)
+PRONUNCIATION_SPEC = importlib.util.spec_from_file_location("sentence_pronunciation", Path(__file__).with_name("sentence-pronunciation.py"))
+pronunciation = importlib.util.module_from_spec(PRONUNCIATION_SPEC)
+PRONUNCIATION_SPEC.loader.exec_module(pronunciation)
+JOURNAL_SPEC = importlib.util.spec_from_file_location("audio_journal", Path(__file__).with_name("audio-journal.py"))
+journals = importlib.util.module_from_spec(JOURNAL_SPEC)
+JOURNAL_SPEC.loader.exec_module(journals)
 
 
 def normalize(text):
@@ -77,24 +83,29 @@ def worker(accent, rows, output_string, models_string, shard):
     output, models = Path(output_string), Path(models_string)
     sources = pack.load_sources(pack.DEFAULT_VOICES_MANIFEST)
     source = sources["voices"][accent]
-    voice = pack.make_voice(source, models, 1, False)
+    voice = None
     journal = output / "progress" / f"{accent}-{shard}.jsonl"
-    saved = {}
-    for filename in (output / "progress").glob(f"{accent}-*.jsonl"):
-        for line in filename.read_text().splitlines():
-            try:
-                entry = json.loads(line)
-                saved[entry["textHash"]] = entry
-            except (ValueError, KeyError):
-                continue
+    wanted = {(row['textHash'], pronunciation.corrected_cache_identity(
+        pack.synthesis_identity(row['text'], accent, source),
+        row.get('pronunciationCorrections', {}).get(accent))) for row in rows}
+    saved = journals.select_entries((output / 'progress').glob(f'{accent}-*.jsonl'), wanted, accent)
     entries = []
     with journal.open("a", encoding="utf-8") as handle:
         for index, row in enumerate(rows):
-            entry = saved.get(row["textHash"])
-            identity = pack.synthesis_identity(row["text"], accent, source)
-            if not entry or entry.get("inferenceBackend") == "CoreML with CPU fallback" or not pack.validate_entry(entry, output, identity):
-                entry = pack.synthesize_entry(row["text"], accent, source, voice, output)
+            correction = row.get('pronunciationCorrections', {}).get(accent)
+            identity = pronunciation.corrected_cache_identity(pack.synthesis_identity(row["text"], accent, source), correction)
+            entry = saved.get((row["textHash"], identity))
+            if (not entry or entry.get("inferenceBackend") == "CoreML with CPU fallback"
+                or not pack.validate_entry(entry, output, identity)
+                or (correction and entry.get('pronunciationCorrectionSha256') != correction['sha256'])):
+                if voice is None:
+                    voice = pack.make_voice(source, models, 1, False)
+                reviewed_voice = pronunciation.corrected_voice(voice, row['text'], correction)
+                entry = pack.synthesize_entry(row["text"], accent, source, reviewed_voice, output)
                 entry = {**entry, "textHash": row["textHash"], "text": row["text"]}
+                if correction:
+                    entry.update(cacheKey=identity, pronunciationCorrectionSha256=correction['sha256'],
+                                 pronunciationCorrectionId=correction['record']['id'])
             attribution = {key: source[key] for key in ('sourceName', 'sourceUrl', 'license', 'attribution')}
             metadata_changed = any(entry.get(key) != value for key, value in attribution.items())
             entry = {**entry, **attribution}
@@ -116,17 +127,9 @@ def audit_entries(entries, output, workers):
     Older completed journals predate the acoustic checks. They can be reused
     after this check without synthesizing the same public sentence again.
     """
-    cached = {}
     journal = output / 'progress' / 'quality-v1.jsonl'
-    if journal.exists():
-        for line in journal.read_text().splitlines():
-            try:
-                row = json.loads(line)
-                if row['qualityMetrics'].get('policyVersion') == codec.QUALITY_POLICY['version']:
-                    cached[row['fileSha256']] = row['qualityMetrics']
-            except (ValueError, KeyError, TypeError):
-                continue
     unique = {entry['fileSha256']: entry for entry in entries}
+    cached = journals.select_quality(journal, set(unique), codec.QUALITY_POLICY['version'])
     pending = [entry for digest, entry in unique.items() if digest not in cached]
     print(json.dumps({'phase': 'sentence-audit', 'cached': len(unique) - len(pending),
                       'pending': len(pending), 'uniqueFiles': len(unique)}), flush=True)
@@ -148,7 +151,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--model-dir", type=Path, required=True)
-    parser.add_argument("--workers", type=int, choices=(2, 4, 6, 8), default=6)
+    parser.add_argument("--workers", type=int, choices=(1, 2, 4, 6, 8), default=1)
     parser.add_argument("--collect-only", action="store_true")
     args = parser.parse_args()
     output = args.output.resolve()
@@ -160,7 +163,7 @@ def main():
     print(json.dumps({"phase": "scope", "sentences": len(rows), "entries": len(rows) * 2}), flush=True)
     if args.collect_only:
         return
-    shards = args.workers // 2
+    shards = max(1, args.workers // 2)
     with concurrent.futures.ProcessPoolExecutor(max_workers=args.workers, mp_context=multiprocessing.get_context("spawn")) as pool:
         futures = [pool.submit(worker, accent, rows[shard::shards], str(output), str(args.model_dir.resolve()), shard) for accent in ("US", "UK") for shard in range(shards)]
         entries = [entry for future in futures for entry in future.result()]

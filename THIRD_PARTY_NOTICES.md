@@ -55,6 +55,12 @@
 
 制作档案 `bilingual-v2-authoring.tar.gz` 包含公开源投影、候选台账、制作稿和源绑定审核决定，不含用户数据、数据库备份、密钥或模型。档案中的原创层与各公开来源许可分别保留。固定字节数与 SHA-256 见 [v2 来源 manifest](data/bilingual-v2.sources.manifest.json)，本地复现和公开附件验收按交付记录补充。
 
+## 辨义选项的公开词汇关系索引
+
+辨义选项的排除索引派生自 Princeton University 的 WordNet 3.0 数据，保留 [WordNet 原许可和版权通知](data/recognition-wordnet.LICENSE.txt)。原始压缩包、独立词条目标和派生文件的摘要见 [固定 manifest](data/recognition-confusables-v1.manifest.json)。参考 [官方许可说明](https://wordnet.princeton.edu/license-and-commercial-use) 与 [WordNet 引用说明](https://wordnet.princeton.edu/citing-wordnet)：Princeton University “About WordNet.” WordNet. Princeton University, 2010。
+
+此索引仅保守排除同一 synset 及直接上下位、相似关系的词对，并显式记录少量 Codex 补充排除项；它没有沿所有祖先递归扩展，也不提供完整的语义重叠认证。派生数据经过规范词形、按固定内置词表投影和关系对称化；未把 WordNet 的许可改为工程代码的 MIT。新写的逐义双语释义和例句另按实际作者与逐字段来源登记，不借该索引声称其文本来自 WordNet。
+
 ## 设计参考
 
 产品保留雨夜学习方向，界面和资源重新实现。多站部署方案只参考通用工程原则，见 [参考证据](docs/architecture/multisite-reference.md)；不复制 guangyue-panel 的代理业务、产品标识或代码。其许可证不由本仓库 MIT 重新授权。

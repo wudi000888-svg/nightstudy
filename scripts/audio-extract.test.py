@@ -77,6 +77,45 @@ class SafeAudioExtraction(unittest.TestCase):
         self.reject([("manifest.json", b"{}", tarfile.REGTYPE), ("licenses/run.py", b"not executed", tarfile.REGTYPE)], "archive_name_not_allowed")
         self.reject([("manifest.json", b"{}", tarfile.REGTYPE), ("manifest.json", b"duplicate", tarfile.REGTYPE)], "archive_duplicate_name")
 
+    def test_exact_pronunciation_sidecars_extract_as_inert_bytes(self):
+        entries = [("manifest.json", b"{}", tarfile.REGTYPE),
+                   ("pronunciation-reviews.json", b'{"review":"original bytes"}\n', tarfile.REGTYPE),
+                   ("pronunciation-holds.json", b'{"holds":"original bytes"}\n', tarfile.REGTYPE)]
+        self.pack(entries)
+        summary = extractor.extract_archive(self.archive, self.output)
+        self.assertEqual(summary["files"], 3)
+        for name, content, _ in entries:
+            self.assertEqual((self.output/name).read_bytes(), content)
+            self.assertEqual(stat.S_IMODE((self.output/name).stat().st_mode), 0o644)
+
+    def test_pronunciation_allowlist_does_not_admit_arbitrary_or_nested_metadata(self):
+        names = ["pronunciation.json", "pronunciation-holds-v2.json", "pronunciation-holds.json.py",
+                 "other.json", "pack/pronunciation-holds.json", "files/pronunciation-reviews.json",
+                 "Pronunciation-holds.json", "./pronunciation-reviews.json",
+                 "../pronunciation-holds.json", "/pronunciation-holds.json"]
+        for name in names:
+            with self.subTest(name=name):
+                self.reject([("manifest.json", b"{}", tarfile.REGTYPE),
+                             (name, b"untrusted inert bytes", tarfile.REGTYPE)])
+
+    def test_pronunciation_sidecars_reject_duplicates_links_and_total_budget_overflow(self):
+        for name in ["pronunciation-reviews.json", "pronunciation-holds.json"]:
+            with self.subTest(name=name, kind="duplicate"):
+                self.reject([("manifest.json", b"{}", tarfile.REGTYPE),
+                             (name, b"{}", tarfile.REGTYPE),
+                             (name, b"{}", tarfile.REGTYPE)], "archive_duplicate_name")
+            for kind in [tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.DIRTYPE]:
+                with self.subTest(name=name, kind=kind):
+                    self.reject([("manifest.json", b"{}", tarfile.REGTYPE),
+                                 (name, b"", kind)])
+        self.pack([("manifest.json", b"{}", tarfile.REGTYPE),
+                   ("pronunciation-holds.json", b"{}", tarfile.REGTYPE)])
+        with patch.object(extractor, "MAX_EXPANDED_BYTES", 3), self.assertRaises(
+                extractor.ArchiveError) as result:
+            extractor.extract_archive(self.archive, self.output)
+        self.assertEqual(result.exception.code, "archive_expansion_limit")
+        self.assertFalse(self.output.exists())
+
     def test_rejects_oversized_effective_names_and_the_actual_60050_member_boundary(self):
         self.reject([("manifest.json", b"{}", tarfile.REGTYPE), ("licenses/" + "a" * 250 + ".txt", b"notice", tarfile.REGTYPE)])
         def entries():
@@ -118,6 +157,8 @@ class SafeAudioExtraction(unittest.TestCase):
     def test_rejects_oversized_declared_file_and_pax_metadata_before_reading_payload(self):
         for name, size in [("manifest.json", 128 * 1024 * 1024 + 1),
                            ("sources.manifest.json", 32 * 1024 * 1024 + 1),
+                           ("pronunciation-reviews.json", 4 * 1024 * 1024 + 1),
+                           ("pronunciation-holds.json", 4 * 1024 * 1024 + 1),
                            ("licenses/notice.txt", 1024 * 1024 + 1),
                            ("files/" + "c" * 64 + ".mp3", 2 * 1024 * 1024 + 1)]:
             with self.subTest(name=name):

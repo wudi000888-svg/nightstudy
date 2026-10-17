@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowUpRight, Pin, Star, X } from 'lucide-react';
 import { useApp, useRemote } from '../AppContext';
 import { api } from '../lib/api';
 import type { Word } from '../lib/types';
+import { senseDisplayLemma, wordSpellingLabel, wordSpellingVariants } from '../lib/word-spelling';
 import { WordCardContext, wordCardPlacement } from '../lib/word-cards';
 import { dictionaryText } from '../lib/dictionary';
 import { beforeAppBackEvent, screenDeactivateEvent } from '../lib/screen-lifecycle';
@@ -74,7 +75,11 @@ export function WordCardSummary({ word }: { word: Word }) {
             {meanings.map((sense) => (
               <div className="word-card-quick-meaning" key={sense.id}>
                 {!!dictionaryText(sense.pos) && (
-                  <span className="sense-pos">{dictionaryText(sense.pos)}</span>
+                  <span className="sense-pos">
+                    {(wordSpellingVariants(word).length > 1 && senseDisplayLemma(word, sense)
+                      ? `${senseDisplayLemma(word, sense)} · `
+                      : '') + dictionaryText(sense.pos)}
+                  </span>
                 )}
                 {!!dictionaryText(sense.definitionZh) && (
                   <p className="word-card-summary-zh" lang="zh-CN">
@@ -470,7 +475,7 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
               <div className="word-card-panel">
                 <div className="word-card-top">
                   <div className="word-card-heading" tabIndex={-1}>
-                    <h2 id={titleId}>{word?.lemma || card.queried}</h2>
+                    <h2 id={titleId}>{word ? wordSpellingLabel(word) : card.queried}</h2>
                   </div>
                   <div className="word-card-tools">
                     {word &&
@@ -605,7 +610,7 @@ export function WordCardProvider({ children }: { children: ReactNode }) {
                       >
                         <ArrowLeft size={20} />
                       </button>
-                      <h2 id={`${titleId}-detail`}>{word.lemma}</h2>
+                      <h2 id={`${titleId}-detail`}>{wordSpellingLabel(word)}</h2>
                       {user && (
                         <WordSaveButton
                           lemma={word.lemma}

@@ -6,6 +6,7 @@ import { id, parse } from './shared.js';
 import type { WordAudio } from '@prisma/client';
 import { verifiedAudioBytes } from '../audio.js';
 import { wordPronunciationCompatible } from './learning-sense-view.js';
+import { sentenceAudioHeld } from '../sentence-audio-policy.js';
 
 export function pronunciationDto(word: {
   id: string;
@@ -79,10 +80,11 @@ export async function registerPronunciation(app: FastifyInstance, getContext: Co
   app.get('/sentence-audio/:textHash', async (req) => {
     const ctx = await getContext(req);
     const { textHash } = parse(sentenceParams, req.params);
-    const entries = await ctx.prisma.sentenceAudio.findMany({
+    const available = await ctx.prisma.sentenceAudio.findMany({
       where: { textHash, status: 'ready' },
       orderBy: { accent: 'asc' },
     });
+    const entries = available.filter((entry) => !sentenceAudioHeld(textHash, entry.accent));
     return {
       sentence: {
         textHash,
@@ -103,6 +105,7 @@ export async function registerPronunciation(app: FastifyInstance, getContext: Co
       sentenceParams.extend({ accent: z.enum(['US', 'UK']) }),
       req.params,
     );
+    if (sentenceAudioHeld(textHash, accent)) throw new HttpError(404, 'audio_not_ready');
     const entry = await ctx.prisma.sentenceAudio.findFirst({
       where: { textHash, accent, status: 'ready' },
     });

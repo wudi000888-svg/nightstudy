@@ -97,6 +97,18 @@ describe('fixed recognition questions from reviewed meanings', () => {
     expect(issued.options.filter((option) => option.text === '水')).toHaveLength(1);
     expect(createRecognitionQuestion(head, 'water-meaning', choices.slice(0, 2))).toBeNull();
   });
+  it('rejects public lexical synonyms even when their Chinese wording is different', () => {
+    const head = word('pliable', '柔韧的', 'adj.');
+    const choices = [
+      word('pliant', '柔顺易弯的', 'adj.'),
+      word('dangerous', '危险的', 'adj.'),
+      word('ancient', '古老的', 'adj.'),
+    ];
+    const question = createRecognitionQuestion(head, 'pliable-meaning', choices)!;
+    expect(question.options).toHaveLength(3);
+    expect(question.options.some((option) => option.text === '柔顺易弯的')).toBe(false);
+    expect(createRecognitionQuestion(head, 'pliable-meaning', choices.slice(0, 2))).toBeNull();
+  });
   it('rejects malformed snapshots and choices outside the issued set', () => {
     const value = createRecognitionQuestion(target(), 'bridge-meaning', pool())!;
     expect(readRecognitionQuestion({ ...value, selectedOptionId: 'forged' })).toBeNull();

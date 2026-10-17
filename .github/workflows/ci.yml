@@ -82,6 +82,12 @@ jobs:
           python3 scripts/phrase-compile.test.py
           python3 scripts/learning-senses-compile.test.py
           python3 scripts/learning-senses-audio.test.py
+          python3 scripts/sentence-pronunciation.test.py
+          python3 scripts/sentence-audio-holds.test.py
+          python3 scripts/audio-journal.test.py
+          python3 scripts/learning-senses-targets.test.py
+          python3 scripts/recognition-confusables.test.py
+          node scripts/check-sentence-audio-policy.mjs --self-test
           node scripts/check-audio-install.mjs --self-test
           node scripts/check-learning-senses-install.mjs --self-test
       - name: Validate Compose descriptors

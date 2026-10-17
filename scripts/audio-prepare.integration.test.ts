@@ -2,13 +2,29 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { createDatabase } from '../apps/api/src/db.js';
 import type { SiteConfig } from '../apps/api/src/config.js';
-import { importAudioSite, importSentenceAudioSite } from './audio-prepare.js';
+import {
+  importAudioSite,
+  importSentenceAudioSite as importSentenceAudioSiteWithPolicy,
+} from './audio-prepare.js';
 import { sentenceTextHash } from '../apps/api/src/audio.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const suite = url ? describe : describe.skip;
 type PreparedManifest = Parameters<typeof importAudioSite>[1];
 type PackSource = Parameters<typeof importAudioSite>[2];
+// These fixtures contain no installed learning collection. The real CLI passes
+// its fixed release policy; SQL fixtures explicitly use an empty local policy.
+const importSentenceAudioSite = (
+  site: Parameters<typeof importSentenceAudioSiteWithPolicy>[0],
+  manifest: Parameters<typeof importSentenceAudioSiteWithPolicy>[1],
+  source: Parameters<typeof importSentenceAudioSiteWithPolicy>[2],
+) =>
+  importSentenceAudioSiteWithPolicy(site, manifest, source, {
+    entries: [],
+    byIdentity: new Map(),
+    manifest: null,
+    manifestSha256: null,
+  });
 
 suite('PostgreSQL audio installer SQL transaction helpers', () => {
   if (!url) return;

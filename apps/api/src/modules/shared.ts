@@ -142,14 +142,21 @@ export function selectLearningSense(senses: Sense[], focusSenseId?: string | nul
 export function selectWordLearningSense(
   word: Pick<WordWithSenses, 'id' | 'senses' | 'learningSenses'>,
   focusSenseId?: string | null,
+  options: { focusPolicy?: 'explicit' | 'built-in-default' } = {},
 ) {
-  const atomic = verifiedLearningSenses(word);
+  // Ordinal is an editorial choice of first reviewed meaning, not a corpus
+  // frequency claim. Never depend on a caller's relation ordering.
+  const atomic = verifiedLearningSenses(word).sort(
+    (a, b) => a.ordinal - b.ordinal || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
   if (!atomic.length) return selectLearningSense(word.senses, focusSenseId);
   return (
     atomic.find((sense) => sense.id === focusSenseId) ??
-    atomic.find((sense) =>
-      sense.sourceBindings.some((binding) => binding.sourceSenseId === focusSenseId),
-    ) ??
+    (options.focusPolicy === 'built-in-default'
+      ? undefined
+      : atomic.find((sense) =>
+          sense.sourceBindings.some((binding) => binding.sourceSenseId === focusSenseId),
+        )) ??
     atomic[0]
   );
 }
@@ -157,7 +164,9 @@ export function wordDto(word: WordWithSenses, includeHeldSources = false) {
   const dictionarySenses = includeHeldSources
     ? word.senses
     : word.senses.filter(learningSense).map(learningDefinitionView);
-  const atomic = includeHeldSources ? [] : verifiedLearningSenses(word).map(atomicSenseView);
+  const atomic = includeHeldSources
+    ? []
+    : verifiedLearningSenses(word).map((sense) => atomicSenseView(sense, word.normalizedLemma));
   const ambiguousPronunciation = !wordPronunciationCompatible(word);
   const senses = atomic.length
     ? atomic
@@ -239,6 +248,9 @@ export function wordDto(word: WordWithSenses, includeHeldSources = false) {
     })),
     senses: senses.map((s) => ({
       id: s.id,
+      ...('displayLemma' in s && typeof s.displayLemma === 'string'
+        ? { displayLemma: s.displayLemma }
+        : {}),
       pos: displayPos(s),
       definitionZh: s.definitionZh,
       definitionEn: s.definitionEn,

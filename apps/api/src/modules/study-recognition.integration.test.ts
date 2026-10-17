@@ -100,6 +100,17 @@ suite('PostgreSQL durable recognition reveal without fabricated memory evidence'
         data: {
           ...sense,
           status: 'published',
+          contentMetadata: {
+            orthography: {
+              displayLemma: (lemmas[i] + ' ' + stem).toUpperCase(),
+              normalizedLemma: lemmas[i] + ' ' + stem,
+              displayLemmaSha256: learningSenseTextHash((lemmas[i] + ' ' + stem).toUpperCase()),
+              reviewer: 'Codex',
+              decision: 'publish',
+              expertCertified: false,
+              reason: 'Synthetic explicit spelling review for a case-sensitive issued meaning.',
+            },
+          },
           bindingHash: learningSenseBindingHash({ ...sense, sourceBindings: [binding] }),
         },
       });
@@ -155,6 +166,31 @@ suite('PostgreSQL durable recognition reveal without fabricated memory evidence'
       hidden = obj(obj(stored.questionJson).recognition);
     expect(first.recognition.options).toHaveLength(4);
     expect(first.recognition.correctOptionId).toBeUndefined();
+    expect(first.word.displayLemma).toBe(first.word.lemma.toUpperCase());
+    expect(obj(stored.contentSnapshot).displayLemma).toBe(first.word.displayLemma);
+    expect(first.word).not.toHaveProperty('senses');
+    expect(JSON.stringify(first.word)).not.toContain('definitionZh');
+    expect(JSON.stringify(first.word)).not.toContain('orthography');
+    // A later editorial spelling change must not rewrite the already-issued focus.
+    await db.learningSense.update({
+      where: { id: first.focusSenseId },
+      data: {
+        contentMetadata: {
+          orthography: {
+            displayLemma: first.word.lemma,
+            normalizedLemma: first.word.lemma,
+            displayLemmaSha256: learningSenseTextHash(first.word.lemma),
+            reviewer: 'Codex',
+            decision: 'publish',
+            expertCertified: false,
+            reason: 'A later synthetic spelling revision must not change an issued question.',
+          },
+        },
+      },
+    });
+    expect(
+      (await good('GET', `/study/sessions/${session.id}`)).session.items[0].word.displayLemma,
+    ).toBe(first.word.displayLemma);
     const chosen = first.recognition.options.find(
       (o: { id: string }) => o.id !== hidden.correctOptionId,
     ).id;
@@ -185,6 +221,7 @@ suite('PostgreSQL durable recognition reveal without fabricated memory evidence'
       selectedOptionId: chosen,
       correctOptionId: hidden.correctOptionId,
     });
+    expect(session.items[0].word.displayLemma).toBe(first.word.displayLemma);
     const retry = await good('POST', `/study/sessions/${session.id}/commands`, body);
     expect(retry.duplicate).toBe(true);
     expect(retry.session.revision).toBe(session.revision);

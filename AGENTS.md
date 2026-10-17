@@ -1,5 +1,7 @@
 # NightStudy engineering guide
 
+2026-10-17 22:44最新恢复点：014全源gate27通过356批/14,212新增词/34,417义/68,834双语例/4,460原创补源，余4,520词；完整Stage24仍截止13,972新词。其相对Stage22已实际纯音素转写450语境/41词头/900英美决定，四分区文字审稿与独立v2门禁通过：233纠正键/241原区间/130文本/14待核键/110合法控制、旧1031键冲突0，自报38,010,880字节。首版报告字段拒绝及root边界标志补齐前版本均保留，不放宽身份/offset/编码检查。新review15和61键策略仅待纯操作器设计，未合盘/安装/发音频；旧review14、47键、8032成品不动。root0301通过40/109/218，累计3,892词/9,181义/18,362例，下一0300纯稿未写。所有小任务固定SHA/排他串行/原128MiB、90s、新swap32MiB停止线，swap1,954.19MiB未增；旧八worker/SAFE禁用，模型保持关闭。软件CI仍44eff75，生产Native/VPS仍0.12；未合main/发行部署/生产内容导入。外置工作014及两份014文档保留证据，下文旧检查点作为历史。
+
 ## Latest user direction, 2026-10-16
 
 Treat the product as a mobile H5 application, with desktop secondary. The home layout must follow the user's BBDC reference recording: full-screen wallpaper, avatar at the upper left, a separate check-in tile above center, paired Learn / Review actions near the bottom, and three bottom function icons. Learning, content and account/settings modules open as distinct application screens. Do not use a website header, marketing hero, long home bookshelf or dashboard as the primary home.
@@ -87,3 +89,5 @@ Both targets passed 347 public HTTP assertions / 123 anonymous requests each. Na
 2026-10-17 21:12后续：第23次源门槛339批/13,532新词/32,448义/64,896例/4,146原创源通过，余5,200词；Stage23固定输入不变。系统自然回到原启动线后，仅以新固定probe14严格守卫（768MiBPG、新swap32MiB、运行可用50%、180秒、6秒稳定前检）实际完成44条新英美句音，77.089秒/468.75MiB、swap1986.19未增、无残留组。三个真实无模型生命周期演练通过；所有失败准备/首轮阶段截止误报均已归档，新v2不放宽空组断言。probe14对应35新纠音键/39区间/9控制，不覆盖前盘未渲染60项，不是全书完成或声学专家认证；独立根checker待完成。没有继续全量推理，旧SAFE/八worker入口仍禁用，无下载模型/付费接口/生产内容导入。外置checkpoint12、audio/probe14-model-resource-01及文档为事实；两端仍0.12，当前有未提交文档更新。
 
 2026-10-17 21:37：全源gate24已344批/13,732新词/33,000义/66,000例/4,210原创源通过，仍余5,000新词；Stage23较早13,132词保持冻结。probe14独立v2 `1a8bba0b611c9b39192f18f837a8ec30bd62c097357f93c08e9fbad635450948`实际通过44MP3完整解码/44原WAV/56tar成员/35真实raw路由/39区间/9控制与全部引用、身份和摘要。1.655秒自身33,800,192字节、外部树31.71875MiB，swap1962.19未增/free66→65/压力正常/PG空。首版因把附纠音来源对象与裸准备对象直接比较误拒，旧源码/失败收据保留，v2逐22条完整重建两数组后精确比对，不忽略任何修正字段。模型已退出，不续跑大任务；无听审或口音声学认证，无生产导入/main合并/发行部署。root305/helper及全源gate已过，304纯稿仍待语义peer和执行；两个文档记录详细边界。
+
+2026-10-17 22:07：gate25通过350批/13,972新词/33,744义/67,488例/4,345原创源，余4,760词。最新完整私密冻结Stage24为70叶、每叶最多200词fresh标准Python，proof `633ba12710585bf3e16e5f4edb18a11fdea21e4b5e1454551cbf1f1a244bd72a`/163803567字节；收据 `f24747bbf123a50dc027fae560787b50461b9020115f40b8822e9b548b36bf5d`。35.962秒、实际tree86.4375MiB、swap1954.19未增/free64→66/正常压力/PG空；旧Stage23等不覆写。304/303现已formal并通过全源gate，root累计3812词/8963义/17926例，下一302纯稿待执行。383短语POS首败已归档后修，不扩枚举；其180义/360例已通过单片及gate。Stage24音素差量必须对最后已审Stage22，尚只计划/静态新入口，模型关闭。生产仍0.12，无本轮main合并/发行部署或生产导入。软件全CI仍44eff75，文档检查点已推工作分支54cc775，后续未提交文档可继续保存。

@@ -35,6 +35,8 @@ jobs:
           "$RUNNER_TEMP/audio-python/bin/pip" install --no-cache-dir --only-binary=:all: \
             'https://files.pythonhosted.org/packages/84/81/0112a7d510911f33018dc24023d1655bb772f84a4e95fe7f0180f66bbd17/piper_tts-1.8.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl#sha256=25b4d3f31ff70c8fa7151908e00aaa5650cbdf16bca8fcf21299f3941b89a7d3' \
             'onnxruntime==1.31.0' 'numpy==2.5.4' 'pathvalidate==3.3.1'
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
           command -v ffmpeg
           ffmpeg -version
       - name: Verify model-free worker and checker fixtures

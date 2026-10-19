@@ -37,6 +37,7 @@ jobs:
           python3 scripts/prepare-ci-sentence-audio-publication.test.py
           python3 scripts/finalize-ci-sentence-audio-collection.test.py
           python3 scripts/prepare-ci-sentence-audio-global.test.py
+          python3 scripts/run-ci-sentence-audio-publication.test.py
           python3 -m py_compile scripts/run-ci-sentence-audio-publication.py
       - name: Restore the immutable complete plan and exact existing controls
         run: |

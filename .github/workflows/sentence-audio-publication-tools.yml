@@ -52,6 +52,8 @@ jobs:
             scripts/check-ci-sentence-audio-selected-installer.test.mjs \
             scripts/check-all-book-recognition-http.test.mjs
           python3 scripts/select-ci-sentence-audio-publication.test.py
+          python3 scripts/run-ci-sentence-audio-publication.test.py
+          python3 -m py_compile scripts/run-ci-sentence-audio-publication.py
           pnpm exec vitest run scripts/audio-prepare-cache.test.ts scripts/audio-prepare-profile.test.ts
           bash -n scripts/install.sh
       - name: Smoke the exact release pull gate against the immutable public 0.12 image
@@ -114,6 +116,7 @@ jobs:
           set -euo pipefail
           stem="ci-publication-tools-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           tar -czf "$RUNNER_TEMP/$stem.sources.tar.gz" \
+            scripts/run-ci-sentence-audio-publication.py scripts/run-ci-sentence-audio-publication.test.py \
             scripts/check-ci-sentence-audio-selected-installer.mjs \
             scripts/check-ci-sentence-audio-selected-installer.test.mjs \
             scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs \

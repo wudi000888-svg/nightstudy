@@ -18,6 +18,8 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
+import time
 
 REPO = Path(__file__).resolve().parent.parent
 REPOSITORY = 'wudi000888-svg/nightstudy'
@@ -86,10 +88,38 @@ def download(index, name, directory):
     need(name in index, 'required_completed_candidate_asset_missing:' + name)
     asset = index[name]
     target = directory / name
-    run(['gh', 'api', 'repos/' + REPOSITORY + '/releases/assets/' + str(asset['id']),
-         '-H', 'Accept: application/octet-stream'], output=target)
-    need(target.stat().st_size == asset['size'] and digest(target) == asset['digest'][7:], 'downloaded_candidate_pin:' + name)
-    return target
+    need(not os.path.lexists(target), 'candidate_download_target_exists:' + name)
+    command = ['gh', 'api', 'repos/' + REPOSITORY + '/releases/assets/' + str(asset['id']),
+               '--method', 'GET', '-H', 'Accept: application/octet-stream']
+    for attempt in range(3):
+        retry = False
+        # Only a fresh temporary transfer is disposable; existing target paths
+        # and every generic run()/upload/validation operation are never retried.
+        with tempfile.NamedTemporaryFile(dir=directory, prefix='.' + name + '.download-') as stream, \
+                tempfile.TemporaryFile() as diagnostic:
+            try:
+                subprocess.run(command, cwd=REPO, stdout=stream, stderr=diagnostic,
+                               check=True, timeout=600)
+            except subprocess.CalledProcessError:
+                diagnostic.seek(0)
+                error = diagnostic.read(16385)
+                if error:
+                    print(error[:16384].decode('utf-8', 'replace'), end='', file=sys.stderr)
+                transient = len(error) <= 16384 and re.search(rb'\bHTTP (?:408|429|500|502|503|504)\b', error)
+                if not transient or attempt == 2:
+                    raise
+                retry = True
+            if not retry:
+                stream.flush()
+                temporary = Path(stream.name)
+                need(temporary.stat().st_size == asset['size'] and digest(temporary) == asset['digest'][7:],
+                     'downloaded_candidate_pin:' + name)
+                # A same-directory hard link publishes verified bytes atomically
+                # without replacing a regular file, directory or symlink race.
+                os.link(temporary, target)
+                return target
+        # Both temporary files have already been removed before this short wait.
+        time.sleep(attempt + 1)
 
 
 def bundle(directory, destination):

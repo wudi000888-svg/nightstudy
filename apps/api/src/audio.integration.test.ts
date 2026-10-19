@@ -301,6 +301,66 @@ suite('PostgreSQL pronunciation media and exact dictionary resolution', () => {
     }
   });
 
+  it('keeps held-audio policy metadata visible without adding its targets to dictionary counts', async () => {
+    const before = await request('GET', '/dictionary/stats');
+    expect(before.statusCode).toBe(200);
+    const policyPackId = `${prefix}-publication-policy`,
+      dictionaryPackId = `ecdict-${prefix}`;
+    try {
+      await db.contentPack.create({
+        data: {
+          id: policyPackId,
+          version: 'test-publication-policy-v1',
+          status: 'ready',
+          sourceUrl: 'https://example.test/audio-policy-fixture',
+          sha256: '4'.repeat(64),
+          license: 'MIT',
+          entryCount: 79,
+          phoneticCount: 0,
+          definitionZhCount: 0,
+          definitionEnCount: 0,
+          tagCounts: { kind: 'sentence-audio-publication-policy', heldClipCount: 79 },
+        },
+      });
+      const withPolicy = await request('GET', '/dictionary/stats');
+      expect(withPolicy.statusCode).toBe(200);
+      expect(withPolicy.json().declaredEntryCount).toBe(before.json().declaredEntryCount);
+      expect(
+        withPolicy.json().packs.find((pack: { id: string }) => pack.id === policyPackId),
+      ).toMatchObject({
+        entryCount: 79,
+        tagCounts: { kind: 'sentence-audio-publication-policy', heldClipCount: 79 },
+      });
+      await db.contentPack.create({
+        data: {
+          id: dictionaryPackId,
+          version: 'test-dictionary-v1',
+          status: 'ready',
+          sourceUrl: 'https://example.test/dictionary-fixture',
+          sha256: '5'.repeat(64),
+          license: 'MIT',
+          entryCount: 7,
+          phoneticCount: 0,
+          definitionZhCount: 0,
+          definitionEnCount: 0,
+          tagCounts: { fixture: 7 },
+        },
+      });
+      const withDictionary = await request('GET', '/dictionary/stats');
+      expect(withDictionary.statusCode).toBe(200);
+      expect(withDictionary.json().installedDictionary).toBe(true);
+      expect(withDictionary.json().declaredEntryCount).toBe(before.json().declaredEntryCount + 7);
+      expect(
+        withDictionary.json().packs.some((pack: { id: string }) => pack.id === policyPackId),
+      ).toBe(true);
+      expect(
+        withDictionary.json().packs.some((pack: { id: string }) => pack.id === dictionaryPackId),
+      ).toBe(true);
+    } finally {
+      await db.contentPack.deleteMany({ where: { id: { in: [policyPackId, dictionaryPackId] } } });
+    }
+  });
+
   it('serves verified PCM bytes with a MIME type, revalidated digest ETag and an empty 304 response', async () => {
     const first = await media();
     expect(first.statusCode).toBe(200);

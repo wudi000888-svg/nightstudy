@@ -238,7 +238,18 @@ jobs:
           docker compose up --detach --no-build --wait --wait-timeout 1800 app
           curl --fail --silent http://127.0.0.1:5198/health/ready
           curl --fail --silent http://127.0.0.1:5198/api/v2/dictionary/stats > /tmp/nightstudy-catalog.json
-          node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-catalog.json','utf8'));if(!j.installedDictionary||j.declaredEntryCount!==770611)process.exit(1)"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const catalog = JSON.parse(fs.readFileSync('/tmp/nightstudy-catalog.json', 'utf8'));
+          console.log(JSON.stringify({
+            action: 'ci.dictionary.stats',
+            installedDictionary: catalog.installedDictionary,
+            declaredEntryCount: catalog.declaredEntryCount,
+            packs: catalog.packs?.map(({ id, entryCount, tagCounts }) => ({ id, entryCount, kind: tagCounts?.kind })),
+          }));
+          if (catalog.installedDictionary !== true || catalog.declaredEntryCount !== 770611)
+            throw new Error('canonical_dictionary_entry_count_changed');
+          NODE
           docker compose exec -T app node scripts/check-learning-senses-install.mjs --single-site default
           docker compose exec -T app node scripts/check-audio-install.mjs --bilingual-baseline /app/.local/content/bilingual-before.json
           docker compose exec -T app node scripts/check-learning-senses-install.mjs --single-site default --audio

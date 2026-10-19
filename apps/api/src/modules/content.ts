@@ -301,6 +301,7 @@ export async function registerContent(app: FastifyInstance, getContext: ContextR
               'phrase-books',
               'exam-books',
               'sentence-audio',
+              'sentence-audio-publication-policy',
             ].includes(String(obj(pack.tagCounts).kind)),
         )
         .reduce((sum, pack) => sum + pack.entryCount, 0),

@@ -1,6 +1,8 @@
 # Alpha 运行与部署
 
-本分支是 `0.13.0-alpha.1` 候选，尚未发行或部署。95 叶完整文本冷安装与 [18 书真实辨义接口验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39246905655) 已通过；完整音频、全局闭合、H5 与最终应用 CI/发行仍待完成。源码、固定媒体发行和站点部署分别验收，候选代码不表示既有站点已经升级。
+本分支是 `0.13.0-alpha.1` 候选，应用版本尚未发行或部署。95 叶完整文本冷安装、[18 书真实辨义接口验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39246905655) 及 [101 包与全局内容绑定验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39263429979) 已通过；[独立句音媒体](https://github.com/wudi000888-svg/nightstudy/releases/tag/media-sentence-v4-014-20261019) 已公开，完整音频冷安装、H5 与最终 main / 发行 CI 仍待完成。源码、固定媒体发行和站点部署分别验收，候选代码不表示既有站点已经升级。
+
+0.13 的固定镜像摘要及最终 main / 发行结果以 [该版本发行页](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.13.0-alpha.1) 发布后的记录为准；本源码文档不预写未验收的镜像摘要。安装时核对所选发行的版本、源码 revision 和固定 digest，下文的历史 0.12 镜像不作为本版新站安装目标。
 
 当前公开版本及 Native / VPS 部署仍为 [`0.12.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.12.0-alpha.1)，运行源码为 [`b8cde5bb`](https://github.com/wudi000888-svg/nightstudy/commit/b8cde5bb8283da2f2f0b20daffd86515b9d2270f)。该版 [main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881203417) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881311451) 均成功，公开镜像已匿名核验；两端的数据保护与部署事实见 [0.12 H5 记录](REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
 
@@ -30,7 +32,7 @@ docker compose up --build --detach --wait --wait-timeout 1800 app
 
 `init` 是新站完整初始化入口，运行 `pnpm db:prepare`：generate、逐站迁移、seed、首次管理员准备，再按 `CONTENT_PACK` 安装内容、按 `AUDIO_PACK` 安装音频并刷新音标覆盖统计。默认 `ecdict` 依次准备完整 ECDICT、考试词书、独立英美 IPA、词组、v1/v2 双语文本及 `learning-senses-collection-v2` 的 95 个义项叶。默认有效目录为 18 本、18,767 个词目与 69,840 条成员关系；原子义项和双语例句范围见本页开头。文本全集先预校验，再逐叶有界读取、在同一事务内顺序导入，最终文件身份检查在提交前执行；精确重放不重写原内容。安装成功后 app 启动，请求进程不重复运行迁移或初始化管理员。
 
-`AUDIO_PACK=standard` 先安装 word-audio-v2、sentence-audio-v1、sentence-audio-v2、sentence-audio-v3；当完整的 `data/sentence-audio-v4.collection.json` 合入后，再安装其中 101 个新句音子包，总共 105 个归档。当前候选的完整 v4 媒体仍在构建，不能把缺少 collection 或显式 `AUDIO_PACK=none` 的文本首装当成完整音频安装通过。应用只播放已发布并验证的静态成品。
+`AUDIO_PACK=standard` 先安装 word-audio-v2、sentence-audio-v1、sentence-audio-v2、sentence-audio-v3，再安装 `data/sentence-audio-v4.collection.json` 中的 101 个新句音子包，总共 105 个归档。101 包和全局绑定检查已通过，媒体已公开；全部归档的下载与完整数据库冷安装仍需分别验收，缺少 collection 或显式 `AUDIO_PACK=none` 的文本首装不算完整音频安装通过。应用只播放已发布并验证的静态成品。
 
 `scripts/install.sh` 的等待上限默认 1800 秒，可用 `NIGHTSTUDY_INSTALL_WAIT_SECONDS` 设置为 60..7200 秒。手动 Compose 的 `--wait-timeout` 单独设置；上限不是安装耗时保证，慢下载应检查 init 日志、网络和实际资源后再决定是否调整。
 
@@ -55,13 +57,13 @@ PG 业务数据、内容源缓存与音频分别保存在 postgres-data、conten
 | sentence-audio-v2 | 0.10.0-alpha.1 | 369,105,500 |   18,878 |
 | sentence-audio-v3 | 0.11.0-alpha.1 |   7,758,221 |      392 |
 
-上述四包压缩总量为 889,694,717 字节，只是旧包基线，不是 0.13 完整大小。真实来源 URL 和摘要以对应的四份 data descriptor 为准，旧公开包保持不可变。新 v4 的 101 个子包压缩总量、解包媒体与安装峰值等待最终实际清单和云端安装结果，不预填估计值。词典、其他文本/音标包、数据库索引、WAL、备份及升级暂存另计。
+上述四包压缩总量为 889,694,717 字节；新 v4 的 101 个子包实际压缩总量为 4,008,058,272 字节，105 个归档合计 4,897,752,989 字节。真实来源 URL 和摘要以对应 data descriptor 为准，旧公开包保持不可变。这些是固定压缩附件的字节数，不是解包成品的稳定占用或安装峰值；词典、其他文本/音标包、数据库索引、WAL、备份及升级暂存另计。独立验证档案和语境/计划镜像不属于安装音包。
 
-v4 的完整目标是 99,940 组去重英文句子 / 199,880 个英美口音键：199,377 条本轮新选择、32 条既有 v1/v2 明确复用、392 条 v3 基线及 79 个暂缓键。79 键涉及 18 组双口音暂缓和 43 组单口音暂缓；已批准的另一口音不受影响。全局暂缓侧件不能按每包重复携带的数量累加。199,377 是口音条目数，不必等于物理 MP3 文件数。完整媒体和全局验收仍待完成。
+v4 已完成当前内容根的全局核对：99,940 组去重英文句子 / 199,880 个英美口音键，由 199,377 条本轮新选择、32 条既有 v1/v2 明确复用、392 条 v3 基线及 79 个暂缓键组成；当前可用为 199,801 个口音键，当前纠音记录为 1,758 条。79 键涉及 18 组双口音暂缓和 43 组单口音暂缓；已批准的另一口音不受影响。全局暂缓侧件不能按每包重复携带的数量累加。199,377 是口音条目数，不必等于物理 MP3 文件数；这些结果不表示生产数据库已经安装新媒体。
 
 `AUDIO_RETAIN_ARCHIVES=false` 为默认：本包完整媒体验证通过后，仅删除其已核身份的压缩缓存，解包成品保留；失败缓存保留供排查。`true` 显式保留验证成功的 tar 以便离线修复，磁盘须额外预算全部压缩包。清理失败时保留已安装文件和归档并明确报错，不静默当作安装成功。该候选行为的 10 项云端回归已通过，完整 101 包的空间峰值尚未实测。
 
-本轮经授权使用已有英美声线在 GitHub 免费环境离线生成，没有下载新模型或调用付费内容接口；本机不运行该轮模型任务。安装与运行无需 Piper、声学模型或翻译权重，线上不即时合成，也不使用浏览器设备语音兜底。完整 WAV / MP3 解码、质量与身份检查不是逐句专家听审；复用的旧 32 条也是合成成品，不称真人录音。
+本次全量句音经授权使用已有英美声线在 GitHub 免费环境离线生成，全量生成期间本机不运行模型，没有下载新模型或调用付费内容接口；早期本机小批试验不选入本轮全量新包。安装与运行无需 Piper、声学模型或翻译权重，线上不即时合成，也不使用浏览器设备语音兜底。完整 WAV / MP3 解码、质量与身份检查不是逐句专家听审；复用的旧 32 条也是合成成品，不称真人录音。
 
 0.10的v1/v2两个句音包合计存储35,686条；该版有效词书当时引用17,814条去重英文，对应35,628条英美目标，其余58条是29条旧句的双口音成品。0.11另新增196句/392条v3音频；旧词级句仍待逐义绑定，不以全部媒体行数冒充已发布原子义项的例句数。音频包安装逐站事务更新媒体与来源记录，保留既有合格真人录音优先级，只补空IPA；文本v2的精确更正有独立源绑定与严格事务规则，不能把音频安装规则概括成所有文本原值永远不变。
 
@@ -146,9 +148,9 @@ PgBouncer、完整分布式队列、活动 Realm LRU、公平调度及高并发�
 
 ## Render 首站描述
 
-根 `render.yaml` 描述一个 Docker Web 与一个 PG17 首站数据库，使用付费资源规格、内部 DB URL、随机认证/初始化密钥、`AUDIO_PACK=none pnpm db:prepare` pre-deploy、2GB Web计算实例、5GB音频持久磁盘及 ready 检查。默认 `autoDeployTrigger: off`，不因上游 push 自动升级所有使用者实例。
+根 `render.yaml` 描述一个 Docker Web 与一个 PG17 首站数据库，使用付费资源规格、内部 DB URL、随机认证/初始化密钥、`AUDIO_PACK=none pnpm db:prepare` pre-deploy、2GB Web计算实例、10GB音频持久磁盘及 ready 检查；PG 磁盘仍为 5GB。默认 `autoDeployTrigger: off`，不因上游 push 自动升级所有使用者实例。
 
-源码模板当前仍是 5GB 音频盘，不能作为 0.13 完整媒体的容量保证。10GB 可作为待实测的配置建议，尚未测得新 101 包完整压缩量、解包量和暂存峰值；最终容量要结合 `AUDIO_RETAIN_ARCHIVES` 策略及实际清单决定，数据库和备份空间另计。下文的 Render 创建、首装与恢复没有因候选源码而变为已验收。
+本轮仅将源码模板的音频盘从 5GB 调为 10GB，没有创建或扩容 Render 资源，也没有验证 10GB 足够。105 个音频归档的压缩总量已实测为 4,897,752,989 字节，仍不能据此推断解包稳定占用或安装暂存峰值；最终容量要结合 `AUDIO_RETAIN_ARCHIVES` 策略和完整安装观测决定，数据库和备份空间另计。下文的 Render 创建、首装与恢复没有因候选源码而变为已验收。
 
 该文件不会自行创建云资源。部署者在Render审阅费用、创建资源并检查构建/ready/catalog；PUBLIC_URL从RENDER_EXTERNAL_URL引用。INITIAL_ADMIN_PASSWORD使用平台generateValue独立生成，部署者从Render私有环境保管，避免依赖临时pre-deploy文件；不是所有实例共用默认密码，既有管理员也不因重部署重置。pre-deploy默认准备完整词典/音标，临时内容缓存可能重新下载，已提交词义/用户保存在PG。Render的pre-deploy不能访问运行磁盘，因此dockerCommand在启动前单独执行audio:prepare，将成品媒体保存在/app/.local/audio持久磁盘；后续重启校验并复用。持久磁盘仅供一个实例，不支持此模板多副本或零停机更新；费用与平台实测由部署者确认。参见[Render磁盘限制](https://render.com/docs/disks)。实际首装、耗时、负载与恢复仍待平台实测。[Render Blueprint规范](https://render.com/docs/blueprint-spec)、[Docker部署](https://render.com/docs/docker)
 
@@ -194,7 +196,7 @@ DeepSeek不是部署必填环境变量。各站管理员从本站后台可选配
 | NIGHTSTUDY_HTTP_PORT                                 | Compose 主机回环端口，默认 5198                                                                                                                                                                             |
 | NIGHTSTUDY_IMAGE                                     | 可选已核验发行镜像；空值从当前 checkout 构建本地镜像                                                                                                                                                        |
 | CONTENT_PACK                                         | 默认 ecdict：完整源词典、考试词书、独立 IPA、词组、v1/v2 双语文本与 95 叶原子义项 collection；有效默认目录18本；demo 显式选择最小测试内容，音频另由 AUDIO_PACK 选择                                         |
-| AUDIO_PACK / AUDIO_CACHE_DIR / AUDIO_PYTHON          | AUDIO_PACK 空时 ecdict 用 standard、demo 用 none；standard 校验旧四包，并在完整 v4 collection 合入后安装其 101 子包；none 跳过音频；Docker 缓存 /app/.local/audio；Native 用 Python 3.11+受限解包，无需模型 |
+| AUDIO_PACK / AUDIO_CACHE_DIR / AUDIO_PYTHON          | AUDIO_PACK 空时 ecdict 用 standard、demo 用 none；standard 校验旧四包与 v4 collection 的 101 子包；none 跳过音频；Docker 缓存 /app/.local/audio；Native 用 Python 3.11+受限解包，无需模型 |
 | AUDIO_RETAIN_ARCHIVES                                | 默认 false，完整媒体验证通过后删除本包压缩缓存；true 显式保留归档供离线修复，失败缓存保留；留存时额外预算全部 tar 空间                                                                                      |
 | NIGHTSTUDY_INSTALL_WAIT_SECONDS                      | install.sh 等待上限默认 1800 秒，范围 60..7200；不代替手动 Compose 的 --wait-timeout，也不是安装耗时保证                                                                                                    |
 | CONTENT_FILE                                         | operator的本地ECDICT源文件；必须匹配固定大小/SHA256，缺失时不自动换源                                                                                                                                       |
@@ -259,9 +261,9 @@ alpha 不提供自动无损跨版本恢复保证；0.10的“无新增迁移”�
 
 [真实辨义接口 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/39246905655) 已完成 95 叶完整文本冷安装，18 个独立普通账号经真实选书、目标确认、偏好、发题、揭晓和重试，共 360 次请求。90 道自然发题包括 84 道辨义（81 道来自原 35 词之外）和 6 道回忆，每本书均出现原 35 词之外的辨义题。实际 GET 确认评分、FSRS、完成数和未评分游标未推进；没有评分、AI 或支付调用。该临时站点不能指向生产，账号和 cookie 不进入公开收据。收据为 181,017 字节，SHA-256 `3138f733e608e399d8fd22ef89bbc293e8cf5e9e30efba11a9aea1341d72ad7d`。
 
-首批 256 组 / 512 个句音和旧 32 个 MP3 的资格检查已通过，候选缓存工具的 10 项定向回归通过。完整 101 包、全局闭合、匿名资源下载、严格新媒体冷安装、H5 与最终 main/发行 CI 仍待完成；不能用文本 CI、工具自测或单包成功替代。没有 0.13 生产镜像或部署成功的主张。
+完整 101 包的独立成品校验、明确选择、全局内容引用和 79 个暂缓键的分区已在 [全量媒体任务](https://github.com/wudi000888-svg/nightstudy/actions/runs/39263429979) 通过，并保留公开语境及不可变计划镜像。当前根精确闭合为 199,377 新选择 + 32 既有复用 + 392 基线 + 79 暂缓，当前可用 199,801；缓存工具的 10 项定向回归通过。媒体发行已公开，全局收据与语境清单的匿名下载摘要复核通过。该任务的应用 verify 未运行，全部音包下载、严格新媒体冷安装、H5 与最终 main / 发行 CI 仍待完成；不能用媒体任务或工具自测代替完整应用验收。没有 0.13 生产部署成功的主张。
 
-新媒体拟使用独立、非 latest 的资源 prerelease，旧公开附件不覆盖。先完成所有固定清单和独立检查，再公开匿名核验下载、执行完整应用 CI，最后发布版本匹配的源码与镜像。`release.yml` 只为 `v` 前缀的应用版本进入验证/镜像任务，资源标签不触发应用容器发布。GitHub 公开源码不保证 GHCR package 自动公开，最终仍需匿名核验。安装等待默认 1800 秒，完整体量与耗时不以历史包估算代替。
+新媒体已作为独立、非 latest 的资源 prerelease [`media-sentence-v4-014-20261019`](https://github.com/wudi000888-svg/nightstudy/releases/tag/media-sentence-v4-014-20261019) 公开，旧公开附件不覆盖。固定清单和独立检查完成后，仍须核验全部音包下载、执行完整应用 CI，最后发布版本匹配的源码与镜像。`release.yml` 只为 `v` 前缀的应用版本进入验证/镜像任务，资源标签不触发应用容器发布。GitHub 公开源码不保证 GHCR package 自动公开，最终仍需匿名核验。安装等待默认 1800 秒，完整安装耗时与磁盘峰值不以压缩体积代替。
 
 ### 0.12 已部署历史基线
 
@@ -279,7 +281,7 @@ ghcr.io/wudi000888-svg/nightstudy@sha256:884c62d81a69f243f370fa30c3b563ffe6dc4ee
 
 该版完整首装保留 770,611 基础词典、18 本书 / 69,840 有效成员和 0.10 文本来源与候选，再安装 35 词 / 98 原子义项 / 196 独立语境及 392 句音身份。独立检查原源行不变、来源摘要、同词同版、每义两个语境及成品文件；不把保留的旧词级句当成全部义项配句完成。随机初始 admin 实际登录和闭合网关未鉴权 401 另验，它们不证明 Google 上游可用。该版清理只针对 CI 的独立 project，不是本轮 0.13 完整媒体或站点验收。
 
-`release.yml`仅在发布GitHub Release时触发；tag 如 `v0.12.0-alpha.1`须与package.json版本相同。公开仓库不保证GHCR package自动公开，仍需匿名核验。新站准备私有`.env`、密钥与HTTPS后，将`NIGHTSTUDY_IMAGE`设为上述固定引用，使用`docker compose up --detach --no-build --wait app`；init准备新站管理员与内容。已有站点按前文增量，不重新seed。`scripts/install.sh`为源码构建入口，使用发行镜像时不加`--build`。不依赖浮动latest；[GitHub镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)。
+上述 digest 仅保留为 0.12 部署历史，不是 0.13 新站安装推荐。`release.yml` 在发布 `v` 前缀的 GitHub 应用 Release 时验证 tag 与 package.json 版本，再执行完整验证与镜像发布。新站准备私有 `.env`、密钥与 HTTPS 后，从目标版本的发行页取得已验收的固定 digest，设置 `NIGHTSTUDY_IMAGE` 并使用 `docker compose up --detach --no-build --wait app`；init 准备新站管理员与内容。已有站点按前文增量，不重新 seed。`scripts/install.sh` 为源码构建入口，使用发行镜像时不加 `--build`，不依赖浮动 latest；公开仓库不保证 GHCR package 自动公开，仍需匿名核验。[GitHub镜像发布文档](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
 
 以下保留旧版发行记录，分别对应当时的源码与验收范围。
 

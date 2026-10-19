@@ -2,6 +2,10 @@ name: Generate selected existing-model sentence audio
 
 on:
   workflow_call:
+    inputs:
+      scope:
+        type: string
+        default: first
 
 permissions:
   contents: read
@@ -18,6 +22,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       PYTHONDONTWRITEBYTECODE: '1'
+      RUN_SCOPE: ${{ inputs.scope }}
+      INPUT_RELEASE: audio-build-inputs-014-20261019
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Verify model-free batch and packaging boundaries
@@ -26,6 +32,7 @@ jobs:
           python3 scripts/ci-sentence-audio-batch.test.py
           python3 scripts/check-ci-sentence-audio-batch.test.py
           python3 scripts/prepare-ci-sentence-audio-run.test.py
+          python3 scripts/prepare-ci-sentence-audio-rest.test.py
           python3 scripts/assemble-ci-sentence-audio.test.py
       - name: Copy the fixed prepared plan
         run: |
@@ -34,13 +41,24 @@ jobs:
           asset=$(jq -er .archive.fileName data/ci-audio-batch-plan.manifest.json)
           gh release download "$release" --repo "$GITHUB_REPOSITORY" \
             --pattern "$asset" --dir "$RUNNER_TEMP"
-      - name: Restore and verify the complete prepared plan before selecting first batch
+      - name: Restore the complete plan and enforce the actual first acceptance for remaining jobs
         id: selection
         run: |
           set -euo pipefail
           asset=$(jq -er .archive.fileName data/ci-audio-batch-plan.manifest.json)
-          python3 scripts/prepare-ci-sentence-audio-run.py \
-            --archive "$RUNNER_TEMP/$asset" --scope first --github-output "$GITHUB_OUTPUT"
+          case "$RUN_SCOPE" in
+            first) scheduler=scripts/prepare-ci-sentence-audio-run.py ;;
+            remaining)
+              scheduler=scripts/prepare-ci-sentence-audio-rest.py
+              mkdir .ci-audio-inputs
+              for field in check assembly unpack; do
+                name=$(jq -er --arg field "$field" '.[$field].fileName | split("/")[-1]' data/ci-audio-first-accepted.manifest.json)
+                gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern "$name" --dir .ci-audio-inputs
+              done ;;
+            *) exit 1 ;;
+          esac
+          python3 "$scheduler" --archive "$RUNNER_TEMP/$asset" \
+            --scope "$RUN_SCOPE" --github-output "$GITHUB_OUTPUT"
 
   generate:
     needs: select
@@ -68,6 +86,7 @@ jobs:
       REQUEST_FILE: ${{ matrix.requestFile }}
       REQUEST_SHA: ${{ matrix.requestSha256 }}
       SLICE_NUMBER: ${{ matrix.sliceNumber }}
+      RUN_SCOPE: ${{ inputs.scope }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Copy the fixed prepared plan and restore with bounded extraction
@@ -79,8 +98,19 @@ jobs:
           asset=$(jq -er .archive.fileName data/ci-audio-batch-plan.manifest.json)
           gh release download "$release" --repo "$GITHUB_REPOSITORY" \
             --pattern "$asset" --dir "$RUNNER_TEMP"
-          python3 scripts/prepare-ci-sentence-audio-run.py \
-            --archive "$RUNNER_TEMP/$asset" --scope first --github-output "$GITHUB_OUTPUT"
+          case "$RUN_SCOPE" in
+            first) scheduler=scripts/prepare-ci-sentence-audio-run.py ;;
+            remaining)
+              scheduler=scripts/prepare-ci-sentence-audio-rest.py
+              mkdir .ci-audio-inputs
+              for field in check assembly unpack; do
+                name=$(jq -er --arg field "$field" '.[$field].fileName | split("/")[-1]' data/ci-audio-first-accepted.manifest.json)
+                gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern "$name" --dir .ci-audio-inputs
+              done ;;
+            *) exit 1 ;;
+          esac
+          python3 "$scheduler" --archive "$RUNNER_TEMP/$asset" \
+            --scope "$RUN_SCOPE" --github-output "$GITHUB_OUTPUT"
       - name: Prepare isolated pinned CPU runtime
         run: |
           set -euo pipefail
@@ -100,7 +130,7 @@ jobs:
           mkdir "$RUNNER_TEMP/existing-models"
           gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
             --pattern '*.onnx*' --dir "$RUNNER_TEMP/existing-models"
-          mkdir .ci-audio-inputs
+          mkdir -p .ci-audio-inputs
           for name in pronunciation-controls-014.json pronunciation-supplement-014.json contrasts-frontend-observation-014.json approved-pilot.check.json sentence-audio-holds-v1.manifest.json sentence-audio-holds-v1.json; do
             gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
               --pattern "$name" --dir .ci-audio-inputs

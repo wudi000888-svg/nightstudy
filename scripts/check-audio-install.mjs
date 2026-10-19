@@ -1701,7 +1701,11 @@ async function selfTest() {
       },
     ],
   };
-  let readyLegacy = ['US', 'UK'].map((accent) => ({ textHash: legacyHash, accent, status: 'ready' }));
+  let readyLegacy = ['US', 'UK'].map((accent) => ({
+    textHash: legacyHash,
+    accent,
+    status: 'ready',
+  }));
   const scopedDb = {
     sentenceAudio: {
       findMany: async ({ where }) => {

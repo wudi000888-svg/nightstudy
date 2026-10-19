@@ -1,0 +1,76 @@
+name: Audit immutable legacy sentence audio intersections
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: github.repository == 'wudi000888-svg/nightstudy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONDONTWRITEBYTECODE: '1'
+      INPUT_RELEASE: audio-build-inputs-014-20261019
+      OUTPUT_RELEASE: audio-build-batches-014-20261019
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Verify model-free legacy identity boundaries
+        run: python3 scripts/audit-ci-legacy-sentence-overlap.test.py
+      - name: Restore the fixed full plan without inference
+        run: |
+          set -euo pipefail
+          release=$(jq -er .release data/ci-audio-batch-plan.manifest.json)
+          asset=$(jq -er .archive.fileName data/ci-audio-batch-plan.manifest.json)
+          gh release download "$release" --repo "$GITHUB_REPOSITORY" \
+            --pattern "$asset" --dir "$RUNNER_TEMP"
+          python3 scripts/prepare-ci-sentence-audio-run.py \
+            --archive "$RUNNER_TEMP/$asset" --scope first --github-output "$GITHUB_OUTPUT"
+      - name: Read actual manifests from the three immutable published archives
+        run: |
+          set -euo pipefail
+          mkdir .cloud-legacy
+          for name in sentence-audio.manifest.json sentence-audio-v2.manifest.json sentence-audio-v3.manifest.json; do
+            descriptor="data/$name"
+            id=$(jq -er .id "$descriptor")
+            url=$(jq -er .source.url "$descriptor")
+            bytes=$(jq -er .source.sizeBytes "$descriptor")
+            checksum=$(jq -er .source.sha256 "$descriptor")
+            archive="$RUNNER_TEMP/$id.tar.gz"
+            curl --fail --location --silent --show-error --retry 2 --max-time 600 \
+              --max-filesize "$bytes" "$url" --output "$archive"
+            test "$(stat -c %s "$archive")" -eq "$bytes"
+            printf '%s  %s\n' "$checksum" "$archive" | sha256sum --check --status
+            tar -xOf "$archive" manifest.json > ".cloud-legacy/$id.manifest.json"
+            tar -xOf "$archive" sources.manifest.json > ".cloud-legacy/$id.sources.manifest.json"
+            rm "$archive"
+          done
+      - name: Copy exact current pronunciation controls
+        run: |
+          set -euo pipefail
+          mkdir .ci-audio-inputs
+          for name in pronunciation-controls-014.json pronunciation-supplement-014.json contrasts-frontend-observation-014.json; do
+            gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+              --pattern "$name" --dir .ci-audio-inputs
+          done
+      - name: Independently enumerate every current intersection
+        run: |
+          set -euo pipefail
+          python3 scripts/audit-ci-legacy-sentence-overlap.py \
+            --controls .ci-audio-inputs/pronunciation-controls-014.json \
+            --supplement .ci-audio-inputs/pronunciation-supplement-014.json \
+            --output "$RUNNER_TEMP/legacy-overlap.json"
+      - name: Preserve the actual read-only overlap report
+        run: |
+          set -euo pipefail
+          stem="ci-audio-legacy-overlap-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cp "$RUNNER_TEMP/legacy-overlap.json" "$RUNNER_TEMP/$stem.json"
+          (cd "$RUNNER_TEMP" && sha256sum "$stem.json" > "$stem.sha256")
+          gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            "$RUNNER_TEMP/$stem.json" "$RUNNER_TEMP/$stem.sha256"
+          printf 'Immutable legacy intersection audit only: %s; no media reuse or publication approval.\n' "$stem" >> "$GITHUB_STEP_SUMMARY"

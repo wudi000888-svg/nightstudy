@@ -9,7 +9,7 @@ on:
       audio_mode:
         description: Application checks, existing-model pilot, complete plan, or first bounded audio batch
         type: choice
-        options: [verify, pilot, batch-plan, batch-first]
+        options: [verify, pilot, batch-plan, batch-first, legacy-audit]
         default: verify
   workflow_call:
 
@@ -38,6 +38,12 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/sentence-audio-generate.yml
+
+  sentence-audio-legacy-audit:
+    if: github.event_name == 'workflow_dispatch' && inputs.audio_mode == 'legacy-audit' && github.repository == 'wudi000888-svg/nightstudy'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/sentence-audio-legacy-audit.yml
 
   verify:
     if: github.event_name != 'workflow_dispatch' || inputs.audio_mode == 'verify'

@@ -127,6 +127,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:5198/health/ready
           curl --fail --silent http://127.0.0.1:5198/api/v2/dictionary/stats > /tmp/nightstudy-catalog.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-catalog.json','utf8'));if(!j.installedDictionary||j.declaredEntryCount!==770611)process.exit(1)"
+          docker compose exec -T app node scripts/check-learning-senses-install.mjs --single-site default
           docker compose exec -T app node scripts/check-audio-install.mjs --bilingual-baseline /app/.local/content/bilingual-before.json
           docker compose exec -T app node scripts/check-learning-senses-install.mjs --single-site default --audio
           umask 077

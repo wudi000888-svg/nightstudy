@@ -477,7 +477,11 @@ export function verifyPolishedContent(data, bundle) {
 export async function readPolishedContent(db, bundle) {
   const words = await db.word.findMany({
     where: { normalizedLemma: { in: bundle.rows.map((row) => row.normalizedLemma) } },
-    include: { senses: true, examples: true, audio: { where: { status: 'ready' } } },
+    include: {
+      senses: true,
+      examples: { where: { learningSenseId: null } },
+      audio: { where: { status: 'ready' } },
+    },
   });
   const books = await db.book.findMany({
     where: {

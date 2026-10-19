@@ -1141,7 +1141,7 @@ async function verifyPhraseAudio(db, data, verifiedAudioBytes) {
     await Promise.all(entries.slice(offset, offset + 8).map((entry) => verifiedAudioBytes(entry)));
   return { phraseMediaFilesVerified: entries.length };
 }
-function selfTest() {
+async function selfTest() {
   const sentenceText = 'The original sentence has a pending British reading.';
   const testEntries = ['US', 'UK'].map((accent) => ({
     text: sentenceText,
@@ -1666,16 +1666,90 @@ function selfTest() {
       );
     }
   }
+  // Atomic-meaning examples have their own complete checker and must not expand
+  // the frozen bilingual polish scope, even if supplied by an unfiltered reader.
+  let polishQuery;
+  await readPolishedContent(
+    {
+      word: {
+        findMany: async (query) => {
+          polishQuery = query;
+          return [];
+        },
+      },
+      book: { findMany: async () => [] },
+      contentPack: { findUnique: async () => null },
+    },
+    { rows: [{ normalizedLemma: 'fixture' }], manifest: { id: 'bilingual-v2' } },
+  );
+  assert.deepEqual(polishQuery.include.examples, { where: { learningSenseId: null } });
+  const legacyText = 'The original example still needs both recordings.';
+  const legacyHash = sha(legacyText);
+  const scopedData = {
+    words: [
+      {
+        normalizedLemma: 'fixture',
+        senses: [],
+        examples: [
+          { exampleEn: legacyText, exampleZh: '原例句仍需要两种录音。', learningSenseId: null },
+          {
+            exampleEn: 'An atomic meaning has a separate audio acceptance scope.',
+            exampleZh: '原子义项有独立的音频验收范围。',
+            learningSenseId: 'learning-sense-fixture',
+          },
+        ],
+      },
+    ],
+  };
+  let readyLegacy = ['US', 'UK'].map((accent) => ({ textHash: legacyHash, accent, status: 'ready' }));
+  const scopedDb = {
+    sentenceAudio: {
+      findMany: async ({ where }) => {
+        assert.deepEqual(where.textHash.in, [legacyHash]);
+        return readyLegacy;
+      },
+    },
+  };
+  let checkedLegacyFiles = 0;
+  const scopedResult = await verifyPolishedSentences(
+    scopedDb,
+    scopedData,
+    { rows: [] },
+    async () => checkedLegacyFiles++,
+    emptySentenceAudioPolicy(),
+  );
+  assert.equal(scopedResult.uniqueBilingualSentences, 1);
+  assert.equal(scopedResult.dualAccentSentenceEntries, 2);
+  assert.equal(checkedLegacyFiles, 2);
+  readyLegacy = readyLegacy.filter((entry) => entry.accent !== 'UK');
+  await assert.rejects(
+    verifyPolishedSentences(
+      scopedDb,
+      scopedData,
+      { rows: [] },
+      async () => {},
+      emptySentenceAudioPolicy(),
+    ),
+    (error) =>
+      error.code === 'polish_sentence_dual_accent_missing' &&
+      error.details.textHash === legacyHash &&
+      error.details.accent === 'UK',
+  );
   console.log(
     JSON.stringify({
       action: 'install.verify.self-test',
-      passed: 51 + polishSelfTest(),
+      passed: 52 + polishSelfTest(),
       databaseUsed: false,
     }),
   );
 }
-async function verifyPolishedSentences(db, data, bundle, verifiedAudioBytes) {
-  const policy = readSentenceAudioPolicy(fileURLToPath(new URL('../data/', import.meta.url)));
+async function verifyPolishedSentences(
+  db,
+  data,
+  bundle,
+  verifiedAudioBytes,
+  policy = readSentenceAudioPolicy(fileURLToPath(new URL('../data/', import.meta.url))),
+) {
   const withdrawn = new Set(
     bundle.rows.filter((row) => row.defaultBookWithdrawal).map((row) => row.normalizedLemma),
   );
@@ -1684,7 +1758,10 @@ async function verifyPolishedSentences(db, data, bundle, verifiedAudioBytes) {
   const texts = new Map(
     data.words
       .filter((word) => !withdrawn.has(word.normalizedLemma))
-      .flatMap((word) => [...word.senses.filter(learningSense), ...word.examples])
+      .flatMap((word) => [
+        ...word.senses.filter(learningSense),
+        ...word.examples.filter((entry) => entry.learningSenseId == null),
+      ])
       .filter((entry) => paired(entry, 'example'))
       .map((entry) => [sha(normalize(entry.exampleEn)), entry.exampleEn]),
   );
@@ -1729,7 +1806,7 @@ async function main() {
   });
   requireCheck(!(values.snapshot && values['bilingual-baseline']), 'choose_one_verification_mode');
   if (values['self-test']) {
-    selfTest();
+    await selfTest();
     return;
   }
   if (fs.existsSync('.env')) process.loadEnvFile('.env');

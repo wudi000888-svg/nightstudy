@@ -7,7 +7,10 @@ import { parseArgs } from 'node:util';
 
 const { values } = parseArgs({
   options: Object.fromEntries(
-    ['http-receipt', 'playwright-module', 'base-url', 'output'].map((name) => [name, { type: 'string' }]),
+    ['http-receipt', 'playwright-module', 'base-url', 'output'].map((name) => [
+      name,
+      { type: 'string' },
+    ]),
   ),
   strict: true,
 });
@@ -30,10 +33,16 @@ need(
     prior.anonymous === true &&
     prior.samples.length === 18 &&
     new Set(prior.samples.map((s) => s.bookId)).size === 18 &&
-    [checkedBase, base].every((url) =>
-      url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) &&
-      !url.username && !url.password && !url.search && !url.hash,
-    ) && base.pathname === checkedBase.pathname,
+    [checkedBase, base].every(
+      (url) =>
+        url.protocol === 'http:' &&
+        ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) &&
+        !url.username &&
+        !url.password &&
+        !url.search &&
+        !url.hash,
+    ) &&
+    base.pathname === checkedBase.pathname,
   'real_complete_isolated_http_receipt',
 );
 const out = path.resolve(values.output);
@@ -177,14 +186,15 @@ try {
         const button = detail.getByRole('button', { name: `播放${label}例句朗读`, exact: true });
         await button.scrollIntoViewIfNeeded();
         await button.waitFor({ state: 'visible', timeout: 30000 });
+        const before = await page.evaluate(() => window.__nightstudyRealPlayback.length);
         await button.click({ timeout: 30000 });
         const expectedPath = `/api/v2/sentence-audio/${sample.textHash}/audio/${accent}`;
         await page.waitForFunction(
-          (p) =>
-            window.__nightstudyRealPlayback.some(
-              (e) => new URL(e.src).pathname.endsWith(p) && e.readyState >= 2 && e.duration > 0,
+          ({ pathname, after }) =>
+            window.__nightstudyRealPlayback.slice(after).some(
+              (e) => new URL(e.src).pathname.endsWith(pathname) && e.readyState >= 2 && e.duration > 0,
             ),
-          expectedPath,
+          { pathname: expectedPath, after: before },
           { timeout: 30000 },
         );
         receipt.playback.push({

@@ -22,6 +22,7 @@ on:
           - publication-first
           - publication-reuse
           - publication-all
+          - recognition-http
         default: verify
   workflow_call:
 
@@ -106,6 +107,10 @@ jobs:
     uses: ./.github/workflows/sentence-audio-publication.yml
     with:
       scope: reuse
+
+  all-book-recognition:
+    if: github.event_name == 'workflow_dispatch' && inputs.audio_mode == 'recognition-http' && github.repository == 'wudi000888-svg/nightstudy'
+    uses: ./.github/workflows/all-book-recognition.yml
 
   verify:
     if: github.event_name != 'workflow_dispatch' || inputs.audio_mode == 'verify'
@@ -237,11 +242,21 @@ jobs:
         run: |
           set -euo pipefail
           mkdir "$RUNNER_TEMP/nightstudy-content-acceptance"
+          result=0
           docker compose exec -T app node scripts/check-all-book-content-http.mjs \
             --base-url http://127.0.0.1:3000 --audio-root /app/.local/audio \
-            --receipt /app/.local/content/all-book-http.json
-          docker compose cp app:/app/.local/content/all-book-http.json \
-            "$RUNNER_TEMP/nightstudy-content-acceptance/http.json"
+            --receipt /app/.local/content/all-book-http.json || result=$?
+          if ! docker compose cp app:/app/.local/content/all-book-http.json \
+            "$RUNNER_TEMP/nightstudy-content-acceptance/http.json"; then
+            if [[ "$result" == 0 ]]; then result=1; fi
+          fi
+          exit "$result"
+      - name: Verify all-book recognition does not create scores on choice or reveal
+        env:
+          NIGHTSTUDY_DISPOSABLE_COMPOSE_ACCEPTANCE: '1'
+        run: |
+          node scripts/check-all-book-recognition-http.mjs --base-url http://127.0.0.1:5198 \
+            --receipt "$RUNNER_TEMP/nightstudy-content-acceptance/recognition.json"
       - name: Exercise all-book bilingual contexts and real browser playback
         run: |
           set -euo pipefail
@@ -252,7 +267,7 @@ jobs:
             --http-receipt "$RUNNER_TEMP/nightstudy-content-acceptance/http.json" \
             --playwright-module "$RUNNER_TEMP/nightstudy-h5-tools/node_modules/playwright/index.mjs" \
             --base-url http://127.0.0.1:5198 --output "$RUNNER_TEMP/nightstudy-content-acceptance/h5"
-      - name: Retain anonymous content acceptance evidence
+      - name: Retain isolated content acceptance evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:

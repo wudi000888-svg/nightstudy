@@ -21,14 +21,18 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24.19.0'
-      - name: Format only new JavaScript and check their boundaries
+      - name: Format new acceptance sources and descriptors
         id: format
         run: |
           set -euo pipefail
           npm exec --yes --package=prettier@3.9.10 -- prettier --write \
             scripts/check-ci-sentence-audio-selected-installer.mjs \
             scripts/check-ci-sentence-audio-selected-installer.test.mjs \
-            scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs
+            scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs \
+            scripts/check-all-book-recognition-http.mjs scripts/check-all-book-recognition-http.test.mjs \
+            .github/workflows/ci.yml .github/workflows/all-book-recognition.yml \
+            .github/workflows/sentence-audio-publication.yml .github/workflows/sentence-audio-publication-tools.yml \
+            docs/ALL_BOOK_SENSES_AUDIO_013.md
           node --check scripts/check-all-book-content-http.mjs
           node --check scripts/check-all-book-content-h5.mjs
       - name: Verify the original and selected installer boundaries
@@ -36,8 +40,10 @@ jobs:
         run: |
           set -euo pipefail
           node --test scripts/check-ci-sentence-audio-installer.test.mjs \
-            scripts/check-ci-sentence-audio-selected-installer.test.mjs
+            scripts/check-ci-sentence-audio-selected-installer.test.mjs \
+            scripts/check-all-book-recognition-http.test.mjs
           python3 scripts/select-ci-sentence-audio-publication.test.py
+          bash -n scripts/install.sh
       - name: Preserve exact sources and outcome
         if: always() && steps.format.outcome == 'success'
         env:
@@ -48,7 +54,11 @@ jobs:
           tar -czf "$RUNNER_TEMP/$stem.sources.tar.gz" \
             scripts/check-ci-sentence-audio-selected-installer.mjs \
             scripts/check-ci-sentence-audio-selected-installer.test.mjs \
-            scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs
+            scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs \
+            scripts/check-all-book-recognition-http.mjs scripts/check-all-book-recognition-http.test.mjs \
+            .github/workflows/ci.yml .github/workflows/all-book-recognition.yml \
+            .github/workflows/sentence-audio-publication.yml .github/workflows/sentence-audio-publication-tools.yml \
+            docs/ALL_BOOK_SENSES_AUDIO_013.md
           jq -n --arg outcome "$TEST_OUTCOME" --arg source "$GITHUB_SHA" \
             '{kind:"nightstudy-publication-tools-test-v1",outcome:$outcome,source:$source,modelUsed:false,fullInstallerExecuted:false,fullApplicationAcceptancePassed:false}' \
             > "$RUNNER_TEMP/$stem.check.json"

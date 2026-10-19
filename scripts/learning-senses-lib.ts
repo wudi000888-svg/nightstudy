@@ -22,6 +22,11 @@ const text = z.string().min(1).max(4000);
 export const LEARNING_SENSE_MAX_BYTES = 64 * 1024 * 1024;
 export const LEARNING_SENSE_MAX_WORDS = 1000;
 export const LEARNING_SENSE_COLLECTION_MAX_BYTES = 512 * 1024 * 1024;
+// Eager bundles are retained only for small callers. Full installations use
+// prepareLearningSensesInstall and never retain all decoded shards together.
+export const LEARNING_SENSE_EAGER_MAX_WORDS = 1000;
+const EAGER_COLLECTION_MAX_BYTES = 16 * 1024 * 1024;
+const COLLECTION_MAX_IDENTITIES = 500000;
 export const learningSensePartsOfSpeech = [
   'n.',
   'v.',
@@ -282,11 +287,42 @@ export type LearningSensesBundle = {
   rows: LearningSensesRow[];
 };
 
-function readPinnedFile(filename: string, maximum: number) {
-  const info = fs.lstatSync(filename);
-  if (!info.isFile() || info.isSymbolicLink() || info.size > maximum)
+type InputObservation = { identity: string; bytes: number; sha256: string };
+type FileObserver = (filename: string, observation: InputObservation) => void;
+const inputIdentity = (info: fs.Stats) =>
+  [info.dev, info.ino, info.size, info.mtimeMs, info.ctimeMs].join(':');
+function readPinnedFile(filename: string, maximum: number, observe?: FileObserver) {
+  const before = fs.lstatSync(filename);
+  if (!before.isFile() || before.isSymbolicLink() || before.size > maximum)
     throw new Error('learning_senses_unsafe_or_oversized_file');
-  return fs.readFileSync(filename);
+  const fd = fs.openSync(filename, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  try {
+    if (inputIdentity(fs.fstatSync(fd)) !== inputIdentity(before))
+      throw new Error('learning_senses_file_changed');
+    const bytes = Buffer.alloc(before.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = fs.readSync(fd, bytes, offset, Math.min(65536, bytes.length - offset), null);
+      if (!count) throw new Error('learning_senses_file_changed');
+      offset += count;
+    }
+    if (fs.readSync(fd, Buffer.alloc(1), 0, 1, null))
+      throw new Error('learning_senses_file_changed');
+    if (
+      bytes.length !== before.size ||
+      inputIdentity(fs.fstatSync(fd)) !== inputIdentity(before) ||
+      inputIdentity(fs.lstatSync(filename)) !== inputIdentity(before)
+    )
+      throw new Error('learning_senses_file_changed');
+    observe?.(filename, {
+      identity: inputIdentity(before),
+      bytes: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+    return bytes;
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 function equalRows(a: LearningSensesRow[], b: LearningSensesRow[]) {
@@ -334,6 +370,8 @@ export function validateLearningSensesBundle(bundle: LearningSensesBundle) {
     return bundle;
   }
   const collection = collectionSchema.parse(bundle.collection);
+  if (collection.wordCount > LEARNING_SENSE_EAGER_MAX_WORDS || collection.shards.length > 16)
+    throw new Error('learning_senses_use_bounded_install');
   validateCollectionPins(collection);
   if (bundle.bundles.length !== collection.shards.length)
     throw new Error('learning_senses_missing_shard');
@@ -409,7 +447,9 @@ export function loadLearningSensesBundle(manifestPath: string | URL): LearningSe
   }
   const collection = collectionSchema.parse(input);
   validateCollectionPins(collection);
-  const budget = { remaining: LEARNING_SENSE_COLLECTION_MAX_BYTES };
+  if (collection.wordCount > LEARNING_SENSE_EAGER_MAX_WORDS || collection.shards.length > 16)
+    throw new Error('learning_senses_use_bounded_install');
+  const budget = { remaining: EAGER_COLLECTION_MAX_BYTES };
   const bundles = collection.shards.map((pin) => {
     const shardFilename = path.join(path.dirname(filename), pin.manifestFileName);
     const bytes = readPinnedFile(shardFilename, 1024 * 1024);
@@ -442,26 +482,32 @@ function validateCollectionPins(collection: LearningSensesCollection) {
 
 export function loadLearningSensesManifest(
   path: string | URL = new URL('../data/learning-senses-v1.manifest.json', import.meta.url),
+  observe?: FileObserver,
 ) {
   const filename = path instanceof URL ? fileURLToPath(path) : path;
-  return manifestSchema.parse(JSON.parse(readPinnedFile(filename, 1024 * 1024).toString('utf8')));
+  return manifestSchema.parse(
+    JSON.parse(readPinnedFile(filename, 1024 * 1024, observe).toString('utf8')),
+  );
 }
 
 export function loadLearningSensesFiles(
   manifestPath: string | URL = new URL('../data/learning-senses-v1.manifest.json', import.meta.url),
   budget?: { remaining: number },
+  observe?: FileObserver,
 ) {
   const filename =
     manifestPath instanceof URL ? fileURLToPath(manifestPath) : path.resolve(manifestPath);
-  const manifest = loadLearningSensesManifest(filename);
+  const manifest = loadLearningSensesManifest(filename, observe);
   const bytes = readPinnedFile(
     path.join(path.dirname(filename), manifest.fileName),
     LEARNING_SENSE_MAX_BYTES,
+    observe,
   );
   for (const notice of manifest.licenseNotices ?? []) {
     const noticeBytes = readPinnedFile(
       path.join(path.dirname(filename), notice.fileName),
       128 * 1024,
+      observe,
     );
     if (noticeBytes.length !== notice.bytes || bufferHash(noticeBytes) !== notice.sha256)
       throw new Error('learning_senses_license_notice_checksum');
@@ -476,6 +522,7 @@ export function loadLearningSensesFiles(
     const packed = readPinnedFile(
       path.join(path.dirname(filename), pin.fileName),
       LEARNING_SENSE_MAX_BYTES,
+      observe,
     );
     if (packed.length !== pin.bytes || bufferHash(packed) !== pin.sha256)
       throw new Error('learning_senses_source_additions_checksum');
@@ -498,6 +545,154 @@ export function loadLearningSensesFiles(
   }
   validateLearningSourceAdditions(sourceRows ?? [], rows, manifest);
   return { manifest, rows, ...(sourceRows ? { sourceRows } : {}) };
+}
+
+export type LearningSensesInstallPlan = Readonly<{
+  kind: 'bounded-learning-senses-install';
+  id: string;
+  manifestSha256: string;
+  leafCount: number;
+  wordCount: number;
+  senseCount: number;
+  exampleCount: number;
+}>;
+type InstallState = {
+  collection?: LearningSensesCollection;
+  leaves: { filename: string; manifest: LearningSensesManifest }[];
+  files: Map<string, InputObservation>;
+};
+const installStates = new WeakMap<LearningSensesInstallPlan, InstallState>();
+
+function installState(plan: LearningSensesInstallPlan) {
+  const state = installStates.get(plan);
+  if (!state) throw new Error('learning_senses_unprepared_install');
+  return state;
+}
+
+/** Check while still inside the transaction callback, before COMMIT. */
+export function assertLearningSensesInstallUnchanged(plan: LearningSensesInstallPlan) {
+  for (const [filename, expected] of installState(plan).files) {
+    const info = fs.lstatSync(filename);
+    if (!info.isFile() || info.isSymbolicLink() || inputIdentity(info) !== expected.identity)
+      throw new Error('learning_senses_prepared_input_changed');
+  }
+}
+
+/** Validate every leaf before opening a database; retain identities, never decoded content. */
+export function prepareLearningSensesInstall(
+  manifestPath: string | URL,
+): LearningSensesInstallPlan {
+  const filename = path.resolve(
+    manifestPath instanceof URL ? fileURLToPath(manifestPath) : manifestPath,
+  );
+  const files = new Map<string, InputObservation>();
+  const observe: FileObserver = (file, observation) => {
+    const previous = files.get(file);
+    if (
+      previous &&
+      (previous.identity !== observation.identity || previous.sha256 !== observation.sha256)
+    )
+      throw new Error('learning_senses_prepared_input_changed');
+    files.set(file, observation);
+  };
+  const rootBytes = readPinnedFile(filename, 1024 * 1024, observe);
+  const input = JSON.parse(rootBytes.toString('utf8'));
+  const collection = input.formatVersion === 2 ? collectionSchema.parse(input) : undefined;
+  if (collection) validateCollectionPins(collection);
+  const pins = collection?.shards;
+  const leaves: InstallState['leaves'] = [];
+  const budget = { remaining: LEARNING_SENSE_COLLECTION_MAX_BYTES };
+  const words = new Map<string, string>(),
+    lemmas = new Set<string>(),
+    ids = new Set<string>();
+  const addIdentity = (id: string) => {
+    if (ids.has(id)) throw new Error('learning_senses_global_duplicate_identity');
+    if (ids.size >= COLLECTION_MAX_IDENTITIES)
+      throw new Error('learning_senses_collection_identity_limit');
+    ids.add(id);
+  };
+  let senses = 0,
+    examples = 0;
+  for (let index = 0; index < (pins?.length ?? 1); index++) {
+    const pin = pins?.[index];
+    const leafFilename = pin ? path.join(path.dirname(filename), pin.manifestFileName) : filename;
+    const leaf = loadLearningSensesFiles(leafFilename, budget, observe);
+    if (
+      pin &&
+      (files.get(leafFilename)?.bytes !== pin.bytes ||
+        files.get(leafFilename)?.sha256 !== pin.sha256 ||
+        leaf.manifest.id !== pin.id ||
+        leaf.manifest.wordCount !== pin.wordCount ||
+        leaf.manifest.senseCount !== pin.senseCount ||
+        leaf.manifest.exampleCount !== pin.exampleCount ||
+        leaf.manifest.sourceExportSha256 !== collection!.sourceExportSha256 ||
+        leaf.manifest.bilingualOverlaySha256 !== collection!.bilingualOverlaySha256)
+    )
+      throw new Error('learning_senses_shard_pin_mismatch');
+    for (const source of leaf.sourceRows ?? []) addIdentity(source.id);
+    for (const row of leaf.rows) {
+      if (words.has(row.wordId) || lemmas.has(row.normalizedLemma))
+        throw new Error('learning_senses_word_crosses_shards');
+      words.set(row.wordId, row.normalizedLemma);
+      lemmas.add(row.normalizedLemma);
+      for (const sense of row.senses) {
+        senses++;
+        examples += sense.examples.length;
+        for (const record of [sense, ...sense.sourceBindings, ...sense.examples])
+          addIdentity(record.id);
+      }
+    }
+    leaves.push({ filename: leafFilename, manifest: leaf.manifest });
+  }
+  if (
+    collection &&
+    (words.size !== collection.wordCount ||
+      senses !== collection.senseCount ||
+      examples !== collection.exampleCount ||
+      learningSensesWordUnionHash(
+        Array.from(words, ([wordId, normalizedLemma]) => ({ wordId, normalizedLemma })),
+      ) !== collection.requiredWordsSha256)
+  )
+    throw new Error('learning_senses_collection_union_mismatch');
+  const plan = Object.freeze({
+    kind: 'bounded-learning-senses-install' as const,
+    id: collection?.id ?? leaves[0]!.manifest.id,
+    manifestSha256: bufferHash(rootBytes),
+    leafCount: leaves.length,
+    wordCount: words.size,
+    senseCount: senses,
+    exampleCount: examples,
+  });
+  installStates.set(plan, { collection, leaves, files });
+  assertLearningSensesInstallUnchanged(plan);
+  return plan;
+}
+
+/** Single-leaf live content, exact original pins; consumers must not accumulate leaves. */
+async function visitPreparedLearningSenses(
+  plan: LearningSensesInstallPlan,
+  visit: (leaf: LearningSensesLeaf) => Promise<void>,
+) {
+  const state = installState(plan);
+  assertLearningSensesInstallUnchanged(plan);
+  const budget = { remaining: LEARNING_SENSE_COLLECTION_MAX_BYTES };
+  const observe: FileObserver = (file, actual) => {
+    const expected = state.files.get(file);
+    if (
+      !expected ||
+      expected.identity !== actual.identity ||
+      expected.bytes !== actual.bytes ||
+      expected.sha256 !== actual.sha256
+    )
+      throw new Error('learning_senses_prepared_input_changed');
+  };
+  for (const entry of state.leaves) {
+    const leaf = loadLearningSensesFiles(entry.filename, budget, observe);
+    if (learningSenseCanonical(leaf.manifest) !== learningSenseCanonical(entry.manifest))
+      throw new Error('learning_senses_prepared_manifest_changed');
+    await visit(leaf);
+  }
+  assertLearningSensesInstallUnchanged(plan);
 }
 
 /** Original Codex-authored source rows are explicit evidence of authorship, never external verification. */
@@ -1070,6 +1265,36 @@ export async function importLearningSensesBundle(
     return {
       siteId: site.id,
       collectionId: bundle.collection?.id ?? null,
+      alreadyInstalled: results.every((result) => result.alreadyInstalled),
+      bundles: results,
+    };
+  });
+}
+
+/** Entire prepared collection commits together, including the final input-identity check. */
+export async function importPreparedLearningSenses(
+  site: Pick<SiteConfig, 'id' | 'databaseUrl'>,
+  plan: LearningSensesInstallPlan,
+) {
+  assertLearningSensesInstallUnchanged(plan);
+  return withLearningSensesTransaction(site, async (client) => {
+    const results: Awaited<ReturnType<typeof importLearningSensesRowsInTransaction>>[] = [];
+    await visitPreparedLearningSenses(plan, async (leaf) => {
+      results.push(
+        await importLearningSensesRowsInTransaction(
+          site,
+          leaf.rows,
+          leaf.manifest,
+          client,
+          leaf.sourceRows,
+        ),
+      );
+    });
+    // This is deliberately before returning to the wrapper that issues COMMIT.
+    assertLearningSensesInstallUnchanged(plan);
+    return {
+      siteId: site.id,
+      collectionId: installState(plan).collection?.id ?? null,
       alreadyInstalled: results.every((result) => result.alreadyInstalled),
       bundles: results,
     };

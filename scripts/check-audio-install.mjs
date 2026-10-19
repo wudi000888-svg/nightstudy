@@ -6,12 +6,13 @@ import os from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import { parseArgs, isDeepStrictEqual } from 'node:util';
 import assert from 'node:assert/strict';
-import { readLearningSensesBundle } from './check-learning-senses-install.mjs';
+import {
+  prepareLearningSensesVerification,
+  readLearningSentenceTargetsForPack,
+} from './check-learning-senses-install.mjs';
 import {
   readSentenceAudioPolicy,
   emptySentenceAudioPolicy,
-  learningSentenceAudioTargets,
-  bindSentenceAudioHoldReferences,
   sentenceAudioIdentity,
   assertHeldSentenceAudioUnavailable,
   verifySentenceAudioPackHolds,
@@ -752,13 +753,12 @@ async function verifyPrebuiltAdditions(db, verifiedAudioBytes, polishedCatalog) 
   const summary = {};
   const dataDirectory = fileURLToPath(new URL('../data/', import.meta.url));
   const policy = readSentenceAudioPolicy(dataDirectory);
-  let meaningTargets = [];
+  let meaningPlan;
   if (policy.manifest) {
-    const meaning = readLearningSensesBundle(
+    meaningPlan = prepareLearningSensesVerification(
       path.join(dataDirectory, policy.manifest.learningSensesManifestFileName),
+      policy,
     );
-    meaningTargets = learningSentenceAudioTargets(meaning.rows);
-    bindSentenceAudioHoldReferences(policy, meaningTargets);
   }
   const pins = ['word-audio-v2.manifest.json', 'sentence-audio.manifest.json'];
   if (polishedCatalog)
@@ -799,6 +799,7 @@ async function verifyPrebuiltAdditions(db, verifiedAudioBytes, polishedCatalog) 
       'prebuilt_audio_source_hash_mismatch',
       { id: pin.id },
     );
+    const sourceMetadata = JSON.parse(sourceBytes);
     if (pin.id === 'word-audio-v2') {
       const manifestFile = path.join(
         process.env.AUDIO_CACHE_DIR || '.local/audio',
@@ -843,11 +844,13 @@ async function verifyPrebuiltAdditions(db, verifiedAudioBytes, polishedCatalog) 
       if (/^sentence-audio-v4(?:-(?!0000)[0-9]{4})?$/.test(pin.id))
         verifySentenceAudioPackHolds(
           policy,
-          JSON.parse(sourceBytes),
+          sourceMetadata,
           built,
           process.env.AUDIO_CACHE_DIR || '.local/audio',
           pin.id,
-          meaningTargets,
+          meaningPlan
+            ? readLearningSentenceTargetsForPack(meaningPlan, sourceMetadata.requestedSentences)
+            : [],
         );
       const installed = await db.sentenceAudio.findMany({
         where: { textHash: { in: [...new Set(entries.map((entry) => entry.textHash))] } },
@@ -912,6 +915,7 @@ async function verifyPrebuiltAdditions(db, verifiedAudioBytes, polishedCatalog) 
         count: book._count.items,
       },
     );
+  meaningPlan?.unchanged();
   return summary;
 }
 function verifyPhrases(

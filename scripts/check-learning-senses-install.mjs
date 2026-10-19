@@ -68,12 +68,18 @@ export function readLearningSensesBundle(
     ? new URL('../data/learning-senses-collection-v2.manifest.json', import.meta.url)
     : new URL('../data/learning-senses-v1.manifest.json', import.meta.url),
   budget = { remaining: 512 * 1024 * 1024 },
+  observe,
 ) {
   const filename =
     manifestPath instanceof URL ? fileURLToPath(manifestPath) : path.resolve(manifestPath);
-  const manifestBytes = pinnedFile(filename, 1024 * 1024);
+  const manifestBytes = pinnedFile(filename, 1024 * 1024, observe);
   const manifest = JSON.parse(manifestBytes.toString('utf8'));
   if (manifest.formatVersion === 2) {
+    check(
+      manifest.wordCount <= 1000 && manifest.shards?.length <= 16,
+      'learning_senses_use_bounded_verification',
+    );
+    budget.remaining = Math.min(budget.remaining, 16 * 1024 * 1024);
     check(
       manifest.kind === 'learning-senses-collection' &&
         /^learning-senses-collection-[a-z0-9-]+$/.test(manifest.id) &&
@@ -110,14 +116,14 @@ export function readLearningSensesBundle(
       ids.add(pin.id);
       files.add(pin.manifestFileName);
       const shardPath = path.join(path.dirname(filename), pin.manifestFileName);
-      const bytes = pinnedFile(shardPath, 1024 * 1024);
+      const bytes = pinnedFile(shardPath, 1024 * 1024, observe);
       check(
         bytes.length === pin.bytes && sha(bytes) === pin.sha256,
         'learning_senses_collection_shard_checksum',
       );
       const shardManifest = JSON.parse(bytes.toString('utf8'));
       check(shardManifest.formatVersion === 1, 'learning_senses_nested_collection');
-      const bundle = readLearningSensesBundle(shardPath, budget);
+      const bundle = readLearningSensesBundle(shardPath, budget, observe);
       check(
         ['id', 'wordCount', 'senseCount', 'exampleCount'].every(
           (field) => bundle.manifest[field] === pin[field],
@@ -168,7 +174,11 @@ export function readLearningSensesBundle(
       manifest.bytes <= 64 * 1024 * 1024,
     'invalid_learning_senses_manifest',
   );
-  const bytes = pinnedFile(path.join(path.dirname(filename), manifest.fileName), 64 * 1024 * 1024);
+  const bytes = pinnedFile(
+    path.join(path.dirname(filename), manifest.fileName),
+    64 * 1024 * 1024,
+    observe,
+  );
   check(
     bytes.length === manifest.bytes && sha(bytes) === manifest.sha256,
     'learning_senses_pack_checksum',
@@ -204,7 +214,11 @@ export function readLearningSensesBundle(
         pin.bytes <= 64 * 1024 * 1024,
       'learning_senses_source_addition_pin',
     );
-    const bytes = pinnedFile(path.join(path.dirname(filename), pin.fileName), 64 * 1024 * 1024);
+    const bytes = pinnedFile(
+      path.join(path.dirname(filename), pin.fileName),
+      64 * 1024 * 1024,
+      observe,
+    );
     check(
       bytes.length === pin.bytes && sha(bytes) === pin.sha256,
       'learning_senses_source_addition_checksum',
@@ -244,6 +258,7 @@ const sourcePos = new Set([
   'num.',
   'aux.',
   'modal v.',
+  'part.',
   'abbr.',
   'phr. v.',
   'n. phr.',
@@ -363,13 +378,241 @@ export function verifyOriginalSourceAdditions(sourceRows, rows, pin) {
 const additionsOf = (bundle) =>
   (bundle.bundles || [bundle]).flatMap((leaf) => leaf.sourceRows || []);
 
-function pinnedFile(filename, maximum) {
+const fileIdentity = (stat) =>
+  [stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs].join(':');
+function pinnedFile(filename, maximum, observe) {
   const stat = fs.lstatSync(filename);
   check(
     stat.isFile() && !stat.isSymbolicLink() && stat.size <= maximum,
     'learning_senses_unsafe_or_oversized_file',
   );
-  return fs.readFileSync(filename);
+  const fd = fs.openSync(filename, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  try {
+    check(fileIdentity(fs.fstatSync(fd)) === fileIdentity(stat), 'learning_senses_input_changed');
+    const bytes = Buffer.alloc(stat.size);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const count = fs.readSync(fd, bytes, offset, Math.min(65536, bytes.length - offset), null);
+      check(count > 0, 'learning_senses_input_changed');
+      offset += count;
+    }
+    check(
+      !fs.readSync(fd, Buffer.alloc(1), 0, 1, null) &&
+        fileIdentity(fs.fstatSync(fd)) === fileIdentity(stat) &&
+        fileIdentity(fs.lstatSync(filename)) === fileIdentity(stat),
+      'learning_senses_input_changed',
+    );
+    observe?.(filename, { bytes: bytes.length, sha256: sha(bytes), identity: fileIdentity(stat) });
+    return bytes;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/** Independent full preflight with only one decoded leaf live at a time. */
+export function prepareLearningSensesVerification(
+  manifestPath,
+  policy = emptySentenceAudioPolicy(),
+) {
+  const filename = path.resolve(
+    manifestPath instanceof URL ? fileURLToPath(manifestPath) : manifestPath,
+  );
+  const files = new Map();
+  const observe = (file, actual) => {
+    const old = files.get(file);
+    check(!old || isDeepStrictEqual(old, actual), 'learning_senses_input_changed');
+    files.set(file, actual);
+  };
+  const manifest = JSON.parse(pinnedFile(filename, 1024 * 1024, observe).toString('utf8'));
+  const collection = manifest.formatVersion === 2;
+  check(
+    !collection ||
+      (manifest.kind === 'learning-senses-collection' &&
+        /^learning-senses-collection-[a-z0-9-]+$/.test(manifest.id) &&
+        manifest.wordCount === manifest.requiredWordCount &&
+        Number.isSafeInteger(manifest.wordCount) &&
+        manifest.wordCount > 0 &&
+        manifest.wordCount <= 100000 &&
+        /^[a-f0-9]{64}$/.test(manifest.requiredWordsSha256) &&
+        manifest.editorialReview === 'codex-reviewed' &&
+        manifest.semanticQualityCertified === false &&
+        manifest.exhaustiveBookCoverage === false &&
+        Array.isArray(manifest.shards) &&
+        manifest.shards.length > 0 &&
+        manifest.shards.length <= 1000),
+    'invalid_learning_senses_collection',
+  );
+  const leaves = [],
+    words = new Map(),
+    wordLeaves = new Map(),
+    lemmas = new Set(),
+    ids = new Set(),
+    packs = new Set(),
+    names = new Set();
+  const foundHolds = new Set();
+  const heldByText = new Map();
+  for (const entry of policy.entries) {
+    const entries = heldByText.get(entry.textHash) ?? [];
+    entries.push(entry);
+    heldByText.set(entry.textHash, entries);
+  }
+  const addId = (id) => {
+    check(typeof id === 'string' && !ids.has(id), 'learning_senses_collection_record_overlap');
+    check(ids.size < 500000, 'learning_senses_collection_identity_limit');
+    ids.add(id);
+  };
+  let senses = 0,
+    examples = 0;
+  const budget = { remaining: 512 * 1024 * 1024 };
+  for (const pin of collection ? manifest.shards : [null]) {
+    const childFilename = pin ? path.join(path.dirname(filename), pin.manifestFileName) : filename;
+    if (pin)
+      check(
+        /^learning-senses-[a-z0-9.-]+\.manifest\.json$/.test(pin.manifestFileName) &&
+          !names.has(pin.manifestFileName) &&
+          !packs.has(pin.id),
+        'learning_senses_collection_shard_identity',
+      );
+    if (pin) {
+      names.add(pin.manifestFileName);
+      packs.add(pin.id);
+    }
+    const leaf = readLearningSensesBundle(childFilename, budget, observe);
+    check(leaf.manifest.formatVersion === 1, 'learning_senses_nested_collection');
+    if (pin)
+      check(
+        files.get(childFilename).bytes === pin.bytes &&
+          files.get(childFilename).sha256 === pin.sha256 &&
+          ['id', 'wordCount', 'senseCount', 'exampleCount'].every(
+            (field) => leaf.manifest[field] === pin[field],
+          ) &&
+          leaf.manifest.sourceExportSha256 === manifest.sourceExportSha256 &&
+          leaf.manifest.bilingualOverlaySha256 === manifest.bilingualOverlaySha256,
+        'learning_senses_collection_shard_scope',
+      );
+    for (const notice of leaf.manifest.licenseNotices ?? []) {
+      check(/^[A-Za-z0-9][A-Za-z0-9.-]*$/.test(notice.fileName), 'learning_senses_notice_name');
+      const raw = pinnedFile(
+        path.join(path.dirname(childFilename), notice.fileName),
+        128 * 1024,
+        observe,
+      );
+      check(
+        raw.length === notice.bytes && sha(raw) === notice.sha256,
+        'learning_senses_notice_checksum',
+      );
+    }
+    for (const source of leaf.sourceRows ?? []) addId(source.id);
+    for (const row of leaf.rows) {
+      check(
+        !words.has(row.wordId) && !lemmas.has(row.normalizedLemma),
+        'learning_senses_collection_word_overlap',
+      );
+      words.set(row.wordId, row.normalizedLemma);
+      wordLeaves.set(row.wordId, leaves.length);
+      lemmas.add(row.normalizedLemma);
+      for (const sense of row.senses) {
+        senses++;
+        examples += sense.examples.length;
+        for (const record of [sense, ...sense.sourceBindings, ...sense.examples]) addId(record.id);
+      }
+    }
+    for (const target of learningSentenceAudioTargets(leaf.rows))
+      for (const entry of heldByText.get(target.textHash) ?? [])
+        if (
+          target.references.some(
+            (ref) =>
+              ref.learningSenseId === entry.learningSenseId && ref.exampleId === entry.exampleId,
+          )
+        ) {
+          check(target.text === entry.text, 'sentence_audio_hold_meaning_mismatch');
+          foundHolds.add(sentenceAudioIdentity(entry.textHash, entry.accent));
+        }
+    leaves.push({ filename: childFilename, id: leaf.manifest.id });
+  }
+  if (collection) {
+    const union = Array.from(words, ([wordId, normalizedLemma]) => ({
+      wordId,
+      normalizedLemma,
+    })).sort((a, b) => (a.wordId < b.wordId ? -1 : a.wordId > b.wordId ? 1 : 0));
+    check(
+      words.size === manifest.wordCount &&
+        senses === manifest.senseCount &&
+        examples === manifest.exampleCount &&
+        sha(canonical(union)) === manifest.requiredWordsSha256 &&
+        ['wordCount', 'senseCount', 'exampleCount'].every(
+          (field) => manifest.shards.reduce((n, pin) => n + pin[field], 0) === manifest[field],
+        ),
+      'learning_senses_collection_required_union',
+    );
+  }
+  check(foundHolds.size === policy.entries.length, 'sentence_audio_hold_scope_missing');
+  const unchanged = () => {
+    for (const [file, expected] of files) {
+      const current = fs.lstatSync(file);
+      check(
+        current.isFile() &&
+          !current.isSymbolicLink() &&
+          fileIdentity(current) === expected.identity,
+        'learning_senses_input_changed',
+      );
+    }
+  };
+  unchanged();
+  return {
+    manifest,
+    collection,
+    leaves,
+    manifestSha256: files.get(filename).sha256,
+    unchanged,
+    leafForWordId(wordId) {
+      return wordLeaves.get(wordId);
+    },
+    readLeaf(index, remaining) {
+      const observePinned = (file, actual) =>
+        check(isDeepStrictEqual(files.get(file), actual), 'learning_senses_input_changed');
+      return readLearningSensesBundle(leaves[index].filename, remaining, observePinned);
+    },
+  };
+}
+
+/** Resolve only one audio pack's declared references; never collect the full catalog. */
+export function readLearningSentenceTargetsForPack(plan, requestedRows) {
+  check(
+    Array.isArray(requestedRows) && requestedRows.length <= 20000,
+    'sentence_audio_requested_scope_limit',
+  );
+  plan.unchanged();
+  const hashes = new Set(),
+    selectedLeaves = new Set(),
+    targets = new Map();
+  let scanAll = false;
+  for (const row of requestedRows) {
+    check(
+      row && /^[a-f0-9]{64}$/.test(row.textHash) && Array.isArray(row.references),
+      'sentence_audio_requested_identity',
+    );
+    hashes.add(row.textHash);
+    for (const ref of row.references) {
+      const index = plan.leafForWordId(ref?.wordId);
+      if (index === undefined) scanAll = true;
+      else selectedLeaves.add(index);
+    }
+  }
+  const budget = { remaining: 512 * 1024 * 1024 };
+  for (let index = 0; index < plan.leaves.length; index++) {
+    if (!scanAll && !selectedLeaves.has(index)) continue;
+    const leaf = plan.readLeaf(index, budget);
+    for (const target of learningSentenceAudioTargets(leaf.rows)) {
+      if (!hashes.has(target.textHash)) continue;
+      const previous = targets.get(target.textHash);
+      check(!previous || previous.text === target.text, 'sentence_audio_text_hash_collision');
+      if (previous) previous.references.push(...target.references);
+      else targets.set(target.textHash, target);
+    }
+  }
+  plan.unchanged();
+  return [...targets.values()];
 }
 
 function exactRecord(actual, expected, code) {
@@ -601,8 +844,13 @@ export async function verifyLearningSentenceAudio(
   audioRows,
   audioRoot,
   policy = emptySentenceAudioPolicy(),
+  allHoldReferencesPrevalidated = false,
 ) {
-  const held = bindSentenceAudioHoldReferences(policy, learningSentenceAudioTargets(rows));
+  // The streaming CLI has already bound every policy reference over the full
+  // collection. A shared sentence can belong to a different leaf's meaning.
+  const held = allHoldReferencesPrevalidated
+    ? policy.byIdentity
+    : bindSentenceAudioHoldReferences(policy, learningSentenceAudioTargets(rows));
   const targets = new Map(
     rows
       .flatMap((row) => row.senses.flatMap((sense) => sense.examples))
@@ -807,6 +1055,29 @@ async function selfTest() {
     const write = () => fs.writeFileSync(collectionFile, JSON.stringify(collection));
     write();
     const all = readLearningSensesBundle(collectionFile);
+    const prepared = prepareLearningSensesVerification(collectionFile);
+    assert.equal(prepared.leaves.length, 1);
+    assert.equal(prepared.readLeaf(0, { remaining: 512 * 1024 * 1024 }).rows.length, rows.length);
+    assert.equal('rows' in prepared, false);
+    const requested = learningSentenceAudioTargets(rows).slice(0, 1);
+    assert.deepEqual(readLearningSentenceTargetsForPack(prepared, requested), requested);
+    const withoutWordIds = requested.map((target) => ({
+      ...target,
+      references: target.references.map(({ wordId, ...ref }) => ref),
+    }));
+    assert.deepEqual(readLearningSentenceTargetsForPack(prepared, withoutWordIds), requested);
+    const unknownWordIds = requested.map((target) => ({
+      ...target,
+      references: target.references.map((ref) => ({ ...ref, wordId: 'unknown-word' })),
+    }));
+    assert.deepEqual(readLearningSentenceTargetsForPack(prepared, unknownWordIds), requested);
+    assert.throws(() => readLearningSentenceTargetsForPack(prepared, [null]), /requested_identity/);
+    prepared.unchanged();
+    const originalLeaf = fs.readFileSync(path.join(collectionDirectory, leafName));
+    fs.appendFileSync(path.join(collectionDirectory, leafName), ' ');
+    assert.throws(() => prepared.unchanged(), /input_changed/);
+    assert.throws(() => prepared.readLeaf(0, { remaining: 512 * 1024 * 1024 }), /input_changed/);
+    fs.writeFileSync(path.join(collectionDirectory, leafName), originalLeaf);
     // The read-side pin test uses real bytes; DB assertions retain the explicit synthetic source fixture above.
     const fixtureCollection = { ...all, rows };
     assert.equal(
@@ -958,7 +1229,7 @@ async function selfTest() {
     /single_site_database_url_missing/,
   );
   return {
-    checks: 35,
+    checks: 44,
     realPackWords: manifest.wordCount,
     realPackMeanings: manifest.senseCount,
     realPackExamples: manifest.exampleCount,
@@ -1050,18 +1321,46 @@ async function main() {
       sha(pinnedFile(manifestFile, 1024 * 1024)) === policy.manifest.learningSensesManifestSha256,
       'sentence_audio_policy_verification_manifest_mismatch',
     );
-  const bundle = readLearningSensesBundle(manifestFile);
-  if (values.audio)
-    bindSentenceAudioHoldReferences(policy, learningSentenceAudioTargets(bundle.rows));
+  const plan = prepareLearningSensesVerification(
+    manifestFile ??
+      (fs.existsSync(
+        new URL('../data/learning-senses-collection-v2.manifest.json', import.meta.url),
+      )
+        ? new URL('../data/learning-senses-collection-v2.manifest.json', import.meta.url)
+        : new URL('../data/learning-senses-v1.manifest.json', import.meta.url)),
+    policy,
+  );
   const sites = verificationSites(values);
   const { Client } = await import('pg');
-  const baseline = values.baseline ? JSON.parse(fs.readFileSync(values.baseline, 'utf8')) : null;
+  const baselineInputs = new Map();
+  const readBaselineFile = (filename, pin) => {
+    const raw = pinnedFile(filename, 4 * 1024 * 1024, (file, input) => {
+      const previous = baselineInputs.get(file);
+      check(!previous || isDeepStrictEqual(previous, input), 'learning_senses_baseline_changed');
+      baselineInputs.set(file, input);
+    });
+    if (pin)
+      check(raw.length === pin.bytes && sha(raw) === pin.sha256, 'learning_senses_baseline_pin');
+    return JSON.parse(raw.toString('utf8'));
+  };
+  const baseline = values.baseline ? readBaselineFile(path.resolve(values.baseline)) : null;
   if (baseline)
     check(
-      baseline.formatVersion === 1 && baseline.sites && typeof baseline.sites === 'object',
+      [1, 2].includes(baseline.formatVersion) &&
+        baseline.sites &&
+        typeof baseline.sites === 'object' &&
+        (!plan.collection || baseline.formatVersion === 2) &&
+        (baseline.formatVersion !== 2 || baseline.learningManifestSha256 === plan.manifestSha256),
       'learning_senses_invalid_baseline',
     );
-  const snapshots = { formatVersion: 1, sites: {} };
+  const snapshotDirectory =
+    values.snapshot && plan.collection ? path.resolve(values.snapshot) + '.parts' : null;
+  if (snapshotDirectory) fs.mkdirSync(snapshotDirectory, { mode: 0o700 });
+  const snapshots = {
+    formatVersion: plan.collection ? 2 : 1,
+    ...(plan.collection ? { learningManifestSha256: plan.manifestSha256 } : {}),
+    sites: {},
+  };
   const summaries = [];
   for (const site of sites) {
     const client = new Client({
@@ -1079,107 +1378,169 @@ async function main() {
         state && ((site.test && !site.id) || state.siteId === site.id),
         'learning_senses_realm_mismatch',
       );
-      const wordIds = bundle.rows.map((row) => row.wordId);
-      const meaningIds = bundle.rows.flatMap((row) => row.senses.map((sense) => sense.id));
-      const data = {
-        siteId: state.siteId,
-        expectedSiteId: site.id || state.siteId,
-        instanceId: state.instanceId,
-        pack: (await client.query(`SELECT * FROM "ContentPack" WHERE id=$1`, [bundle.manifest.id]))
-          .rows[0],
-        packs: bundle.bundles
-          ? (
-              await client.query(`SELECT * FROM "ContentPack" WHERE id=ANY($1::text[])`, [
-                bundle.bundles.map((leaf) => leaf.manifest.id),
-              ])
-            ).rows
-          : undefined,
-        words: (
-          await client.query(
-            `SELECT id,lemma,"normalizedLemma","sourceRef","contentVersion",status FROM "Word" WHERE id=ANY($1::text[])`,
-            [wordIds],
-          )
-        ).rows,
-        rawSenses: (
-          await client.query(
-            `SELECT id,"wordId",pos,"definitionZh","definitionEn","exampleZh","exampleEn",ordinal,"contentMetadata" FROM "Sense" WHERE "wordId"=ANY($1::text[])`,
-            [wordIds],
-          )
-        ).rows,
-        learningSenses: (
-          await client.query(`SELECT * FROM "LearningSense" WHERE id=ANY($1::text[])`, [meaningIds])
-        ).rows,
-        bindings: (
-          await client.query(
-            `SELECT * FROM "SenseSourceBinding" WHERE "learningSenseId"=ANY($1::text[])`,
-            [meaningIds],
-          )
-        ).rows,
-        examples: (
-          await client.query(
-            `SELECT * FROM "WordExample" WHERE "learningSenseId"=ANY($1::text[])`,
-            [meaningIds],
-          )
-        ).rows,
-      };
-      if (values.snapshot) {
+      if (baseline) check(baseline.sites[state.siteId], 'learning_senses_baseline_site_missing');
+      const siteBaseline = baseline?.sites[state.siteId];
+      if (siteBaseline && baseline.formatVersion === 2)
         check(
-          data.words.length === bundle.manifest.wordCount,
-          'learning_senses_snapshot_scope_incomplete',
+          siteBaseline.siteId === state.siteId &&
+            siteBaseline.instanceId === state.instanceId &&
+            Array.isArray(siteBaseline.leaves) &&
+            siteBaseline.leaves.length === plan.leaves.length,
+          'learning_senses_baseline_realm',
         );
-        const sourceById = new Map(data.rawSenses.map((sense) => [sense.id, sense]));
-        const newById = new Map(additionsOf(bundle).map((source) => [source.id, source]));
-        for (const row of bundle.rows)
-          for (const sense of row.senses)
-            for (const binding of sense.sourceBindings) {
-              const raw =
-                sourceById.get(binding.sourceSenseId) ?? newById.get(binding.sourceSenseId);
-              check(
-                raw?.wordId === row.wordId &&
-                  sha(raw.pos) === binding.sourcePosSha256 &&
-                  sha(raw.definitionZh) === binding.sourceDefinitionZhSha256 &&
-                  sha(raw.definitionEn) === binding.sourceDefinitionEnSha256,
-                'learning_senses_snapshot_source_drift',
+      if (values.snapshot && plan.collection)
+        snapshots.sites[state.siteId] = {
+          siteId: state.siteId,
+          instanceId: state.instanceId,
+          leaves: [],
+        };
+      const remaining = { remaining: 512 * 1024 * 1024 };
+      for (let leafIndex = 0; leafIndex < plan.leaves.length; leafIndex++) {
+        const bundle = plan.readLeaf(leafIndex, remaining);
+        let leafBaseline = siteBaseline;
+        if (siteBaseline && baseline.formatVersion === 2) {
+          const pin = siteBaseline.leaves[leafIndex];
+          check(
+            pin.leafId === bundle.manifest.id &&
+              /^snapshot-[0-9]{4}-[0-9]{4}\.json$/.test(pin.fileName),
+            'learning_senses_baseline_leaf_scope',
+          );
+          leafBaseline = readBaselineFile(
+            path.join(path.resolve(values.baseline) + '.parts', pin.fileName),
+            pin,
+          );
+        }
+        const wordIds = bundle.rows.map((row) => row.wordId);
+        const meaningIds = bundle.rows.flatMap((row) => row.senses.map((sense) => sense.id));
+        const data = {
+          siteId: state.siteId,
+          expectedSiteId: site.id || state.siteId,
+          instanceId: state.instanceId,
+          pack: (
+            await client.query(`SELECT * FROM "ContentPack" WHERE id=$1`, [bundle.manifest.id])
+          ).rows[0],
+          packs: bundle.bundles
+            ? (
+                await client.query(`SELECT * FROM "ContentPack" WHERE id=ANY($1::text[])`, [
+                  bundle.bundles.map((leaf) => leaf.manifest.id),
+                ])
+              ).rows
+            : undefined,
+          words: (
+            await client.query(
+              `SELECT id,lemma,"normalizedLemma","sourceRef","contentVersion",status FROM "Word" WHERE id=ANY($1::text[])`,
+              [wordIds],
+            )
+          ).rows,
+          rawSenses: (
+            await client.query(
+              `SELECT id,"wordId",pos,"definitionZh","definitionEn","exampleZh","exampleEn",ordinal,"contentMetadata" FROM "Sense" WHERE "wordId"=ANY($1::text[])`,
+              [wordIds],
+            )
+          ).rows,
+          learningSenses: (
+            await client.query(`SELECT * FROM "LearningSense" WHERE id=ANY($1::text[])`, [
+              meaningIds,
+            ])
+          ).rows,
+          bindings: (
+            await client.query(
+              `SELECT * FROM "SenseSourceBinding" WHERE "learningSenseId"=ANY($1::text[])`,
+              [meaningIds],
+            )
+          ).rows,
+          examples: (
+            await client.query(
+              `SELECT * FROM "WordExample" WHERE "learningSenseId"=ANY($1::text[])`,
+              [meaningIds],
+            )
+          ).rows,
+        };
+        if (values.snapshot) {
+          check(
+            data.words.length === bundle.manifest.wordCount,
+            'learning_senses_snapshot_scope_incomplete',
+          );
+          const sourceById = new Map(data.rawSenses.map((sense) => [sense.id, sense]));
+          const newById = new Map(additionsOf(bundle).map((source) => [source.id, source]));
+          for (const row of bundle.rows)
+            for (const sense of row.senses)
+              for (const binding of sense.sourceBindings) {
+                const raw =
+                  sourceById.get(binding.sourceSenseId) ?? newById.get(binding.sourceSenseId);
+                check(
+                  raw?.wordId === row.wordId &&
+                    sha(raw.pos) === binding.sourcePosSha256 &&
+                    sha(raw.definitionZh) === binding.sourceDefinitionZhSha256 &&
+                    sha(raw.definitionEn) === binding.sourceDefinitionEnSha256,
+                  'learning_senses_snapshot_source_drift',
+                );
+              }
+          for (const source of additionsOf(bundle))
+            if (sourceById.has(source.id)) {
+              const { normalizedLemma, ...record } = source;
+              exactRecord(
+                sourceById.get(source.id),
+                record,
+                'learning_senses_snapshot_new_source_changed',
               );
             }
-        for (const source of additionsOf(bundle))
-          if (sourceById.has(source.id)) {
-            const { normalizedLemma, ...record } = source;
-            exactRecord(
-              sourceById.get(source.id),
-              record,
-              'learning_senses_snapshot_new_source_changed',
+          const leafSnapshot = sourceSnapshot(data, additionsOf(bundle));
+          if (plan.collection) {
+            const fileName =
+              'snapshot-' +
+              String(sites.indexOf(site) + 1).padStart(4, '0') +
+              '-' +
+              String(leafIndex + 1).padStart(4, '0') +
+              '.json';
+            const bytes = Buffer.from(JSON.stringify(leafSnapshot) + '\n');
+            check(bytes.length <= 4 * 1024 * 1024, 'learning_senses_snapshot_leaf_limit');
+            fs.writeFileSync(path.join(snapshotDirectory, fileName), bytes, {
+              mode: 0o600,
+              flag: 'wx',
+            });
+            snapshots.sites[state.siteId].leaves.push({
+              leafId: bundle.manifest.id,
+              fileName,
+              bytes: bytes.length,
+              sha256: sha(bytes),
+            });
+          } else snapshots.sites[state.siteId] = leafSnapshot;
+          summaries.push({
+            siteId: state.siteId,
+            snapshotWords: data.words.length,
+            snapshotSourceSenses: data.rawSenses.length,
+          });
+        } else {
+          const summary = verifyLearningSenses(data, bundle, leafBaseline);
+          let audio = { checked: false, missingCount: null };
+          if (values.audio) {
+            const hashes = bundle.rows.flatMap((row) =>
+              row.senses.flatMap((sense) => sense.examples.map((e) => e.contentMetadata.textHash)),
             );
+            const audioRows = (
+              await client.query(`SELECT * FROM "SentenceAudio" WHERE "textHash"=ANY($1::text[])`, [
+                hashes,
+              ])
+            ).rows;
+            audio = await verifyLearningSentenceAudio(
+              bundle.rows,
+              audioRows,
+              values['audio-root'] || process.env.AUDIO_CACHE_DIR || '.local/audio',
+              policy,
+              true,
+            );
+            if (audio.missingCount || audio.integrityProblemCount) process.exitCode = 1;
           }
-        snapshots.sites[state.siteId] = sourceSnapshot(data, additionsOf(bundle));
-        summaries.push({
-          siteId: state.siteId,
-          snapshotWords: data.words.length,
-          snapshotSourceSenses: data.rawSenses.length,
-        });
-      } else {
-        if (baseline) check(baseline.sites[state.siteId], 'learning_senses_baseline_site_missing');
-        const summary = verifyLearningSenses(data, bundle, baseline?.sites?.[state.siteId]);
-        let audio = { checked: false, missingCount: null };
-        if (values.audio) {
-          const hashes = bundle.rows.flatMap((row) =>
-            row.senses.flatMap((sense) => sense.examples.map((e) => e.contentMetadata.textHash)),
-          );
-          const audioRows = (
-            await client.query(`SELECT * FROM "SentenceAudio" WHERE "textHash"=ANY($1::text[])`, [
-              hashes,
-            ])
-          ).rows;
-          audio = await verifyLearningSentenceAudio(
-            bundle.rows,
-            audioRows,
-            values['audio-root'] || process.env.AUDIO_CACHE_DIR || '.local/audio',
-            policy,
-          );
-          if (audio.missingCount || audio.integrityProblemCount) process.exitCode = 1;
+          summaries.push({ siteId: state.siteId, leafId: bundle.manifest.id, ...summary, audio });
         }
-        summaries.push({ siteId: state.siteId, ...summary, audio });
       }
+      plan.unchanged();
+      for (const [filename, original] of baselineInputs)
+        check(
+          fileIdentity(fs.lstatSync(filename)) === original.identity,
+          'learning_senses_baseline_changed',
+        );
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');

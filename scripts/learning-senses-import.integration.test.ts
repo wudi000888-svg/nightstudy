@@ -3,9 +3,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { gzipSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Client } from 'pg';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import {
   learningSenseBindingHash,
   learningSenseTextHash as hash,
@@ -19,6 +19,8 @@ import {
   type LearningSensesBundle,
   type LearningSenseSourceAddition,
   loadLearningSensesBundle,
+  prepareLearningSensesInstall,
+  importPreparedLearningSenses,
 } from './learning-senses-lib.js';
 
 const databaseUrl = process.env.CONTENT_TEST_DATABASE_URL;
@@ -469,7 +471,7 @@ it.skipIf(!databaseUrl)(
           [oldIds[index], ids[index]],
         );
       await insertOld(0);
-      expect(check(['--snapshot', baselineFile]).status).not.toBe(0); // The missing OLD source is never exempted.
+      expect(check(['--snapshot', baselineFile + '.failed']).status).not.toBe(0); // Preserve failed partials at a different path.
       expect(fs.existsSync(baselineFile)).toBe(false);
       await expect(
         importLearningSensesBundle({ id: siteId, databaseUrl: databaseUrl! }, bundle),
@@ -489,7 +491,14 @@ it.skipIf(!databaseUrl)(
       await insertOld(1);
       expect(check(['--snapshot', baselineFile]).status).toBe(0);
       const snapshot = JSON.parse(fs.readFileSync(baselineFile, 'utf8'));
-      expect(snapshot.sites[siteId].allowedNewSourceIds).toEqual([addition.id]);
+      expect(snapshot.formatVersion).toBe(2);
+      const firstSnapshot = JSON.parse(
+        fs.readFileSync(
+          path.join(baselineFile + '.parts', snapshot.sites[siteId].leaves[0].fileName),
+          'utf8',
+        ),
+      );
+      expect(firstSnapshot.allowedNewSourceIds).toEqual([addition.id]);
       const before = (
         await client.query(`SELECT * FROM "Sense" WHERE id=ANY($1::text[]) ORDER BY id`, [oldIds])
       ).rows;
@@ -560,7 +569,7 @@ it.skipIf(!databaseUrl)(
 );
 
 it.skipIf(!databaseUrl)(
-  'all collection shards install atomically and a late source failure leaves no partial pack',
+  'prepared shards preserve realm, replay and atomic rollback for late DB and input changes',
   async () => {
     if (!new URL(databaseUrl!).pathname.endsWith('_test'))
       throw new Error('use_a_disposable_test_database');
@@ -654,6 +663,30 @@ it.skipIf(!databaseUrl)(
         })),
       },
     };
+    const scratch = fs.mkdtempSync(
+      path.join(process.env.TMPDIR || os.tmpdir(), 'nightstudy-prepared-db-'),
+    );
+    for (const [index, leaf] of leaves.entries()) {
+      const raw = Buffer.from(leaf.rows.map((row) => JSON.stringify(row)).join('\n') + '\n');
+      const packed = gzipSync(raw);
+      Object.assign(leaf.manifest, {
+        fileName: 'prepared-' + index + '.jsonl.gz',
+        bytes: packed.length,
+        sha256: createHash('sha256').update(packed).digest('hex'),
+        jsonlSha256: createHash('sha256').update(raw).digest('hex'),
+      });
+      fs.writeFileSync(path.join(scratch, leaf.manifest.fileName), packed);
+      const bytes = Buffer.from(JSON.stringify(leaf.manifest));
+      const pin = bundle.collection!.shards[index]!;
+      Object.assign(pin, {
+        bytes: bytes.length,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+      });
+      fs.writeFileSync(path.join(scratch, pin.manifestFileName), bytes);
+    }
+    const file = path.join(scratch, 'collection.manifest.json');
+    fs.writeFileSync(file, JSON.stringify(bundle.collection));
+    let plan = prepareLearningSensesInstall(file);
     const siteId = (await client.query(`SELECT "siteId" FROM "SiteState" WHERE id='singleton'`))
       .rows[0]?.siteId;
     if (!siteId) throw new Error('test_database_not_prepared');
@@ -670,7 +703,10 @@ it.skipIf(!databaseUrl)(
         );
       await insertSource(0);
       await expect(
-        importLearningSensesBundle({ id: siteId, databaseUrl: databaseUrl! }, bundle),
+        importPreparedLearningSenses({ id: 'another-site', databaseUrl: databaseUrl! }, plan),
+      ).rejects.toThrow('site_binding');
+      await expect(
+        importPreparedLearningSenses({ id: siteId, databaseUrl: databaseUrl! }, plan),
       ).rejects.toThrow('source_drift');
       expect(
         (
@@ -688,13 +724,70 @@ it.skipIf(!databaseUrl)(
         ).rows[0]!.n,
       ).toBe(0);
       await insertSource(1);
-      const result = await importLearningSensesBundle(
+      const originalQuery = Client.prototype.query;
+      const tamperDuringInstall = async (packId: string, target: string) => {
+        const originalBytes = fs.readFileSync(target);
+        let changed = false;
+        const spy = vi.spyOn(Client.prototype, 'query');
+        spy.mockImplementation(async function (this: Client, ...args: unknown[]) {
+          const result = await Reflect.apply(originalQuery, this, args);
+          if (
+            !changed &&
+            typeof args[0] === 'string' &&
+            args[0].includes('INSERT INTO "ContentPack"') &&
+            Array.isArray(args[1]) &&
+            args[1][0] === packId
+          ) {
+            changed = true;
+            fs.appendFileSync(target, ' ');
+          }
+          return result;
+        } as Client['query']);
+        try {
+          await expect(
+            importPreparedLearningSenses({ id: siteId, databaseUrl: databaseUrl! }, plan),
+          ).rejects.toThrow('prepared_input_changed');
+          expect(changed).toBe(true);
+        } finally {
+          spy.mockRestore();
+          fs.writeFileSync(target, originalBytes);
+        }
+        expect(
+          (
+            await client.query(
+              `SELECT count(*)::int n FROM "LearningSense" WHERE "wordId"=ANY($1::text[])`,
+              [rows.map((row) => row.wordId)],
+            )
+          ).rows[0]!.n,
+        ).toBe(0);
+        expect(
+          (
+            await client.query(
+              `SELECT count(*)::int n FROM "ContentPack" WHERE id=ANY($1::text[])`,
+              [leaves.map((leaf) => leaf.manifest.id)],
+            )
+          ).rows[0]!.n,
+        ).toBe(0);
+        plan = prepareLearningSensesInstall(file);
+      };
+      // Change an unread later leaf after the first pack INSERT; no partial pack may commit.
+      await tamperDuringInstall(
+        leaves[0]!.manifest.id,
+        path.join(scratch, bundle.collection!.shards[1]!.manifestFileName),
+      );
+      // Change an already-read first leaf after the last pack INSERT. The final
+      // identity check must still be inside the transaction, before COMMIT.
+      await tamperDuringInstall(
+        leaves[1]!.manifest.id,
+        path.join(scratch, leaves[0]!.manifest.fileName),
+      );
+      const result = await importPreparedLearningSenses(
         { id: siteId, databaseUrl: databaseUrl! },
-        bundle,
+        plan,
       );
       expect(result.bundles.map((b) => b.insertedSenses)).toEqual([1, 1]);
       expect(
-        (await importLearningSensesBundle({ id: siteId, databaseUrl: databaseUrl! }, bundle))
+        (await importPreparedLearningSenses({ id: siteId, databaseUrl: databaseUrl! }, plan))
           .alreadyInstalled,
       ).toBe(true);
       const sourceBefore = (
@@ -702,7 +795,7 @@ it.skipIf(!databaseUrl)(
           rows.map((r) => r.wordId),
         ])
       ).rows;
-      await importLearningSensesBundle({ id: siteId, databaseUrl: databaseUrl! }, bundle);
+      await importPreparedLearningSenses({ id: siteId, databaseUrl: databaseUrl! }, plan);
       expect(
         (
           await client.query(`SELECT * FROM "Sense" WHERE "wordId"=ANY($1::text[]) ORDER BY id`, [
@@ -720,6 +813,7 @@ it.skipIf(!databaseUrl)(
         leaves.map((l) => l.manifest.id),
       ]);
       await client.end();
+      fs.rmSync(scratch, { recursive: true, force: true });
     }
   },
 );

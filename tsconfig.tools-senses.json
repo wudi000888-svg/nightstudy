@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.tools.json",
+  "include": [
+    "scripts/learning-senses-lib.ts",
+    "scripts/learning-senses-prepare.ts",
+    "scripts/learning-senses-lib.test.ts",
+    "scripts/learning-senses-import.integration.test.ts",
+    "scripts/learning-senses-full.integration.test.ts"
+  ]
+}

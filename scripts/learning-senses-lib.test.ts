@@ -19,6 +19,8 @@ import {
   learningSensesWordUnionHash,
   learningSensePartsOfSpeech,
   LEARNING_SENSE_MAX_BYTES,
+  prepareLearningSensesInstall,
+  assertLearningSensesInstallUnchanged,
   type LearningSensesBundle,
   validateLearningSourceAdditions,
   type LearningSenseSourceAddition,
@@ -135,6 +137,76 @@ function collectionFixture(): LearningSensesBundle {
     },
   };
 }
+
+function writeCollectionFixture(scratch: string, fixture = collectionFixture()) {
+  for (const [index, leaf] of fixture.bundles.entries()) {
+    const raw = Buffer.from(leaf.rows.map((row) => JSON.stringify(row)).join('\n') + '\n');
+    const packed = gzipSync(raw);
+    Object.assign(leaf.manifest, {
+      bytes: packed.length,
+      sha256: sha(packed),
+      jsonlSha256: sha(raw),
+    });
+    fs.writeFileSync(path.join(scratch, leaf.manifest.fileName), packed);
+    const manifestBytes = Buffer.from(JSON.stringify(leaf.manifest));
+    const pin = fixture.collection!.shards[index]!;
+    Object.assign(pin, { bytes: manifestBytes.length, sha256: sha(manifestBytes) });
+    fs.writeFileSync(path.join(scratch, pin.manifestFileName), manifestBytes);
+  }
+  const file = path.join(scratch, 'collection.manifest.json');
+  fs.writeFileSync(file, JSON.stringify(fixture.collection));
+  return { file, fixture };
+}
+
+it('preflights every leaf and refuses late omissions, cross-leaf identity reuse and changed prepared inputs', () => {
+  const scratch = fs.mkdtempSync(
+    path.join(process.env.TMPDIR || os.tmpdir(), 'nightstudy-preflight-'),
+  );
+  try {
+    const { file, fixture } = writeCollectionFixture(scratch);
+    const plan = prepareLearningSensesInstall(file);
+    expect(plan).toMatchObject({
+      kind: 'bounded-learning-senses-install',
+      leafCount: 2,
+      wordCount: 35,
+      senseCount: manifest.senseCount,
+      exampleCount: manifest.exampleCount,
+    });
+    expect('rows' in plan).toBe(false);
+    expect('bundles' in plan).toBe(false);
+    assertLearningSensesInstallUnchanged(plan);
+    const last = path.join(scratch, fixture.collection!.shards[1]!.manifestFileName);
+    fs.appendFileSync(last, ' ');
+    expect(() => assertLearningSensesInstallUnchanged(plan)).toThrow('prepared_input_changed');
+    expect(() => prepareLearningSensesInstall(file)).toThrow('shard_pin_mismatch');
+    fs.unlinkSync(last);
+    expect(() => prepareLearningSensesInstall(file)).toThrow();
+    const collision = collectionFixture();
+    collision.bundles[1]!.rows[0]!.senses[0]!.examples[0]!.id =
+      collision.bundles[0]!.rows[0]!.senses[0]!.examples[0]!.id;
+    writeCollectionFixture(scratch, collision);
+    expect(() => prepareLearningSensesInstall(file)).toThrow('global_duplicate_identity');
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+it('rejects a large collection at the eager entry point before loading a payload', () => {
+  const scratch = fs.mkdtempSync(
+    path.join(process.env.TMPDIR || os.tmpdir(), 'nightstudy-eager-limit-'),
+  );
+  try {
+    const fixture = collectionFixture();
+    fixture.collection!.wordCount = fixture.collection!.requiredWordCount = 1001;
+    fixture.collection!.shards[0]!.wordCount = 500;
+    fixture.collection!.shards[1]!.wordCount = 501;
+    const file = path.join(scratch, 'collection.manifest.json');
+    fs.writeFileSync(file, JSON.stringify(fixture.collection));
+    expect(() => loadLearningSensesBundle(file)).toThrow('use_bounded_install');
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
 
 it('validates the real authored pack and Python/TypeScript canonical binding hashes', () => {
   expect(rows).toHaveLength(manifest.wordCount);

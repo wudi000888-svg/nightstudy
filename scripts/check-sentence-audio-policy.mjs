@@ -624,6 +624,10 @@ export function sentenceAudioPolicySelfTest() {
         (s) => (s.requestedSentences[0].references[0].exampleId = 'wrong'),
         /release_reference_mismatch/,
       ],
+      [
+        (s) => (s.requestedSentences[0].references[0].wordId = 'wrong-word'),
+        /release_reference_mismatch/,
+      ],
     ]) {
       const copiedSource = structuredClone(source),
         copiedBuilt = structuredClone(built);

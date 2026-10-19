@@ -1,0 +1,23 @@
+{
+  "kind": "nightstudy-ci-audio-prepared-plan-pin-v1",
+  "release": "audio-build-batches-014-20261019",
+  "archive": {
+    "fileName": "ci-audio-plan-39227489303-1.tar.gz",
+    "bytes": 77073616,
+    "sha256": "7a91e0431497029cebb3655a4ec4a2f4c8d804e5db21ca4563fa12afc9ae7485"
+  },
+  "jobs": {
+    "fileName": ".ci-audio-plan/job-manifest.json",
+    "bytes": 22584,
+    "sha256": "b6ec1693958e1a2da5a12c27e3f466a69f1a11dffb24add6c086488929edae4d"
+  },
+  "selection": {
+    "fileName": ".ci-audio-plan/selection.manifest.json",
+    "bytes": 36984,
+    "sha256": "5fae9d4b8e6bf4c18966e74f3a9e1503a2a3fdb1786a6daf17bc5ff13e46bd2a"
+  },
+  "preparedBy": {
+    "runId": 39227489303,
+    "commit": "3eb1192d06b960f8572fb53bb1a8fbe22fe90cc4"
+  }
+}

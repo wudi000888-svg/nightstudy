@@ -1,0 +1,93 @@
+name: Verify the actual first extracted sentence audio installer
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: github.repository == 'wudi000888-svg/nightstudy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INPUT_RELEASE: audio-build-inputs-014-20261019
+      OUTPUT_RELEASE: audio-build-batches-014-20261019
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+      - name: Format only the two new JavaScript verifier files and run their boundaries
+        id: source
+        run: |
+          set -euo pipefail
+          npm exec --yes --package=prettier@3.9.10 -- prettier --write \
+            scripts/check-ci-sentence-audio-installer.mjs scripts/check-ci-sentence-audio-installer.test.mjs
+          node --test scripts/check-ci-sentence-audio-installer.test.mjs
+      - name: Restore the exact accepted plan
+        run: |
+          set -euo pipefail
+          release=$(jq -er .release data/ci-audio-batch-plan.manifest.json)
+          asset=$(jq -er .archive.fileName data/ci-audio-batch-plan.manifest.json)
+          gh release download "$release" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$RUNNER_TEMP"
+          python3 scripts/prepare-ci-sentence-audio-run.py \
+            --archive "$RUNNER_TEMP/$asset" --scope first --github-output "$GITHUB_OUTPUT"
+      - name: Copy the accepted first pack, its check and exact policies
+        run: |
+          set -euo pipefail
+          mkdir .ci-audio-inputs
+          for name in pronunciation-controls-014.json pronunciation-supplement-014.json contrasts-frontend-observation-014.json sentence-audio-holds-v1.manifest.json sentence-audio-holds-v1.json; do
+            gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern "$name" --dir .ci-audio-inputs
+          done
+          check=$(jq -er '.check.fileName | split("/")[-1]' data/ci-audio-first-accepted.manifest.json)
+          gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern "$check" --dir .ci-audio-inputs
+          gh release download "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'nightstudy-sentence-audio-v4-0101.tar.gz' \
+            --pattern 'sentence-audio-v4-0101.manifest.json' --dir "$RUNNER_TEMP"
+      - name: Extract with the unchanged mature bounded installer
+        run: |
+          set -euo pipefail
+          python3 scripts/audio-extract.py \
+            --archive "$RUNNER_TEMP/nightstudy-sentence-audio-v4-0101.tar.gz" \
+            --output "$RUNNER_TEMP/actual-first-extracted"
+      - name: Independently verify every packaged MP3 and complete publication sidecars
+        id: acceptance
+        run: |
+          set -euo pipefail
+          request=$(jq -er .request.fileName data/ci-audio-first-accepted.manifest.json)
+          request_sha=$(jq -er .request.sha256 data/ci-audio-first-accepted.manifest.json)
+          check=$(jq -er .check.fileName data/ci-audio-first-accepted.manifest.json)
+          check_sha=$(jq -er .check.sha256 data/ci-audio-first-accepted.manifest.json)
+          node scripts/check-ci-sentence-audio-installer.mjs \
+            --request "$request" --request-sha256 "$request_sha" \
+            --check "$check" --check-sha256 "$check_sha" \
+            --descriptor "$RUNNER_TEMP/sentence-audio-v4-0101.manifest.json" \
+            --descriptor-sha256 95033e5fe58da6ebb2af55aa2246488a44228b73b7b91d3bd4f70fd3da87dbd8 \
+            --archive "$RUNNER_TEMP/nightstudy-sentence-audio-v4-0101.tar.gz" \
+            --extracted "$RUNNER_TEMP/actual-first-extracted" \
+            --policy-manifest .ci-audio-inputs/sentence-audio-holds-v1.manifest.json \
+            --receipt "$RUNNER_TEMP/first-installer-check.json"
+      - name: Preserve the exact formatted sources and actual acceptance result
+        if: always() && steps.source.outcome == 'success'
+        env:
+          ACCEPTANCE_OUTCOME: ${{ steps.acceptance.outcome }}
+        run: |
+          set -euo pipefail
+          label=unverified
+          if [[ "$ACCEPTANCE_OUTCOME" == success ]]; then label=verified; fi
+          stem="ci-audio-installer-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$label"
+          tar -czf "$RUNNER_TEMP/$stem.sources.tar.gz" \
+            scripts/check-ci-sentence-audio-installer.mjs scripts/check-ci-sentence-audio-installer.test.mjs
+          assets=("$RUNNER_TEMP/$stem.sources.tar.gz")
+          if [[ "$label" == verified ]]; then
+            cp "$RUNNER_TEMP/first-installer-check.json" "$RUNNER_TEMP/$stem.check.json"
+            assets+=("$RUNNER_TEMP/$stem.check.json")
+          fi
+          gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" "${assets[@]}"
+          printf 'Actual first installer check %s; no DB or full release approval.\n' "$label" >> "$GITHUB_STEP_SUMMARY"

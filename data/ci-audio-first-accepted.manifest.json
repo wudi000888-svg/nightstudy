@@ -1,0 +1,41 @@
+{
+  "kind": "nightstudy-ci-audio-first-accepted-v1",
+  "source": {
+    "release": "audio-build-batches-014-20261019",
+    "runId": 39229287197,
+    "attempt": 1,
+    "commit": "3b8da3fc09ca89883f96a539c8dad73f0980559d",
+    "conclusion": "success"
+  },
+  "packId": "sentence-audio-v4-0101",
+  "selectionManifest": {
+    "fileName": ".ci-audio-plan/selection.manifest.json",
+    "bytes": 36984,
+    "sha256": "5fae9d4b8e6bf4c18966e74f3a9e1503a2a3fdb1786a6daf17bc5ff13e46bd2a"
+  },
+  "request": {
+    "fileName": ".ci-audio-plan/request-0001.json",
+    "bytes": 248810,
+    "sha256": "7a27537e72bb52398657d64945189d81b655cd7151df4039fa293fff383200bd"
+  },
+  "check": {
+    "fileName": ".ci-audio-inputs/ci-audio-batch-39229287197-1-1-verified.check.json",
+    "bytes": 368196,
+    "sha256": "5a02b5d95f2c0a7d433b04e4b7ad4d9d4708a3aeeb27391394deb3057f37b975"
+  },
+  "assembly": {
+    "fileName": ".ci-audio-inputs/sentence-audio-v4-0101.assembly.json",
+    "bytes": 986,
+    "sha256": "a20a26f55983296856c2aedd61ec368951328656dc217bec6c67987f5283a4d2"
+  },
+  "unpack": {
+    "fileName": ".ci-audio-inputs/sentence-audio-v4-0101.unpack.json",
+    "bytes": 70,
+    "sha256": "b1cc612b1ff62c7a4cca9d9802625ff9b429d76cacf607ef213b781ef13d68b5"
+  },
+  "archive": {
+    "fileName": "nightstudy-sentence-audio-v4-0101.tar.gz",
+    "bytes": 10316537,
+    "sha256": "c01900ae7d42748881a2b8b738fb83ebc8e8b5328d8bec77b75ac5f601c7c412"
+  }
+}

@@ -5,17 +5,30 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      audio_mode:
+        description: Existing-model sentence audio pilot; verify runs the application checks
+        type: choice
+        options: [verify, pilot]
+        default: verify
   workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ inputs.audio_mode || 'verify' }}
   cancel-in-progress: true
 
 jobs:
+  sentence-audio:
+    if: github.event_name == 'workflow_dispatch' && inputs.audio_mode == 'pilot' && github.repository == 'wudi000888-svg/nightstudy'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/sentence-audio-build.yml
+
   verify:
+    if: github.event_name != 'workflow_dispatch' || inputs.audio_mode != 'pilot'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     services:

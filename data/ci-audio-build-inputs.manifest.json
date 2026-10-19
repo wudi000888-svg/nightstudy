@@ -1,0 +1,10 @@
+{
+  "kind": "nightstudy-ci-audio-build-inputs-v1",
+  "mode": "pilot",
+  "packId": "sentence-audio-v4-0001",
+  "portableControls": {
+    "fileName": ".ci-audio-inputs/pronunciation-controls-014.json",
+    "bytes": 8216309,
+    "sha256": "3b7f791260a3d7490f89304c58afab7bc062a092271f67c2aa4a9b4c4cd367c7"
+  }
+}

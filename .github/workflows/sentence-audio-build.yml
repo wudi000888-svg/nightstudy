@@ -1,0 +1,94 @@
+name: Existing-model sentence audio
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    if: github.repository == 'wudi000888-svg/nightstudy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      NUMEXPR_NUM_THREADS: '1'
+      VECLIB_MAXIMUM_THREADS: '1'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      INPUT_RELEASE: audio-build-inputs-014-20261019
+      OUTPUT_RELEASE: audio-build-pilot-014-20261019
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Prepare isolated CPU runtime
+        run: |
+          set -euo pipefail
+          python3 -c 'import sys; assert sys.version_info[:2] == (3, 12)'
+          python3 -m venv "$RUNNER_TEMP/audio-python"
+          "$RUNNER_TEMP/audio-python/bin/pip" install --no-cache-dir --only-binary=:all: \
+            'https://files.pythonhosted.org/packages/84/81/0112a7d510911f33018dc24023d1655bb772f84a4e95fe7f0180f66bbd17/piper_tts-1.8.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl#sha256=25b4d3f31ff70c8fa7151908e00aaa5650cbdf16bca8fcf21299f3941b89a7d3' \
+            'onnxruntime==1.31.0' 'numpy==2.5.4' 'pathvalidate==3.3.1'
+          command -v ffmpeg
+          ffmpeg -version
+      - name: Verify model-free worker and checker fixtures
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/audio-python/bin/python" scripts/ci-sentence-audio-worker.test.py
+          "$RUNNER_TEMP/audio-python/bin/python" scripts/check-ci-sentence-audio.test.py
+      - name: Copy the four existing model files and frozen pronunciation controls
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/existing-models"
+          gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.onnx*' --dir "$RUNNER_TEMP/existing-models"
+          mkdir -p .ci-audio-inputs
+          gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'pronunciation-controls-014.json' --dir .ci-audio-inputs
+          # The request planner and worker both enforce the committed control pin,
+          # public text root, exact four voice-file hashes and original configs.
+          "$RUNNER_TEMP/audio-python/bin/python" scripts/prepare-ci-sentence-audio.py \
+            --inputs data/ci-audio-build-inputs.manifest.json \
+            --output "$RUNNER_TEMP/audio-pilot-request.json"
+      - name: Generate a bounded offline pilot
+        run: |
+          set -euo pipefail
+          request_sha=$(sha256sum "$RUNNER_TEMP/audio-pilot-request.json" | cut -d ' ' -f 1)
+          /usr/bin/time -v -o "$RUNNER_TEMP/pilot-resources.txt" \
+            "$RUNNER_TEMP/audio-python/bin/python" scripts/ci-sentence-audio-worker.py \
+            --request "$RUNNER_TEMP/audio-pilot-request.json" --request-sha256 "$request_sha" \
+            --models "$RUNNER_TEMP/existing-models" --output "$RUNNER_TEMP/pilot-output" \
+            --ffmpeg "$(command -v ffmpeg)"
+      - name: Independently verify identities and decode every complete audio file
+        run: |
+          set -euo pipefail
+          request_sha=$(sha256sum "$RUNNER_TEMP/audio-pilot-request.json" | cut -d ' ' -f 1)
+          "$RUNNER_TEMP/audio-python/bin/python" scripts/check-ci-sentence-audio.py \
+            --request "$RUNNER_TEMP/audio-pilot-request.json" --request-sha256 "$request_sha" \
+            --output "$RUNNER_TEMP/pilot-output" --ffmpeg "$(command -v ffmpeg)" \
+            --receipt "$RUNNER_TEMP/pilot-check.json"
+      - name: Preserve verified pilot as immutable draft release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          stem="ci-audio-pilot-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/$stem.tar.gz" \
+            pilot-output pilot-check.json audio-pilot-request.json \
+            audio-pilot-request.json.receipt.json pilot-resources.txt
+          cp "$RUNNER_TEMP/pilot-check.json" "$RUNNER_TEMP/$stem.check.json"
+          cp "$RUNNER_TEMP/pilot-output/build-receipt.json" "$RUNNER_TEMP/$stem.build.json"
+          (cd "$RUNNER_TEMP" && sha256sum "$stem.tar.gz" "$stem.check.json" "$stem.build.json" > "$stem.sha256")
+          gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            "$RUNNER_TEMP/$stem.tar.gz" "$RUNNER_TEMP/$stem.check.json" \
+            "$RUNNER_TEMP/$stem.build.json" "$RUNNER_TEMP/$stem.sha256"
+          cat "$RUNNER_TEMP/$stem.check.json"
+          printf 'Pilot artifacts: %s\n' "$stem" >> "$GITHUB_STEP_SUMMARY"

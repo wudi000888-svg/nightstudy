@@ -1,0 +1,84 @@
+name: Qualify exact official legacy MP3s for publication selection
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.repository == 'wudi000888-svg/nightstudy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONDONTWRITEBYTECODE: '1'
+      INPUT_RELEASE: audio-build-inputs-014-20261019
+      OUTPUT_RELEASE: audio-build-batches-014-20261019
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Verify model-free official reuse boundaries
+        run: python3 scripts/qualify-ci-legacy-sentence-reuse.test.py
+      - name: Copy the actual overlap inventory and fixed pronunciation controls
+        run: |
+          set -euo pipefail
+          mkdir .ci-audio-inputs
+          gh release download "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'ci-audio-legacy-overlap-39235310299-1.json' --dir .ci-audio-inputs
+          mv .ci-audio-inputs/ci-audio-legacy-overlap-39235310299-1.json .ci-audio-inputs/legacy-overlap-audit.json
+          test "$(stat -c %s .ci-audio-inputs/legacy-overlap-audit.json)" -eq 3387333
+          printf '%s  %s\n' 48425b09c5837edd2c9be3bf19fa438570adf830cd3c1302e9807db54356ef5c \
+            .ci-audio-inputs/legacy-overlap-audit.json | sha256sum --check --status
+          for name in pronunciation-controls-014.json pronunciation-supplement-014.json contrasts-frontend-observation-014.json; do
+            gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern "$name" --dir .ci-audio-inputs
+          done
+      - name: Rehash the two immutable official archives and extract only the exact 32 MP3s
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/legacy-official"
+          for name in sentence-audio.manifest.json sentence-audio-v2.manifest.json; do
+            descriptor="data/$name"
+            id=$(jq -er .id "$descriptor")
+            url=$(jq -er .source.url "$descriptor")
+            bytes=$(jq -er .source.sizeBytes "$descriptor")
+            checksum=$(jq -er .source.sha256 "$descriptor")
+            archive="$RUNNER_TEMP/$id.tar.gz"
+            curl --fail --location --silent --show-error --retry 2 --max-time 600 \
+              --max-filesize "$bytes" "$url" --output "$archive"
+            test "$(stat -c %s "$archive")" -eq "$bytes"
+            printf '%s  %s\n' "$checksum" "$archive" | sha256sum --check --status
+            list="$RUNNER_TEMP/$id.files"
+            printf 'manifest.json\nsources.manifest.json\n' > "$list"
+            jq -r --arg pack "$id" '.overlaps[] | select(.plannedDecision.decision=="planned-fresh") | .oldPublishedEntries[] | select(.packId==$pack) | .entry.fileKey' \
+              .ci-audio-inputs/legacy-overlap-audit.json >> "$list"
+            test "$(wc -l < "$list")" -eq 18
+            mkdir "$RUNNER_TEMP/legacy-official/$id"
+            tar -xzf "$archive" -C "$RUNNER_TEMP/legacy-official/$id" --verbatim-files-from --files-from "$list"
+            rm "$archive"
+          done
+      - name: Prepare the complete-file decoder
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+      - name: Rebind every current reference and fully decode the 32 official files
+        run: |
+          set -euo pipefail
+          python3 scripts/qualify-ci-legacy-sentence-reuse.py \
+            --report .ci-audio-inputs/legacy-overlap-audit.json \
+            --report-sha256 48425b09c5837edd2c9be3bf19fa438570adf830cd3c1302e9807db54356ef5c \
+            --legacy-root "$RUNNER_TEMP/legacy-official" --ffmpeg "$(command -v ffmpeg)" \
+            --output "$RUNNER_TEMP/legacy-reuse-qualified"
+      - name: Preserve qualification and the explicit exact selection
+        run: |
+          set -euo pipefail
+          stem="ci-audio-official32-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cp "$RUNNER_TEMP/legacy-reuse-qualified/qualification.json" "$RUNNER_TEMP/$stem.qualification.json"
+          cp "$RUNNER_TEMP/legacy-reuse-qualified/approved-selection.json" "$RUNNER_TEMP/$stem.selection.json"
+          tar -C "$RUNNER_TEMP/legacy-reuse-qualified" -czf "$RUNNER_TEMP/$stem.tar.gz" qualification.json approved-selection.json
+          gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            "$RUNNER_TEMP/$stem.qualification.json" "$RUNNER_TEMP/$stem.selection.json" "$RUNNER_TEMP/$stem.tar.gz"
+          printf 'Exactly 32 official MP3s qualified; no original WAV revalidation, new inference or publication.\n' >> "$GITHUB_STEP_SUMMARY"

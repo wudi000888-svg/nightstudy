@@ -1,0 +1,56 @@
+name: Check independent publication tools without models
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: github.repository == 'wudi000888-svg/nightstudy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+      - name: Format only new JavaScript and check their boundaries
+        id: format
+        run: |
+          set -euo pipefail
+          npm exec --yes --package=prettier@3.9.10 -- prettier --write \
+            scripts/check-ci-sentence-audio-selected-installer.mjs \
+            scripts/check-ci-sentence-audio-selected-installer.test.mjs \
+            scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs
+          node --check scripts/check-all-book-content-http.mjs
+          node --check scripts/check-all-book-content-h5.mjs
+      - name: Verify the original and selected installer boundaries
+        id: tests
+        run: |
+          set -euo pipefail
+          node --test scripts/check-ci-sentence-audio-installer.test.mjs \
+            scripts/check-ci-sentence-audio-selected-installer.test.mjs
+          python3 scripts/select-ci-sentence-audio-publication.test.py
+      - name: Preserve exact sources and outcome
+        if: always() && steps.format.outcome == 'success'
+        env:
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+        run: |
+          set -euo pipefail
+          stem="ci-publication-tools-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tar -czf "$RUNNER_TEMP/$stem.sources.tar.gz" \
+            scripts/check-ci-sentence-audio-selected-installer.mjs \
+            scripts/check-ci-sentence-audio-selected-installer.test.mjs \
+            scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs
+          jq -n --arg outcome "$TEST_OUTCOME" --arg source "$GITHUB_SHA" \
+            '{kind:"nightstudy-publication-tools-test-v1",outcome:$outcome,source:$source,modelUsed:false,fullInstallerExecuted:false,fullApplicationAcceptancePassed:false}' \
+            > "$RUNNER_TEMP/$stem.check.json"
+          gh release upload audio-build-batches-014-20261019 --repo "$GITHUB_REPOSITORY" \
+            "$RUNNER_TEMP/$stem.sources.tar.gz" "$RUNNER_TEMP/$stem.check.json"

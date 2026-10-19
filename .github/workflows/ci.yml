@@ -18,6 +18,7 @@ on:
           - legacy-audit
           - installer-audit
           - legacy-reuse
+          - publication-tools
         default: verify
   workflow_call:
 
@@ -72,6 +73,12 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/sentence-audio-legacy-reuse.yml
+
+  sentence-audio-publication-tools:
+    if: github.event_name == 'workflow_dispatch' && inputs.audio_mode == 'publication-tools' && github.repository == 'wudi000888-svg/nightstudy'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/sentence-audio-publication-tools.yml
 
   verify:
     if: github.event_name != 'workflow_dispatch' || inputs.audio_mode == 'verify'

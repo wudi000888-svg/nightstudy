@@ -37,7 +37,7 @@ jobs:
             scripts/audio-prepare.ts scripts/audio-prepare-cache.test.ts compose.yaml \
             .github/workflows/ci.yml .github/workflows/all-book-recognition.yml \
             .github/workflows/sentence-audio-publication.yml .github/workflows/sentence-audio-publication-tools.yml \
-            docs/ALL_BOOK_SENSES_AUDIO_013.md
+            docs/ALL_BOOK_SENSES_AUDIO_013.md README.md CHANGELOG.md docs/DEPLOYMENT.md
           node --check scripts/check-all-book-content-http.mjs
           node --check scripts/check-all-book-content-h5.mjs
       - name: Verify the original and selected installer boundaries
@@ -65,7 +65,7 @@ jobs:
             scripts/audio-prepare.ts scripts/audio-prepare-cache.test.ts compose.yaml \
             .github/workflows/ci.yml .github/workflows/all-book-recognition.yml \
             .github/workflows/sentence-audio-publication.yml .github/workflows/sentence-audio-publication-tools.yml \
-            docs/ALL_BOOK_SENSES_AUDIO_013.md
+            docs/ALL_BOOK_SENSES_AUDIO_013.md README.md CHANGELOG.md docs/DEPLOYMENT.md
           jq -n --arg outcome "$TEST_OUTCOME" --arg source "$GITHUB_SHA" \
             '{kind:"nightstudy-publication-tools-test-v1",outcome:$outcome,source:$source,modelUsed:false,fullInstallerExecuted:false,fullApplicationAcceptancePassed:false}' \
             > "$RUNNER_TEMP/$stem.check.json"

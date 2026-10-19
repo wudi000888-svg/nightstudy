@@ -60,6 +60,12 @@ jobs:
           "$RUNNER_TEMP/audio-python/bin/python" scripts/prepare-ci-sentence-audio.py \
             --inputs data/ci-audio-build-inputs.manifest.json \
             --output "$RUNNER_TEMP/audio-pilot-request.json"
+      - name: Observe the exact unresolved sentence without model inference
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/audio-python/bin/python" scripts/observe-ci-sentence-phonemes.py \
+            --models "$RUNNER_TEMP/existing-models" \
+            --output "$RUNNER_TEMP/contrasts-frontend-observation.json"
       - name: Generate a bounded offline pilot
         id: generation
         run: |
@@ -87,7 +93,7 @@ jobs:
         run: |
           set -euo pipefail
           label=unverified
-          members=(pilot-output audio-pilot-request.json audio-pilot-request.json.receipt.json pilot-resources.txt)
+          members=(pilot-output audio-pilot-request.json audio-pilot-request.json.receipt.json pilot-resources.txt contrasts-frontend-observation.json)
           if [[ "$ACCEPTANCE_OUTCOME" == success ]]; then
             label=verified
             members+=(pilot-check.json)
@@ -98,6 +104,8 @@ jobs:
           (cd "$RUNNER_TEMP" && sha256sum "$stem.tar.gz" "$stem.build.json" > "$stem.sha256")
           gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
             "$RUNNER_TEMP/$stem.tar.gz" "$RUNNER_TEMP/$stem.build.json" "$RUNNER_TEMP/$stem.sha256"
+          cp "$RUNNER_TEMP/contrasts-frontend-observation.json" "$RUNNER_TEMP/$stem.frontend.json"
+          gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/$stem.frontend.json"
           if [[ "$label" == verified ]]; then
             cp "$RUNNER_TEMP/pilot-check.json" "$RUNNER_TEMP/$stem.check.json"
             gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/$stem.check.json"

@@ -19,6 +19,8 @@ on:
           - installer-audit
           - legacy-reuse
           - publication-tools
+          - publication-first
+          - publication-all
         default: verify
   workflow_call:
 
@@ -79,6 +81,22 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/sentence-audio-publication-tools.yml
+
+  sentence-audio-publication-first:
+    if: github.event_name == 'workflow_dispatch' && inputs.audio_mode == 'publication-first' && github.repository == 'wudi000888-svg/nightstudy'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/sentence-audio-publication.yml
+    with:
+      scope: first
+
+  sentence-audio-publication-all:
+    if: github.event_name == 'workflow_dispatch' && inputs.audio_mode == 'publication-all' && github.repository == 'wudi000888-svg/nightstudy'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/sentence-audio-publication.yml
+    with:
+      scope: all
 
   verify:
     if: github.event_name != 'workflow_dispatch' || inputs.audio_mode == 'verify'

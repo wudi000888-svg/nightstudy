@@ -29,3 +29,7 @@ data/sentence-audio-v2.manifest.json
 data/learning-senses-authored*.json
 data/learning-senses-v1.manifest.json
 data/sentence-audio-v3.manifest.json
+# Complete audio collection pins and pronunciation policy retain original bytes.
+data/sentence-audio-v4*.json
+data/sentence-audio-holds-v1.json
+data/sentence-audio-holds-v1.manifest.json

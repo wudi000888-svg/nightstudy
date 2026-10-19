@@ -9,6 +9,8 @@ coverage/
 !.env.example
 .local/
 .ci-audio-inputs/
+.ci-audio-plan/
+.ci-publication/
 work/
 prisma/generated/
 *.log

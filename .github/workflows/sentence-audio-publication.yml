@@ -1,0 +1,94 @@
+name: Independently select complete MP3 installers into an unpublished draft
+
+on:
+  workflow_call:
+    inputs:
+      scope:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    if: github.repository == 'wudi000888-svg/nightstudy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONDONTWRITEBYTECODE: '1'
+      SCOPE: ${{ inputs.scope }}
+      INPUT_RELEASE: audio-build-inputs-014-20261019
+      CANDIDATE_RELEASE: audio-build-batches-014-20261019
+      MEDIA_RELEASE: media-sentence-v4-014-20261019
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.19.0'
+      - name: Check independent model-free publication boundaries
+        run: |
+          set -euo pipefail
+          node --test scripts/check-ci-sentence-audio-installer.test.mjs scripts/check-ci-sentence-audio-selected-installer.test.mjs
+          python3 scripts/select-ci-sentence-audio-publication.test.py
+          python3 scripts/prepare-ci-sentence-audio-publication.test.py
+          python3 scripts/finalize-ci-sentence-audio-collection.test.py
+          python3 -m py_compile scripts/run-ci-sentence-audio-publication.py
+      - name: Restore the immutable complete plan and exact existing controls
+        run: |
+          set -euo pipefail
+          case "$SCOPE" in first|all) ;; *) exit 1 ;; esac
+          mkdir .ci-audio-inputs .ci-publication
+          gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            --pattern pronunciation-controls-014.json --pattern pronunciation-supplement-014.json \
+            --pattern contrasts-frontend-observation-014.json --pattern approved-pilot.check.json \
+            --pattern sentence-audio-holds-v1.manifest.json --pattern sentence-audio-holds-v1.json --dir .ci-audio-inputs
+          gh release download "$CANDIDATE_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            --pattern ci-audio-official32-39237172878-1.qualification.json \
+            --pattern ci-audio-official32-39237172878-1.selection.json \
+            --pattern ci-audio-legacy-overlap-39235310299-1.json --dir .ci-audio-inputs
+          mv .ci-audio-inputs/ci-audio-official32-39237172878-1.qualification.json .ci-audio-inputs/qualification.json
+          mv .ci-audio-inputs/ci-audio-official32-39237172878-1.selection.json .ci-audio-inputs/approved-selection.json
+          mv .ci-audio-inputs/ci-audio-legacy-overlap-39235310299-1.json .ci-audio-inputs/legacy-overlap-audit.json
+          asset=$(jq -er .archive.fileName data/ci-audio-batch-plan.manifest.json)
+          gh release download "$CANDIDATE_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$RUNNER_TEMP"
+          python3 scripts/prepare-ci-sentence-audio-run.py --archive "$RUNNER_TEMP/$asset" \
+            --scope first --github-output "$GITHUB_OUTPUT"
+      - name: Freeze exact release asset identities and enforce the draft boundary
+        run: |
+          set -euo pipefail
+          candidate_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$CANDIDATE_RELEASE" --jq .id)
+          media_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$MEDIA_RELEASE" --jq 'if .draft then .id else error("media release must remain a draft") end')
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases/$candidate_id/assets?per_page=100" \
+            --jq 'add' > .ci-publication/candidate-assets.json
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases/$media_id/assets?per_page=100" \
+            --jq 'add' > .ci-publication/existing-media-assets.json
+      - name: Verify, select and copy immutable MP3 installers to the draft
+        id: acceptance
+        run: |
+          set -euo pipefail
+          last=1
+          if [[ "$SCOPE" == all ]]; then last=101; fi
+          for ((number=1; number<=last; number++)); do
+            python3 scripts/run-ci-sentence-audio-publication.py --slice "$number" \
+              --assets .ci-publication/candidate-assets.json \
+              --media-assets .ci-publication/existing-media-assets.json
+          done
+      - name: Preserve stage state without publishing a release
+        if: always()
+        env:
+          ACCEPTANCE_OUTCOME: ${{ steps.acceptance.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ -d .ci-publication ]]; then
+            stem="ci-publication-stage-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            jq -n --arg outcome "$ACCEPTANCE_OUTCOME" --arg scope "$SCOPE" --arg source "$GITHUB_SHA" \
+              '{kind:"nightstudy-publication-stage-v1",outcome:$outcome,scope:$scope,source:$source,modelUsed:false,publicationAuthorized:false}' \
+              > "$RUNNER_TEMP/$stem.check.json"
+            # Full media and original WAV archives are excluded. Per-slice
+            # completed evidence archives already reside in the media draft.
+            gh release upload "$CANDIDATE_RELEASE" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/$stem.check.json"
+          fi

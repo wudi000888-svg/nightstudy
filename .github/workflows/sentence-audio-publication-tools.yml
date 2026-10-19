@@ -2,6 +2,10 @@ name: Check independent publication tools without models
 
 on:
   workflow_call:
+    inputs:
+      image_smoke:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,7 +39,7 @@ jobs:
             scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs \
             scripts/check-all-book-recognition-http.mjs scripts/check-all-book-recognition-http.test.mjs \
             scripts/audio-prepare.ts scripts/audio-prepare-cache.test.ts compose.yaml \
-            .github/workflows/ci.yml .github/workflows/all-book-recognition.yml \
+            .github/workflows/ci.yml .github/workflows/all-book-recognition.yml .github/workflows/release.yml \
             .github/workflows/sentence-audio-publication.yml .github/workflows/sentence-audio-publication-tools.yml \
             docs/ALL_BOOK_SENSES_AUDIO_013.md README.md CHANGELOG.md docs/DEPLOYMENT.md
           node --check scripts/check-all-book-content-http.mjs
@@ -50,10 +54,62 @@ jobs:
           python3 scripts/select-ci-sentence-audio-publication.test.py
           pnpm exec vitest run scripts/audio-prepare-cache.test.ts
           bash -n scripts/install.sh
+      - name: Smoke the exact release pull gate against the immutable public 0.12 image
+        id: image_smoke
+        if: inputs.image_smoke
+        env:
+          IMAGE_NAME: ghcr.io/wudi000888-svg/nightstudy
+          IMAGE_DIGEST: sha256:884c62d81a69f243f370fa30c3b563ffe6dc4eee776cc9848a2e33380d5b43b5
+          RELEASE_TAG: v0.12.0-alpha.1
+          SOURCE_REVISION: b8cde5bb8283da2f2f0b20daffd86515b9d2270f
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import crypto from 'node:crypto';
+          const source = fs.readFileSync('.github/workflows/release.yml', 'utf8');
+          const lines = source.split('\n');
+          const marker = '      - name: Verify anonymous access to the immutable Linux amd64 release image';
+          if (lines.filter(line => line === marker).length !== 1) throw new Error('exact_release_gate_required');
+          const start = lines.indexOf(marker);
+          const run = lines.findIndex((line, index) => index > start && line === '        run: |');
+          if (run < 0 || run - start > 10) throw new Error('bounded_release_run_block');
+          const body = [];
+          for (const line of lines.slice(run + 1)) {
+            if (line && !line.startsWith('          ')) break;
+            body.push(line.slice(10));
+          }
+          if (body.length < 20 || body.length > 100 || !body.some(line => line.includes('env -u GH_TOKEN -u GITHUB_TOKEN -u DOCKER_AUTH_CONFIG'))) throw new Error('complete_anonymous_gate_required');
+          const script = body.join('\n') + '\n';
+          const sha = value => crypto.createHash('sha256').update(value).digest('hex');
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'nightstudy-release-smoke.sh'), script, { flag: 'wx', mode: 0o700 });
+          fs.writeFileSync(path.join(process.env.RUNNER_TEMP, 'nightstudy-release-smoke-source.json'), JSON.stringify({
+            kind: 'nightstudy-existing-image-gate-smoke-source-v1',
+            workflowSourceSha256: sha(source), extractedBashSha256: sha(script),
+            executingRevision: process.env.GITHUB_SHA,
+            subjectImage: process.env.IMAGE_NAME + '@' + process.env.IMAGE_DIGEST,
+            subjectVersion: process.env.RELEASE_TAG, subjectRevision: process.env.SOURCE_REVISION,
+            new013ImageAcceptance: false, modelUsed: false, applicationStarted: false,
+          }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+          NODE
+          bash -n "$RUNNER_TEMP/nightstudy-release-smoke.sh"
+          bash "$RUNNER_TEMP/nightstudy-release-smoke.sh"
+      - name: Retain the old-image smoke evidence without claiming a new release
+        if: always() && inputs.image_smoke
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: existing-image-gate-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ steps.image_smoke.outputs.receipt }}
+            ${{ runner.temp }}/nightstudy-release-smoke-source.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Preserve exact sources and outcome
         if: always() && steps.format.outcome == 'success'
         env:
           TEST_OUTCOME: ${{ steps.tests.outcome }}
+          IMAGE_SMOKE_OUTCOME: ${{ steps.image_smoke.outcome }}
         run: |
           set -euo pipefail
           stem="ci-publication-tools-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -63,11 +119,11 @@ jobs:
             scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs \
             scripts/check-all-book-recognition-http.mjs scripts/check-all-book-recognition-http.test.mjs \
             scripts/audio-prepare.ts scripts/audio-prepare-cache.test.ts compose.yaml \
-            .github/workflows/ci.yml .github/workflows/all-book-recognition.yml \
+            .github/workflows/ci.yml .github/workflows/all-book-recognition.yml .github/workflows/release.yml \
             .github/workflows/sentence-audio-publication.yml .github/workflows/sentence-audio-publication-tools.yml \
             docs/ALL_BOOK_SENSES_AUDIO_013.md README.md CHANGELOG.md docs/DEPLOYMENT.md
-          jq -n --arg outcome "$TEST_OUTCOME" --arg source "$GITHUB_SHA" \
-            '{kind:"nightstudy-publication-tools-test-v1",outcome:$outcome,source:$source,modelUsed:false,fullInstallerExecuted:false,fullApplicationAcceptancePassed:false}' \
+          jq -n --arg outcome "$TEST_OUTCOME" --arg source "$GITHUB_SHA" --arg imageSmokeOutcome "$IMAGE_SMOKE_OUTCOME" \
+            '{kind:"nightstudy-publication-tools-test-v1",outcome:$outcome,source:$source,imageSmokeOutcome:$imageSmokeOutcome,modelUsed:false,fullInstallerExecuted:false,fullApplicationAcceptancePassed:false}' \
             > "$RUNNER_TEMP/$stem.check.json"
           gh release upload audio-build-batches-014-20261019 --repo "$GITHUB_REPOSITORY" \
             "$RUNNER_TEMP/$stem.sources.tar.gz" "$RUNNER_TEMP/$stem.check.json"

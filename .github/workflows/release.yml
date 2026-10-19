@@ -16,7 +16,9 @@ jobs:
     if: startsWith(github.event.release.tag_name, 'v')
     uses: ./.github/workflows/ci.yml
     permissions:
-      contents: read
+      # The reusable CI declares manual media jobs requiring this ceiling.
+      # Its application verification job explicitly lowers the token to read.
+      contents: write
 
   publish:
     if: startsWith(github.event.release.tag_name, 'v')
@@ -62,6 +64,47 @@ jobs:
           labels: |
             org.opencontainers.image.version=${{ steps.identity.outputs.tag }}
             org.opencontainers.image.revision=${{ github.sha }}
+      - name: Verify anonymous access to the immutable Linux amd64 release image
+        id: anonymous
+        env:
+          IMAGE_NAME: ${{ steps.identity.outputs.image }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          umask 077
+          release_pull_config_dir=$(mktemp -d "$RUNNER_TEMP/nightstudy-release-anonymous-docker.XXXXXX")
+          release_pull_evidence_dir=$(mktemp -d "$RUNNER_TEMP/nightstudy-release-pull-evidence.XXXXXX")
+          printf '{"auths":{}}\n' > "$release_pull_config_dir/config.json"
+          release_pull_reference="$IMAGE_NAME@$IMAGE_DIGEST"
+          env -u GH_TOKEN -u GITHUB_TOKEN -u DOCKER_AUTH_CONFIG \
+            DOCKER_CONFIG="$release_pull_config_dir" \
+            docker pull --platform linux/amd64 "$release_pull_reference"
+          docker image inspect "$release_pull_reference" \
+            --format '{"imageId":{{json .Id}},"os":{{json .Os}},"architecture":{{json .Architecture}},"version":{{json (index .Config.Labels "org.opencontainers.image.version")}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}},"repoDigests":{{json .RepoDigests}}}' \
+            > "$release_pull_evidence_dir/identity.json"
+          jq -e --arg image "$release_pull_reference" --arg version "$RELEASE_TAG" --arg revision "$SOURCE_REVISION" \
+            '.os == "linux" and .architecture == "amd64" and .version == $version and .revision == $revision and
+             (.repoDigests | index($image) != null) and (.imageId | test("^sha256:[a-f0-9]{64}$"))' \
+            "$release_pull_evidence_dir/identity.json" > /dev/null
+          jq --arg image "$release_pull_reference" --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" \
+            '{kind:"nightstudy-release-anonymous-image-pull-v1",state:"VERIFIED_ANONYMOUS_LINUX_AMD64_PULL",
+              image:$image,imageId,version,revision,platform:(.os+"/"+.architecture),runId:$run,runAttempt:$attempt,
+              freshDockerConfig:true,registryCredentialsProvided:false,applicationStarted:false,
+              databaseInitialized:false,productionDeployment:false,otherArchitecturesVerified:false}' \
+            "$release_pull_evidence_dir/identity.json" > "$release_pull_evidence_dir/anonymous-pull.json"
+          printf 'receipt=%s\n' "$release_pull_evidence_dir/anonymous-pull.json" >> "$GITHUB_OUTPUT"
+          printf 'Anonymous pull verified `%s` on `linux/amd64`, version `%s`, revision `%s`. No application or database was started; this is not production deployment or other-architecture acceptance.\n' \
+            "$release_pull_reference" "$RELEASE_TAG" "$SOURCE_REVISION" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain the non-secret anonymous pull receipt
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-anonymous-pull-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.anonymous.outputs.receipt }}
+          if-no-files-found: error
+          retention-days: 30
       - name: Record immutable deployment reference
         env:
           IMAGE_NAME: ${{ steps.identity.outputs.image }}

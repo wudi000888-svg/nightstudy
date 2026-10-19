@@ -23,6 +23,7 @@ on:
           - publication-reuse
           - publication-all
           - recognition-http
+          - release-image-smoke
         default: verify
   workflow_call:
 
@@ -112,9 +113,19 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.audio_mode == 'recognition-http' && github.repository == 'wudi000888-svg/nightstudy'
     uses: ./.github/workflows/all-book-recognition.yml
 
+  release-image-smoke:
+    if: github.event_name == 'workflow_dispatch' && inputs.audio_mode == 'release-image-smoke' && github.repository == 'wudi000888-svg/nightstudy'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/sentence-audio-publication-tools.yml
+    with:
+      image_smoke: true
+
   verify:
     if: github.event_name != 'workflow_dispatch' || inputs.audio_mode == 'verify'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     timeout-minutes: 60
     services:
       postgres:

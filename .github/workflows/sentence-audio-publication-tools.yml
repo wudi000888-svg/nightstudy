@@ -38,7 +38,7 @@ jobs:
             scripts/check-ci-sentence-audio-selected-installer.test.mjs \
             scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs \
             scripts/check-all-book-recognition-http.mjs scripts/check-all-book-recognition-http.test.mjs \
-            scripts/audio-prepare.ts scripts/audio-prepare-cache.test.ts compose.yaml \
+            scripts/audio-prepare.ts scripts/audio-prepare-cache.test.ts scripts/audio-prepare-profile.test.ts compose.yaml \
             .github/workflows/ci.yml .github/workflows/all-book-recognition.yml .github/workflows/release.yml \
             .github/workflows/sentence-audio-publication.yml .github/workflows/sentence-audio-publication-tools.yml \
             docs/ALL_BOOK_SENSES_AUDIO_013.md README.md CHANGELOG.md docs/DEPLOYMENT.md
@@ -52,7 +52,7 @@ jobs:
             scripts/check-ci-sentence-audio-selected-installer.test.mjs \
             scripts/check-all-book-recognition-http.test.mjs
           python3 scripts/select-ci-sentence-audio-publication.test.py
-          pnpm exec vitest run scripts/audio-prepare-cache.test.ts
+          pnpm exec vitest run scripts/audio-prepare-cache.test.ts scripts/audio-prepare-profile.test.ts
           bash -n scripts/install.sh
       - name: Smoke the exact release pull gate against the immutable public 0.12 image
         id: image_smoke
@@ -118,7 +118,7 @@ jobs:
             scripts/check-ci-sentence-audio-selected-installer.test.mjs \
             scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs \
             scripts/check-all-book-recognition-http.mjs scripts/check-all-book-recognition-http.test.mjs \
-            scripts/audio-prepare.ts scripts/audio-prepare-cache.test.ts compose.yaml \
+            scripts/audio-prepare.ts scripts/audio-prepare-cache.test.ts scripts/audio-prepare-profile.test.ts compose.yaml \
             .github/workflows/ci.yml .github/workflows/all-book-recognition.yml .github/workflows/release.yml \
             .github/workflows/sentence-audio-publication.yml .github/workflows/sentence-audio-publication-tools.yml \
             docs/ALL_BOOK_SENSES_AUDIO_013.md README.md CHANGELOG.md docs/DEPLOYMENT.md

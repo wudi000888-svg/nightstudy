@@ -230,7 +230,9 @@ jobs:
             pnpm db:bootstrap
             pnpm content:prepare
             pnpm phonetics:prepare
-            pnpm audio:prepare
+            # Snapshot validation requires all canonical word audio, but full
+            # sentence policy SQL must wait for the meaning/example import.
+            pnpm audio:prepare --words-only
             node scripts/check-audio-install.mjs --snapshot /app/.local/content/bilingual-before.json
           '
           docker compose up --detach --no-build --wait --wait-timeout 1800 app
@@ -244,6 +246,9 @@ jobs:
           docker compose run --rm --no-deps --entrypoint node init scripts/export-admin-credentials.mjs > /tmp/nightstudy-ci-admin.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-ci-admin.json','utf8'));const c=j.credentials[0];if(j.credentials.length!==1||c.username!=='admin'||c.password.length<32)process.exit(1);const r=await fetch('http://127.0.0.1:5198/api/auth/sign-in/username',{method:'POST',headers:{'Content-Type':'application/json',Origin:'http://127.0.0.1:5198'},body:JSON.stringify({username:c.username,password:c.password})});if(r.status!==200)process.exit(1)"
           rm -f /tmp/nightstudy-ci-admin.json
+          # Stable installed logical bytes, not a build peak or volume allocation.
+          docker compose exec -T app du -sb /app/.local/audio > "$RUNNER_TEMP/nightstudy-audio-installed-bytes.tsv"
+          cat "$RUNNER_TEMP/nightstudy-audio-installed-bytes.tsv"
       - name: Check every built-in book and sampled exact sentence audio through HTTP
         env:
           COMPOSE_PROJECT_NAME: nightstudy-ci-${{ github.run_id }}
@@ -253,6 +258,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir "$RUNNER_TEMP/nightstudy-content-acceptance"
+          cp "$RUNNER_TEMP/nightstudy-audio-installed-bytes.tsv" \
+            "$RUNNER_TEMP/nightstudy-content-acceptance/audio-installed-bytes.tsv"
           result=0
           docker compose exec -T app node scripts/check-all-book-content-http.mjs \
             --base-url http://127.0.0.1:3000 --audio-root /app/.local/audio \

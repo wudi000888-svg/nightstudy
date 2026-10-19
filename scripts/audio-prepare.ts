@@ -7,6 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { Client } from 'pg';
 import { z } from 'zod';
 import { readSentenceAudioCollection, sentenceAudioPackId } from './audio-collection.js';
@@ -769,34 +770,62 @@ export async function importSentenceAudioSite(
     await client.end();
   }
 }
+export function audioPreparationOptions(
+  args = process.argv.slice(2),
+  environment: NodeJS.ProcessEnv = process.env,
+) {
+  const { values } = parseArgs({
+    args,
+    options: { 'words-only': { type: 'boolean', default: false } },
+    strict: true,
+    allowPositionals: false,
+  });
+  const profile =
+    environment.AUDIO_PACK || (environment.CONTENT_PACK === 'demo' ? 'none' : 'standard');
+  if (!['none', 'standard'].includes(profile)) throw new Error('invalid_audio_profile');
+  const wordsOnly = values['words-only'];
+  if (wordsOnly && profile !== 'standard') throw new Error('audio_words_only_requires_standard');
+  return {
+    profile,
+    wordsOnly,
+    sourceFiles:
+      profile === 'none'
+        ? []
+        : wordsOnly
+          ? ['word-audio-v2.manifest.json']
+          : [
+              'word-audio-v2.manifest.json',
+              'sentence-audio.manifest.json',
+              'sentence-audio-v2.manifest.json',
+              'sentence-audio-v3.manifest.json',
+            ],
+    includeCollection: profile === 'standard' && !wordsOnly,
+  };
+}
+
 async function main() {
   if (existsSync('.env')) process.loadEnvFile('.env');
-  const profile =
-    process.env.AUDIO_PACK || (process.env.CONTENT_PACK === 'demo' ? 'none' : 'standard');
+  const { profile, wordsOnly, sourceFiles, includeCollection } = audioPreparationOptions();
   if (profile === 'none') {
     console.log(JSON.stringify({ action: 'audio.skipped', profile }));
     return;
   }
-  if (profile !== 'standard') throw new Error('invalid_audio_profile');
   const pronunciationPolicy = loadSentenceAudioPolicy();
   const root = audioCacheRoot();
   await ensureCacheDirectory(root);
   // Preserve the consolidated words and original sentences, then add the static sentence delta.
   // Neither installation downloads a voice model or invokes a speech engine.
   const sources: unknown[] = [];
-  for (const filename of [
-    'word-audio-v2.manifest.json',
-    'sentence-audio.manifest.json',
-    'sentence-audio-v2.manifest.json',
-    'sentence-audio-v3.manifest.json',
-  ]) {
+  for (const filename of sourceFiles) {
     sources.push(JSON.parse(await fs.readFile(path.join('data', filename), 'utf8')));
   }
   const collectionFile = path.join('data', 'sentence-audio-v4.collection.json');
-  if (existsSync(collectionFile))
+  if (includeCollection && existsSync(collectionFile))
     sources.push(...(await readSentenceAudioCollection(collectionFile)).pins);
   // Validate every pin before downloading or changing any site.
   const parsedSources = sources.map((source) => packSource.parse(source));
+  if (wordsOnly && (parsedSources.length !== 1 || parsedSources[0]?.id !== 'word-audio-v2'))
+    throw new Error('audio_words_only_source_mismatch');
   for (const source of parsedSources) {
     const manifest = await installAudioFiles(source);
     for (const site of readConfig().sites) {

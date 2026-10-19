@@ -1,0 +1,36 @@
+{
+  "kind": "nightstudy-ci-audio-build-inputs-v1",
+  "mode": "batch",
+  "portableControls": {
+    "fileName": ".ci-audio-inputs/pronunciation-controls-014.json",
+    "bytes": 8216309,
+    "sha256": "3b7f791260a3d7490f89304c58afab7bc062a092271f67c2aa4a9b4c4cd367c7"
+  },
+  "supplementalControls": {
+    "fileName": ".ci-audio-inputs/pronunciation-supplement-014.json",
+    "bytes": 4855,
+    "sha256": "61a312342cf9de263e2eb232c6b8feba108b1d9d5da6d1c9bf7940889000bf81"
+  },
+  "approvedPilot": {
+    "fileName": ".ci-audio-inputs/approved-pilot.check.json",
+    "bytes": 12250,
+    "sha256": "0fa7270c6bee04ccc3641fdb4f9e4bdc24fdc113b19353c31df456984fdfa2bb"
+  },
+  "firstJobGroups": 256,
+  "groupsPerJob": 1000,
+  "workers": 4,
+  "firstPackOrdinal": 101,
+  "blockedKeys": [],
+  "baseline": {
+    "textManifest": {
+      "fileName": "data/learning-senses-v1.manifest.json",
+      "bytes": 1116,
+      "sha256": "de8852d30321f4915d93a3ed7d87adb4ef23810249b4bc3537ddedfa9a8d636a"
+    },
+    "audioManifest": {
+      "fileName": "data/sentence-audio-v3.manifest.json",
+      "bytes": 672,
+      "sha256": "96c6752235004e7c5272da44b97eeaa68e5b5965fd14959d508a78a789d4725f"
+    }
+  }
+}

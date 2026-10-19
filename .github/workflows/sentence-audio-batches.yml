@@ -1,0 +1,59 @@
+name: Existing-model sentence audio batches
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: github.repository == 'wudi000888-svg/nightstudy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      INPUT_RELEASE: audio-build-inputs-014-20261019
+      OUTPUT_RELEASE: audio-build-batches-014-20261019
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Verify model-free batch boundary fixtures
+        run: |
+          set -euo pipefail
+          python3 -c 'import sys; assert sys.version_info[:2] == (3, 12)'
+          python3 scripts/ci-sentence-audio-batch.test.py
+      - name: Copy the accepted pilot and frozen text pronunciation decisions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir .ci-audio-inputs
+          for name in pronunciation-controls-014.json pronunciation-supplement-014.json contrasts-frontend-observation-014.json approved-pilot.check.json; do
+            gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+              --pattern "$name" --dir .ci-audio-inputs
+          done
+      - name: Account for every current target and prepare disjoint bounded requests
+        run: |
+          set -euo pipefail
+          /usr/bin/time -v -o "$RUNNER_TEMP/plan-resources.txt" \
+            python3 scripts/prepare-ci-sentence-audio-batch.py \
+            --inputs data/ci-audio-batch-inputs.manifest.json --output .ci-audio-plan
+      - name: Preserve the immutable prepared plan in draft assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test ! -e .ci-audio-plan/planning.sqlite
+          stem="ci-audio-plan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tar -czf "$RUNNER_TEMP/$stem.tar.gz" .ci-audio-plan
+          test "$(stat -c %s "$RUNNER_TEMP/$stem.tar.gz")" -lt 2000000000
+          cp .ci-audio-plan/job-manifest.json "$RUNNER_TEMP/$stem.jobs.json"
+          cp .ci-audio-plan/selection.manifest.json "$RUNNER_TEMP/$stem.selection.json"
+          cp "$RUNNER_TEMP/plan-resources.txt" "$RUNNER_TEMP/$stem.resources.txt"
+          (cd "$RUNNER_TEMP" && sha256sum "$stem.tar.gz" "$stem.jobs.json" "$stem.selection.json" "$stem.resources.txt" > "$stem.sha256")
+          gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            "$RUNNER_TEMP/$stem.tar.gz" "$RUNNER_TEMP/$stem.jobs.json" \
+            "$RUNNER_TEMP/$stem.selection.json" "$RUNNER_TEMP/$stem.resources.txt" "$RUNNER_TEMP/$stem.sha256"
+          printf 'Prepared plan only; no inference or media acceptance: %s\n' "$stem" >> "$GITHUB_STEP_SUMMARY"

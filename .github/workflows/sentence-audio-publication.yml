@@ -41,7 +41,7 @@ jobs:
       - name: Restore the immutable complete plan and exact existing controls
         run: |
           set -euo pipefail
-          case "$SCOPE" in first|all) ;; *) exit 1 ;; esac
+          case "$SCOPE" in first|reuse|all) ;; *) exit 1 ;; esac
           mkdir .ci-audio-inputs .ci-publication
           gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
             --pattern pronunciation-controls-014.json --pattern pronunciation-supplement-014.json \
@@ -71,9 +71,11 @@ jobs:
         id: acceptance
         run: |
           set -euo pipefail
+          first=1
           last=1
           if [[ "$SCOPE" == all ]]; then last=101; fi
-          for ((number=1; number<=last; number++)); do
+          if [[ "$SCOPE" == reuse ]]; then first=4; last=4; fi
+          for ((number=first; number<=last; number++)); do
             python3 scripts/run-ci-sentence-audio-publication.py --slice "$number" \
               --assets .ci-publication/candidate-assets.json \
               --media-assets .ci-publication/existing-media-assets.json

@@ -20,6 +20,7 @@ on:
           - legacy-reuse
           - publication-tools
           - publication-first
+          - publication-reuse
           - publication-all
         default: verify
   workflow_call:
@@ -98,10 +99,18 @@ jobs:
     with:
       scope: all
 
+  sentence-audio-publication-reuse:
+    if: github.event_name == 'workflow_dispatch' && inputs.audio_mode == 'publication-reuse' && github.repository == 'wudi000888-svg/nightstudy'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/sentence-audio-publication.yml
+    with:
+      scope: reuse
+
   verify:
     if: github.event_name != 'workflow_dispatch' || inputs.audio_mode == 'verify'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 60
     services:
       postgres:
         image: postgres:17
@@ -176,6 +185,7 @@ jobs:
           node scripts/check-learning-senses-install.mjs --self-test
       - name: Validate Compose descriptors
         run: |
+          bash -n scripts/install.sh
           cp .env.example .env
           docker compose config --quiet
           docker compose -f compose.yaml -f compose.scale.yaml config --quiet
@@ -207,7 +217,7 @@ jobs:
             pnpm audio:prepare
             node scripts/check-audio-install.mjs --snapshot /app/.local/content/bilingual-before.json
           '
-          docker compose up --detach --no-build --wait --wait-timeout 600 app
+          docker compose up --detach --no-build --wait --wait-timeout 1800 app
           curl --fail --silent http://127.0.0.1:5198/health/ready
           curl --fail --silent http://127.0.0.1:5198/api/v2/dictionary/stats > /tmp/nightstudy-catalog.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-catalog.json','utf8'));if(!j.installedDictionary||j.declaredEntryCount!==770611)process.exit(1)"
@@ -218,6 +228,38 @@ jobs:
           docker compose run --rm --no-deps --entrypoint node init scripts/export-admin-credentials.mjs > /tmp/nightstudy-ci-admin.json
           node --input-type=module -e "import fs from 'node:fs';const j=JSON.parse(fs.readFileSync('/tmp/nightstudy-ci-admin.json','utf8'));const c=j.credentials[0];if(j.credentials.length!==1||c.username!=='admin'||c.password.length<32)process.exit(1);const r=await fetch('http://127.0.0.1:5198/api/auth/sign-in/username',{method:'POST',headers:{'Content-Type':'application/json',Origin:'http://127.0.0.1:5198'},body:JSON.stringify({username:c.username,password:c.password})});if(r.status!==200)process.exit(1)"
           rm -f /tmp/nightstudy-ci-admin.json
+      - name: Check every built-in book and sampled exact sentence audio through HTTP
+        env:
+          COMPOSE_PROJECT_NAME: nightstudy-ci-${{ github.run_id }}
+          NIGHTSTUDY_IMAGE: nightstudy:ci
+          DATABASE_URL: ''
+          PUBLIC_URL: http://127.0.0.1:5198
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/nightstudy-content-acceptance"
+          docker compose exec -T app node scripts/check-all-book-content-http.mjs \
+            --base-url http://127.0.0.1:3000 --audio-root /app/.local/audio \
+            --receipt /app/.local/content/all-book-http.json
+          docker compose cp app:/app/.local/content/all-book-http.json \
+            "$RUNNER_TEMP/nightstudy-content-acceptance/http.json"
+      - name: Exercise all-book bilingual contexts and real browser playback
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/nightstudy-h5-tools" --ignore-scripts --no-audit --no-fund \
+            --save-exact playwright@1.64.1
+          node "$RUNNER_TEMP/nightstudy-h5-tools/node_modules/playwright/cli.js" install --with-deps chromium
+          node scripts/check-all-book-content-h5.mjs \
+            --http-receipt "$RUNNER_TEMP/nightstudy-content-acceptance/http.json" \
+            --playwright-module "$RUNNER_TEMP/nightstudy-h5-tools/node_modules/playwright/index.mjs" \
+            --base-url http://127.0.0.1:5198 --output "$RUNNER_TEMP/nightstudy-content-acceptance/h5"
+      - name: Retain anonymous content acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: all-book-content-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/nightstudy-content-acceptance
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Smoke-test closed translation gateway container
         env:
           COMPOSE_PROJECT_NAME: nightstudy-ci-${{ github.run_id }}

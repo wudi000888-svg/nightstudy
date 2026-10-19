@@ -5,11 +5,15 @@ TASK_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$TASK_ROOT"
 TASK_PORT=${NIGHTSTUDY_HTTP_PORT:-5198}
 TASK_PROJECT=${COMPOSE_PROJECT_NAME:-nightstudy}
+TASK_WAIT=${NIGHTSTUDY_INSTALL_WAIT_SECONDS:-1800}
 if [[ ! "$TASK_PORT" =~ ^[0-9]{1,5}$ ]] || (( 10#$TASK_PORT < 1 || 10#$TASK_PORT > 65535 )); then
   echo 'NIGHTSTUDY_HTTP_PORT must be a valid port.' >&2; exit 1
 fi
 if [[ ! "$TASK_PROJECT" =~ ^[a-z0-9][a-z0-9_-]{0,62}$ ]]; then
   echo 'COMPOSE_PROJECT_NAME must be a valid project name.' >&2; exit 1
+fi
+if [[ ! "$TASK_WAIT" =~ ^[0-9]{1,4}$ ]] || (( 10#$TASK_WAIT < 60 || 10#$TASK_WAIT > 7200 )); then
+  echo 'NIGHTSTUDY_INSTALL_WAIT_SECONDS must be between 60 and 7200.' >&2; exit 1
 fi
 TASK_URL=${PUBLIC_URL:-http://127.0.0.1:$TASK_PORT}
 if [[ "$TASK_URL" == *$'\n'* || "$TASK_URL" == *$'\r'* ]]; then
@@ -34,7 +38,7 @@ fi
 mkdir -p .local/sites .local/admin
 chmod 700 .local/admin
 docker compose config --quiet
-docker compose up --build --detach --wait --wait-timeout 600 app
+docker compose up --build --detach --wait --wait-timeout "$TASK_WAIT" app
 TASK_TEMP=$(mktemp .local/admin/credentials.XXXXXX)
 trap 'rm -f "$TASK_TEMP"' EXIT
 docker compose run --rm --no-deps --entrypoint node init scripts/export-admin-credentials.mjs > "$TASK_TEMP"

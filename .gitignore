@@ -11,6 +11,7 @@ coverage/
 .ci-audio-inputs/
 .ci-audio-plan/
 .ci-publication/
+.cloud-legacy/
 work/
 prisma/generated/
 *.log

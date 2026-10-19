@@ -7,7 +7,7 @@ import { parseArgs } from 'node:util';
 
 const { values } = parseArgs({
   options: Object.fromEntries(
-    ['http-receipt', 'playwright-module', 'output'].map((name) => [name, { type: 'string' }]),
+    ['http-receipt', 'playwright-module', 'base-url', 'output'].map((name) => [name, { type: 'string' }]),
   ),
   strict: true,
 });
@@ -15,22 +15,25 @@ const need = (ok, reason) => {
   if (!ok) throw new Error(reason);
 };
 need(
-  ['http-receipt', 'playwright-module', 'output'].every((name) => values[name]),
+  ['http-receipt', 'playwright-module', 'base-url', 'output'].every((name) => values[name]),
   'explicit_h5_inputs',
 );
 need(process.env.GITHUB_ACTIONS === 'true' && process.platform === 'linux', 'cloud_browser_only');
 const input = fs.readFileSync(values['http-receipt']);
 need(input.length < 4 * 1024 ** 2, 'bounded_http_receipt');
 const prior = JSON.parse(input),
-  base = new URL(prior.baseUrl);
+  checkedBase = new URL(prior.baseUrl),
+  base = new URL(values['base-url']);
 need(
   prior.kind === 'nightstudy-all-book-content-http-v1' &&
     prior.passed === true &&
     prior.anonymous === true &&
     prior.samples.length === 18 &&
     new Set(prior.samples.map((s) => s.bookId)).size === 18 &&
-    base.protocol === 'http:' &&
-    ['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname),
+    [checkedBase, base].every((url) =>
+      url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) &&
+      !url.username && !url.password && !url.search && !url.hash,
+    ) && base.pathname === checkedBase.pathname,
   'real_complete_isolated_http_receipt',
 );
 const out = path.resolve(values.output);
@@ -43,6 +46,8 @@ const receipt = {
   kind: 'nightstudy-all-book-content-h5-v1',
   startedAt: new Date().toISOString(),
   httpReceiptSha256: crypto.createHash('sha256').update(input).digest('hex'),
+  browserBaseUrl: base.href,
+  checkedApplicationBaseUrl: checkedBase.href,
   anonymous: true,
   browser: 'Chromium',
   checks: [],

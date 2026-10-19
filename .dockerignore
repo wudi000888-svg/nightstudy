@@ -1,6 +1,10 @@
 .git
 .github
 .local
+.ci-audio-inputs
+.ci-audio-plan
+.ci-publication
+.cloud-legacy
 node_modules
 **/node_modules
 **/dist

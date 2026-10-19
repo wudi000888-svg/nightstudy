@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       audio_mode:
-        description: Application checks, existing-model audio pilot, or model-free full batch plan
+        description: Application checks, existing-model pilot, complete plan, or first bounded audio batch
         type: choice
-        options: [verify, pilot, batch-plan]
+        options: [verify, pilot, batch-plan, batch-first]
         default: verify
   workflow_call:
 
@@ -32,6 +32,12 @@ jobs:
     permissions:
       contents: write
     uses: ./.github/workflows/sentence-audio-batches.yml
+
+  sentence-audio-first:
+    if: github.event_name == 'workflow_dispatch' && inputs.audio_mode == 'batch-first' && github.repository == 'wudi000888-svg/nightstudy'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/sentence-audio-generate.yml
 
   verify:
     if: github.event_name != 'workflow_dispatch' || inputs.audio_mode == 'verify'

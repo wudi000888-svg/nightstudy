@@ -1,0 +1,178 @@
+name: Generate selected existing-model sentence audio
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  select:
+    if: github.repository == 'wudi000888-svg/nightstudy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.selection.outputs.matrix }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Verify model-free batch and packaging boundaries
+        run: |
+          set -euo pipefail
+          python3 scripts/ci-sentence-audio-batch.test.py
+          python3 scripts/check-ci-sentence-audio-batch.test.py
+          python3 scripts/prepare-ci-sentence-audio-run.test.py
+          python3 scripts/assemble-ci-sentence-audio.test.py
+      - name: Copy the fixed prepared plan
+        run: |
+          set -euo pipefail
+          release=$(jq -er .release data/ci-audio-batch-plan.manifest.json)
+          asset=$(jq -er .archive.fileName data/ci-audio-batch-plan.manifest.json)
+          gh release download "$release" --repo "$GITHUB_REPOSITORY" \
+            --pattern "$asset" --dir "$RUNNER_TEMP"
+      - name: Restore and verify the complete prepared plan before selecting first batch
+        id: selection
+        run: |
+          set -euo pipefail
+          asset=$(jq -er .archive.fileName data/ci-audio-batch-plan.manifest.json)
+          python3 scripts/prepare-ci-sentence-audio-run.py \
+            --archive "$RUNNER_TEMP/$asset" --scope first --github-output "$GITHUB_OUTPUT"
+
+  generate:
+    needs: select
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      NUMEXPR_NUM_THREADS: '1'
+      VECLIB_MAXIMUM_THREADS: '1'
+      HF_HUB_OFFLINE: '1'
+      TRANSFORMERS_OFFLINE: '1'
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      INPUT_RELEASE: audio-build-inputs-014-20261019
+      OUTPUT_RELEASE: audio-build-batches-014-20261019
+      PACK_ID: ${{ matrix.packId }}
+      REQUEST_FILE: ${{ matrix.requestFile }}
+      REQUEST_SHA: ${{ matrix.requestSha256 }}
+      SLICE_NUMBER: ${{ matrix.sliceNumber }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Copy the fixed prepared plan and restore with bounded extraction
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release=$(jq -er .release data/ci-audio-batch-plan.manifest.json)
+          asset=$(jq -er .archive.fileName data/ci-audio-batch-plan.manifest.json)
+          gh release download "$release" --repo "$GITHUB_REPOSITORY" \
+            --pattern "$asset" --dir "$RUNNER_TEMP"
+          python3 scripts/prepare-ci-sentence-audio-run.py \
+            --archive "$RUNNER_TEMP/$asset" --scope first --github-output "$GITHUB_OUTPUT"
+      - name: Prepare isolated pinned CPU runtime
+        run: |
+          set -euo pipefail
+          python3 -c 'import sys; assert sys.version_info[:2] == (3, 12)'
+          python3 -m venv "$RUNNER_TEMP/audio-python"
+          "$RUNNER_TEMP/audio-python/bin/pip" install --no-cache-dir --only-binary=:all: \
+            'https://files.pythonhosted.org/packages/84/81/0112a7d510911f33018dc24023d1655bb772f84a4e95fe7f0180f66bbd17/piper_tts-1.8.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl#sha256=25b4d3f31ff70c8fa7151908e00aaa5650cbdf16bca8fcf21299f3941b89a7d3' \
+            'onnxruntime==1.31.0' 'numpy==2.5.4' 'pathvalidate==3.3.1'
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          ffmpeg -version
+      - name: Copy the existing voices and all exact reviewed controls
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/existing-models"
+          gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.onnx*' --dir "$RUNNER_TEMP/existing-models"
+          mkdir .ci-audio-inputs
+          for name in pronunciation-controls-014.json pronunciation-supplement-014.json contrasts-frontend-observation-014.json approved-pilot.check.json sentence-audio-holds-v1.manifest.json sentence-audio-holds-v1.json; do
+            gh release download "$INPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+              --pattern "$name" --dir .ci-audio-inputs
+          done
+      - name: Generate only the immutable selected batch with four bounded workers
+        id: generation
+        run: |
+          set -euo pipefail
+          /usr/bin/time -v -o "$RUNNER_TEMP/batch-resources.txt" \
+            "$RUNNER_TEMP/audio-python/bin/python" scripts/ci-sentence-audio-batch.py \
+            --request "$REQUEST_FILE" --request-sha256 "$REQUEST_SHA" \
+            --models "$RUNNER_TEMP/existing-models" --output "$RUNNER_TEMP/batch-output" \
+            --ffmpeg "$(command -v ffmpeg)"
+      - name: Independently bind every target and fully decode every audio file
+        id: acceptance
+        run: |
+          set -euo pipefail
+          python3 scripts/check-ci-sentence-audio-batch.py \
+            --request "$REQUEST_FILE" --request-sha256 "$REQUEST_SHA" \
+            --output "$RUNNER_TEMP/batch-output" --ffmpeg "$(command -v ffmpeg)" \
+            --receipt "$RUNNER_TEMP/batch-check.json"
+      - name: Assemble the accepted MP3-only installer archive
+        id: assembly
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/installer-package"
+          check_sha=$(sha256sum "$RUNNER_TEMP/batch-check.json" | cut -d ' ' -f 1)
+          python3 scripts/assemble-ci-sentence-audio.py \
+            --request "$REQUEST_FILE" --request-sha256 "$REQUEST_SHA" \
+            --build-output "$RUNNER_TEMP/batch-output" \
+            --check-receipt "$RUNNER_TEMP/batch-check.json" --check-sha256 "$check_sha" \
+            --policy-manifest .ci-audio-inputs/sentence-audio-holds-v1.manifest.json \
+            --output "$RUNNER_TEMP/installer-package/pack" \
+            --release-url https://github.com/wudi000888-svg/nightstudy/releases/download/media-sentence-v4-014-20261019
+      - name: Exercise the mature bounded installer archive extractor
+        id: unpack
+        run: |
+          set -euo pipefail
+          python3 scripts/audio-extract.py \
+            --archive "$RUNNER_TEMP/installer-package/nightstudy-$PACK_ID.tar.gz" \
+            --output "$RUNNER_TEMP/installer-extracted" > "$RUNNER_TEMP/installer-unpack.json"
+          cat "$RUNNER_TEMP/installer-unpack.json"
+      - name: Preserve immutable build evidence and accepted installer candidates
+        if: always() && steps.generation.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACCEPTANCE_OUTCOME: ${{ steps.acceptance.outcome }}
+          ASSEMBLY_OUTCOME: ${{ steps.assembly.outcome }}
+          UNPACK_OUTCOME: ${{ steps.unpack.outcome }}
+        run: |
+          set -euo pipefail
+          label=unverified
+          members=(batch-output batch-resources.txt)
+          if [[ "$ACCEPTANCE_OUTCOME" == success ]]; then
+            label=verified
+            members+=(batch-check.json)
+          fi
+          stem="ci-audio-batch-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${SLICE_NUMBER}-${label}"
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/$stem.tar.gz" "${members[@]}"
+          test "$(stat -c %s "$RUNNER_TEMP/$stem.tar.gz")" -lt 2000000000
+          cp "$RUNNER_TEMP/batch-output/build-receipt.json" "$RUNNER_TEMP/$stem.build.json"
+          (cd "$RUNNER_TEMP" && sha256sum "$stem.tar.gz" "$stem.build.json" > "$stem.sha256")
+          gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            "$RUNNER_TEMP/$stem.tar.gz" "$RUNNER_TEMP/$stem.build.json" "$RUNNER_TEMP/$stem.sha256"
+          if [[ "$label" == verified ]]; then
+            cp "$RUNNER_TEMP/batch-check.json" "$RUNNER_TEMP/$stem.check.json"
+            gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/$stem.check.json"
+          fi
+          if [[ "$ASSEMBLY_OUTCOME" == success && "$UNPACK_OUTCOME" == success ]]; then
+            cp "$RUNNER_TEMP/installer-unpack.json" "$RUNNER_TEMP/$PACK_ID.unpack.json"
+            gh release upload "$OUTPUT_RELEASE" --repo "$GITHUB_REPOSITORY" \
+              "$RUNNER_TEMP/installer-package/nightstudy-$PACK_ID.tar.gz" \
+              "$RUNNER_TEMP/installer-package/$PACK_ID.manifest.json" \
+              "$RUNNER_TEMP/installer-package/$PACK_ID.assembly.json" "$RUNNER_TEMP/$PACK_ID.unpack.json"
+          fi
+          printf 'Selected slice %s: generation check %s; installer assembly %s. Whole release remains unapproved.\n' \
+            "$SLICE_NUMBER" "$label" "$ASSEMBLY_OUTCOME" >> "$GITHUB_STEP_SUMMARY"

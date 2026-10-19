@@ -48,4 +48,4 @@ export function localDate(value: Date, timeZone = 'Asia/Shanghai'): string {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-export const appVersion = '0.12.0-alpha.1';
+export const appVersion = '0.13.0-alpha.1';

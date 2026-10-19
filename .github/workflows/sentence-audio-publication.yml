@@ -36,6 +36,7 @@ jobs:
           python3 scripts/select-ci-sentence-audio-publication.test.py
           python3 scripts/prepare-ci-sentence-audio-publication.test.py
           python3 scripts/finalize-ci-sentence-audio-collection.test.py
+          python3 scripts/prepare-ci-sentence-audio-global.test.py
           python3 -m py_compile scripts/run-ci-sentence-audio-publication.py
       - name: Restore the immutable complete plan and exact existing controls
         run: |
@@ -60,8 +61,8 @@ jobs:
       - name: Freeze exact release asset identities and enforce the draft boundary
         run: |
           set -euo pipefail
-          candidate_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$CANDIDATE_RELEASE" --jq .id)
-          media_id=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$MEDIA_RELEASE" --jq 'if .draft then .id else error("media release must remain a draft") end')
+          candidate_id=$(gh release view "$CANDIDATE_RELEASE" --repo "$GITHUB_REPOSITORY" --json databaseId --jq .databaseId)
+          media_id=$(gh release view "$MEDIA_RELEASE" --repo "$GITHUB_REPOSITORY" --json databaseId,isDraft --jq 'if .isDraft then .databaseId else error("media release must remain a draft") end')
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases/$candidate_id/assets?per_page=100" \
             --jq 'add' > .ci-publication/candidate-assets.json
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases/$media_id/assets?per_page=100" \
@@ -77,6 +78,40 @@ jobs:
               --assets .ci-publication/candidate-assets.json \
               --media-assets .ci-publication/existing-media-assets.json
           done
+      - name: Rehash the immutable legacy archives and retain only their metadata
+        if: inputs.scope == 'all'
+        run: |
+          set -euo pipefail
+          mkdir .cloud-legacy
+          for name in sentence-audio.manifest.json sentence-audio-v2.manifest.json sentence-audio-v3.manifest.json; do
+            descriptor="data/$name"
+            id=$(jq -er .id "$descriptor")
+            url=$(jq -er .source.url "$descriptor")
+            bytes=$(jq -er .source.sizeBytes "$descriptor")
+            checksum=$(jq -er .source.sha256 "$descriptor")
+            archive="$RUNNER_TEMP/$id.tar.gz"
+            curl --fail --location --silent --show-error --retry 2 --max-time 600 \
+              --max-filesize "$bytes" "$url" --output "$archive"
+            test "$(stat -c %s "$archive")" -eq "$bytes"
+            printf '%s  %s\n' "$checksum" "$archive" | sha256sum --check --status
+            tar -xOf "$archive" manifest.json > ".cloud-legacy/$id.manifest.json"
+            tar -xOf "$archive" sources.manifest.json > ".cloud-legacy/$id.sources.manifest.json"
+            rm "$archive"
+          done
+      - name: Independently close all current examples, audio and unavailability decisions
+        if: inputs.scope == 'all'
+        id: global
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare-ci-sentence-audio-global.py --output .ci-publication/global-inventory.json
+          python3 scripts/finalize-ci-sentence-audio-collection.py \
+            --inventory .ci-publication/global-inventory.json --output .ci-publication/final
+          stem="ci-publication-global-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tar -C .ci-publication/final -czf "$RUNNER_TEMP/$stem.tar.gz" .
+          cp .ci-publication/final/completion.json "$RUNNER_TEMP/$stem.completion.json"
+          gh release upload "$MEDIA_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            "$RUNNER_TEMP/$stem.tar.gz" "$RUNNER_TEMP/$stem.completion.json"
+          printf 'Full 101-pack metadata closure passed. Draft remains unpublished; anonymous fetch and cold database checks still required.\n' >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve stage state without publishing a release
         if: always()
         env:

@@ -75,7 +75,13 @@ function check(code, condition) {
   receipt.checks.push({ code, passed: !!condition });
   need(condition, code);
 }
-const normalize = (s) => s.replace(/\\r\\n/g, '\n').replace(/\\[rn]/g, '\n').normalize('NFKC').replace(/\s+/gu, ' ').trim();
+const normalize = (s) =>
+  s
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\[rn]/g, '\n')
+    .normalize('NFKC')
+    .replace(/\s+/gu, ' ')
+    .trim();
 const equal = (actual, expected) => normalize(actual) === normalize(expected);
 async function setup(options) {
   const context = await browser.newContext({
@@ -139,7 +145,7 @@ async function exactContext(detail, sample, index) {
 async function exactMeaning(detail, sample) {
   const meaning = detail.locator('.study-meaning-browser');
   const disclosures = meaning.locator('.bilingual-definition details.definition-disclosure');
-  for (let index = 0; index < await disclosures.count(); index++) {
+  for (let index = 0; index < (await disclosures.count()); index++) {
     const disclosure = disclosures.nth(index);
     if (!(await disclosure.evaluate((element) => element.open)))
       await disclosure.locator('summary .definition-toggle').click();
@@ -148,13 +154,26 @@ async function exactMeaning(detail, sample) {
   const chinese = meaning.locator('.bilingual-definition p.meaning-zh');
   await english.waitFor({ state: 'visible' });
   await chinese.waitFor({ state: 'visible' });
-  check('new_book_sample_english_definition', equal(await english.innerText(), sample.definitionEn));
-  check('new_book_sample_chinese_definition', equal(await chinese.innerText(), sample.definitionZh));
-  const shownPos = normalize(await meaning.locator('.study-meaning-topline .sense-pos').innerText());
+  check(
+    'new_book_sample_english_definition',
+    equal(await english.innerText(), sample.definitionEn),
+  );
+  check(
+    'new_book_sample_chinese_definition',
+    equal(await chinese.innerText(), sample.definitionZh),
+  );
+  const shownPos = normalize(
+    await meaning.locator('.study-meaning-topline .sense-pos').innerText(),
+  );
   const posParts = shownPos.split(' · ');
-  check('new_book_sample_part_of_speech', !!sample.pos.trim() &&
-    (shownPos === sample.pos.trim() || (posParts.length === 2 &&
-      posParts[0].toLowerCase() === normalize(sample.lemma).toLowerCase() && posParts[1] === sample.pos.trim())));
+  check(
+    'new_book_sample_part_of_speech',
+    !!sample.pos.trim() &&
+      (shownPos === sample.pos.trim() ||
+        (posParts.length === 2 &&
+          posParts[0].toLowerCase() === normalize(sample.lemma).toLowerCase() &&
+          posParts[1] === sample.pos.trim())),
+  );
 }
 async function layout(page, name) {
   check(
@@ -163,42 +182,80 @@ async function layout(page, name) {
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
     ),
   );
-  const measurements = await page.getByRole('region', { name: '词条详情', exact: true }).evaluate((entry) => {
-    const screen = entry.closest('.h5-screen-content');
-    const active = entry.closest('.h5-screen');
-    if (!screen || !active || active.hidden || active.dataset.screenActive === 'false')
-      return { validScreen: false, containers: [], controls: [] };
-    const viewport = window.visualViewport;
-    const left = viewport?.offsetLeft ?? 0, right = left + (viewport?.width ?? window.innerWidth);
-    const top = viewport?.offsetTop ?? 0, bottom = top + (viewport?.height ?? window.innerHeight);
-    const bounds = screen.getBoundingClientRect(), clipLeft = Math.max(left, bounds.left), clipRight = Math.min(right, bounds.right);
-    const visible = (node) => {
-      const rect = node.getBoundingClientRect(), style = getComputedStyle(node);
-      return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' &&
-        !node.closest('[hidden],[inert]');
-    };
-    // These are normal-flow content containers, not the intentionally scrollable
-    // sense directory/tabs or clamped text previews. Never test every descendant.
-    const nodes = [screen, entry, ...entry.querySelectorAll('.study-meaning-browser,.study-context-body,.study-context-sentence')];
-    const containers = nodes.filter(visible).map((node) => {
-      const rect = node.getBoundingClientRect();
-      return { name: node.className, horizontalContentFits: node.scrollWidth <= node.clientWidth + 2,
-        horizontalBoundsFit: rect.left >= clipLeft - 2 && rect.right <= clipRight + 2 };
-    });
-    const controls = [...entry.querySelectorAll('.study-meaning-controls button,.study-context-arrows button,.sentence-audio-controls button,.word-header-action')]
-      .filter(visible).filter((node) => {
+  const measurements = await page
+    .getByRole('region', { name: '词条详情', exact: true })
+    .evaluate((entry) => {
+      const screen = entry.closest('.h5-screen-content');
+      const active = entry.closest('.h5-screen');
+      if (!screen || !active || active.hidden || active.dataset.screenActive === 'false')
+        return { validScreen: false, containers: [], controls: [] };
+      const viewport = window.visualViewport;
+      const left = viewport?.offsetLeft ?? 0,
+        right = left + (viewport?.width ?? window.innerWidth);
+      const top = viewport?.offsetTop ?? 0,
+        bottom = top + (viewport?.height ?? window.innerHeight);
+      const bounds = screen.getBoundingClientRect(),
+        clipLeft = Math.max(left, bounds.left),
+        clipRight = Math.min(right, bounds.right);
+      const visible = (node) => {
+        const rect = node.getBoundingClientRect(),
+          style = getComputedStyle(node);
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          !node.closest('[hidden],[inert]')
+        );
+      };
+      // These are normal-flow content containers, not the intentionally scrollable
+      // sense directory/tabs or clamped text previews. Never test every descendant.
+      const nodes = [
+        screen,
+        entry,
+        ...entry.querySelectorAll(
+          '.study-meaning-browser,.study-context-body,.study-context-sentence',
+        ),
+      ];
+      const containers = nodes.filter(visible).map((node) => {
         const rect = node.getBoundingClientRect();
-        return rect.bottom > top && rect.top < bottom;
-      }).map((node) => {
-        const rect = node.getBoundingClientRect();
-        return { name: node.getAttribute('aria-label') || node.className,
-          horizontalBoundsFit: rect.left >= clipLeft - 2 && rect.right <= clipRight + 2 };
+        return {
+          name: node.className,
+          horizontalContentFits: node.scrollWidth <= node.clientWidth + 2,
+          horizontalBoundsFit: rect.left >= clipLeft - 2 && rect.right <= clipRight + 2,
+        };
       });
-    return { validScreen: true, containers, controls };
-  });
-  check(name + '_active_content_containers_fit', measurements.validScreen && measurements.containers.length >= 4 &&
-    measurements.containers.every((entry) => entry.horizontalContentFits && entry.horizontalBoundsFit));
-  check(name + '_visible_controls_fit', measurements.controls.every((entry) => entry.horizontalBoundsFit));
+      const controls = [
+        ...entry.querySelectorAll(
+          '.study-meaning-controls button,.study-context-arrows button,.sentence-audio-controls button,.word-header-action',
+        ),
+      ]
+        .filter(visible)
+        .filter((node) => {
+          const rect = node.getBoundingClientRect();
+          return rect.bottom > top && rect.top < bottom;
+        })
+        .map((node) => {
+          const rect = node.getBoundingClientRect();
+          return {
+            name: node.getAttribute('aria-label') || node.className,
+            horizontalBoundsFit: rect.left >= clipLeft - 2 && rect.right <= clipRight + 2,
+          };
+        });
+      return { validScreen: true, containers, controls };
+    });
+  check(
+    name + '_active_content_containers_fit',
+    measurements.validScreen &&
+      measurements.containers.length >= 4 &&
+      measurements.containers.every(
+        (entry) => entry.horizontalContentFits && entry.horizontalBoundsFit,
+      ),
+  );
+  check(
+    name + '_visible_controls_fit',
+    measurements.controls.every((entry) => entry.horizontalBoundsFit),
+  );
   receipt.layout ??= [];
   receipt.layout.push({ name, ...measurements });
 }
@@ -245,9 +302,12 @@ try {
         const expectedPath = `/api/v2/sentence-audio/${sample.textHash}/audio/${accent}`;
         await page.waitForFunction(
           ({ pathname, after }) =>
-            window.__nightstudyRealPlayback.slice(after).some(
-              (e) => new URL(e.src).pathname.endsWith(pathname) && e.readyState >= 2 && e.duration > 0,
-            ),
+            window.__nightstudyRealPlayback
+              .slice(after)
+              .some(
+                (e) =>
+                  new URL(e.src).pathname.endsWith(pathname) && e.readyState >= 2 && e.duration > 0,
+              ),
           { pathname: expectedPath, after: before },
           { timeout: 30000 },
         );
@@ -273,32 +333,61 @@ try {
   const detail = await open(desktop.page, prior.samples[0]);
   const tokens = detail.locator('.study-context-sentence .word-token');
   const tokenTexts = await tokens.allTextContents();
-  const headwordIndex = tokenTexts.findIndex((text) => normalize(text).toLowerCase() === normalize(prior.samples[0].lemma).toLowerCase());
+  const headwordIndex = tokenTexts.findIndex(
+    (text) => normalize(text).toLowerCase() === normalize(prior.samples[0].lemma).toLowerCase(),
+  );
   const token = tokens.nth(headwordIndex >= 0 ? headwordIndex : 0);
   const queried = await token.innerText();
-  const resolution = desktop.page.waitForResponse((response) => {
-    const url = new URL(response.url());
-    return response.request().method() === 'GET' && url.origin === base.origin &&
-      url.pathname.endsWith('/api/v2/dictionary/resolve') && url.searchParams.get('text') === queried;
-  }, { timeout: 30000 });
+  const resolution = desktop.page.waitForResponse(
+    (response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === 'GET' &&
+        url.origin === base.origin &&
+        url.pathname.endsWith('/api/v2/dictionary/resolve') &&
+        url.searchParams.get('text') === queried
+      );
+    },
+    { timeout: 30000 },
+  );
   await token.hover();
   const response = await resolution;
   const resolved = await response.json();
-  check('desktop_hover_resolves_real_word', response.status() === 200 && resolved.word?.id &&
-    resolved.matchType === 'exact' && normalize(resolved.queried).toLowerCase() === normalize(queried).toLowerCase());
+  check(
+    'desktop_hover_resolves_real_word',
+    response.status() === 200 &&
+      resolved.word?.id &&
+      resolved.matchType === 'exact' &&
+      normalize(resolved.queried).toLowerCase() === normalize(queried).toLowerCase(),
+  );
   const card = desktop.page.getByRole('dialog');
   await card.waitFor({ state: 'visible', timeout: 30000 });
   const content = card.locator('.word-card-quick-content');
   await content.waitFor({ state: 'visible', timeout: 30000 });
   const heading = normalize(await card.locator('.word-card-heading h2').innerText());
-  const definitions = (resolved.word.senses?.length ? resolved.word.senses : resolved.word.dictionarySenses ?? [])
-    .flatMap((sense) => [sense.definitionEn, sense.definitionZh]).filter((value) => typeof value === 'string' && value.trim());
+  const definitions = (
+    resolved.word.senses?.length ? resolved.word.senses : (resolved.word.dictionarySenses ?? [])
+  )
+    .flatMap((sense) => [sense.definitionEn, sense.definitionZh])
+    .filter((value) => typeof value === 'string' && value.trim());
   const actualContent = normalize(await content.innerText());
-  check('desktop_hover_heading_and_resolved_content', heading.length > 0 &&
-    heading.split(' / ').every((value) => value.toLowerCase() === normalize(resolved.word.lemma).toLowerCase()) &&
-    definitions.some((value) => actualContent.includes(normalize(value))) && await content.locator('.word-card-quick-meaning').count() > 0);
-  receipt.desktopHover = { queried, wordId: resolved.word.id, lemma: resolved.word.lemma, heading,
-    realLookupResponse: true, resolvedContentVisible: true };
+  check(
+    'desktop_hover_heading_and_resolved_content',
+    heading.length > 0 &&
+      heading
+        .split(' / ')
+        .every((value) => value.toLowerCase() === normalize(resolved.word.lemma).toLowerCase()) &&
+      definitions.some((value) => actualContent.includes(normalize(value))) &&
+      (await content.locator('.word-card-quick-meaning').count()) > 0,
+  );
+  receipt.desktopHover = {
+    queried,
+    wordId: resolved.word.id,
+    lemma: resolved.word.lemma,
+    heading,
+    realLookupResponse: true,
+    resolvedContentVisible: true,
+  };
   check(
     'hover_card_has_no_recursive_word_triggers',
     (await card.locator('.word-token').count()) === 0,

@@ -114,6 +114,122 @@ jobs:
           gh release upload "$MEDIA_RELEASE" --repo "$GITHUB_REPOSITORY" \
             "$RUNNER_TEMP/$stem.tar.gz" "$RUNNER_TEMP/$stem.completion.json"
           printf 'Full 101-pack metadata closure passed. Draft remains unpublished; anonymous fetch and cold database checks still required.\n' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve the exact public metadata context and immutable plan mirror
+        if: inputs.scope == 'all' && steps.global.outcome == 'success'
+        run: |
+          set -euo pipefail
+          asset=$(jq -er .archive.fileName data/ci-audio-batch-plan.manifest.json)
+          stem="ci-publication-context-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          manifest="$RUNNER_TEMP/$stem.manifest.json"
+          context="$RUNNER_TEMP/$stem.tar.gz"
+          python3 - "$RUNNER_TEMP/$asset" "$manifest" "$context" <<'PY'
+          import gzip, hashlib, io, json, os, re, stat, sys, tarfile
+          from pathlib import Path
+          root = Path.cwd().resolve()
+          identities = []
+          def need(ok, reason):
+              if not ok: raise ValueError(reason)
+          def signature(value):
+              return value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns
+          def take(file, logical_name, cap, expected=None, capture=True):
+              file = Path(file).absolute()
+              need(file.resolve(strict=True) == file, 'context_real_regular_input')
+              fd = os.open(file, os.O_RDONLY | os.O_NOFOLLOW)
+              try:
+                  before = os.fstat(fd)
+                  need(stat.S_ISREG(before.st_mode) and 0 < before.st_size <= cap, 'context_input_bounds')
+                  digest, parts, remaining = hashlib.sha256(), [], before.st_size
+                  while remaining:
+                      block = os.read(fd, min(remaining, 65536))
+                      need(block, 'context_input_truncated')
+                      digest.update(block)
+                      if capture: parts.append(block)
+                      remaining -= len(block)
+                  need(not os.read(fd, 1) and signature(before) == signature(os.fstat(fd)) == signature(os.lstat(file)), 'context_input_changed')
+                  pin = dict(fileName=logical_name, bytes=before.st_size, sha256=digest.hexdigest())
+                  need(expected is None or pin == expected, 'context_pin_must_equal_verified_inventory')
+                  identities.append((file, signature(before)))
+                  return pin, b''.join(parts) if capture else None
+              finally: os.close(fd)
+          def document(name, cap=1048576, expected=None):
+              pin, raw = take(root / name, name, cap, expected)
+              return pin, json.loads(raw)
+          inventory_pin, inventory = document('.ci-publication/global-inventory.json', 2 * 1048576)
+          completion_pin, completion = document('.ci-publication/final/completion.json', 2 * 1048576)
+          need(completion['kind'] == 'nightstudy-ci-audio-global-publication-closure-v1' and
+               completion['state'] == 'COMPLETE_METADATA_REQUIRES_ANONYMOUS_FETCH_AND_COLD_DB' and
+               completion['counts']['pairs'] == 199880 and completion['publicationAuthorized'] is False,
+               'context_requires_actual_complete_global_closure')
+          need(inventory['kind'] == 'nightstudy-ci-audio-global-publication-inventory-v1' and
+               inventory['publicRoot']['sha256'] == completion['publicRootSha256'] and
+               inventory['mediaReleaseUrl'] == 'https://github.com/' + os.environ['GITHUB_REPOSITORY'] +
+                   '/releases/download/' + os.environ['MEDIA_RELEASE'], 'context_same_completed_public_root_and_release')
+          _, prepared = document('data/ci-audio-batch-plan.manifest.json', expected=inventory['planManifest'])
+          _, configuration = document('data/ci-audio-batch-inputs.manifest.json', 65536)
+          _, selection = document(prepared['selection']['fileName'], expected=prepared['selection'])
+          need(selection['approvedPilot'] == configuration['approvedPilot'], 'context_same_verified_pilot')
+          expected = {
+              '.ci-audio-inputs/pronunciation-controls-014.json': inventory['controls']['base'],
+              '.ci-audio-inputs/pronunciation-supplement-014.json': inventory['controls']['supplement'],
+              '.ci-audio-inputs/contrasts-frontend-observation-014.json': inventory['controls']['observation'],
+              '.ci-audio-inputs/approved-pilot.check.json': configuration['approvedPilot'],
+              '.ci-audio-inputs/sentence-audio-holds-v1.manifest.json': inventory['globalHolds']['manifest'],
+              '.ci-audio-inputs/sentence-audio-holds-v1.json': inventory['globalHolds']['payload'],
+              '.ci-audio-inputs/qualification.json': inventory['legacyQualification']['receipt'],
+              '.ci-audio-inputs/approved-selection.json': inventory['legacyQualification']['selection'],
+              '.ci-audio-inputs/legacy-overlap-audit.json': inventory['legacyOverlap'],
+          }
+          files, total = [], 0
+          for name, declared in expected.items():
+              pin, raw = take(root / name, name, 16 * 1048576, declared)
+              total += len(raw)
+              need(total <= 16 * 1048576, 'context_nine_json_total_bounds')
+              files.append((pin, raw))
+          archive_name = prepared['archive']['fileName']
+          need(re.fullmatch(r'[A-Za-z0-9._-]+\.tar\.gz', archive_name) and Path(sys.argv[1]).name == archive_name,
+               'context_exact_original_plan_basename')
+          plan_pin, _ = take(sys.argv[1], archive_name, 128 * 1048576, prepared['archive'], False)
+          value = dict(kind='nightstudy-ci-audio-public-metadata-context-v1', state='COMPLETE_GLOBAL_METADATA_CONTEXT_ONLY',
+              publicRootSha256=completion['publicRootSha256'], finalPolicySha256=completion['finalPolicySha256'],
+              globalInventory=inventory_pin, globalCompletion=completion_pin, files=[pin for pin, _ in files],
+              planMirror=dict(**plan_pin, url=inventory['mediaReleaseUrl'] + '/' + archive_name,
+                  originalRelease=prepared['release']), tarMemberCount=10,
+              limitations=['Public metadata and published MP3 integrity can be independently checked.',
+                  'Original WAVs and all private historical authoring evidence are not published here.',
+                  'This is not a claim of full acoustic certification or bit-identical speech regeneration.'],
+              modelsIncluded=False, mediaIncluded=False, publicationAuthorized=False)
+          manifest_raw = (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False) + '\n').encode('utf-8')
+          need(len(manifest_raw) <= 128 * 1024, 'context_manifest_bounds')
+          for file, before in identities:
+              need(signature(os.lstat(file)) == before and file.resolve() == file, 'context_final_input_changed')
+          with Path(sys.argv[2]).open('xb') as output: output.write(manifest_raw)
+          members = [(pin['fileName'], raw) for pin, raw in files] + [('public-context.manifest.json', manifest_raw)]
+          need(len(members) == 10 and len({name for name, _ in members}) == 10, 'context_exact_ten_regular_members')
+          with Path(sys.argv[3]).open('xb') as raw_output:
+              with gzip.GzipFile(filename='', mode='wb', fileobj=raw_output, mtime=0) as zipped:
+                  with tarfile.open(fileobj=zipped, mode='w|', format=tarfile.USTAR_FORMAT) as archive:
+                      for name, raw in members:
+                          info = tarfile.TarInfo(name)
+                          info.size, info.mode, info.mtime, info.uid, info.gid = len(raw), 0o644, 0, 0, 0
+                          archive.addfile(info, io.BytesIO(raw))
+          need(Path(sys.argv[3]).stat().st_size <= 16 * 1048576, 'context_archive_bounds')
+          PY
+          bytes=$(jq -er .archive.bytes data/ci-audio-batch-plan.manifest.json)
+          checksum=$(jq -er .archive.sha256 data/ci-audio-batch-plan.manifest.json)
+          matches=$(jq --arg name "$asset" '[.[] | select(.name == $name)] | length' .ci-publication/existing-media-assets.json)
+          upload=()
+          if [[ "$matches" == 0 ]]; then
+            upload+=("$RUNNER_TEMP/$asset")
+          else
+            jq -e --arg name "$asset" --arg checksum "sha256:$checksum" --argjson bytes "$bytes" \
+              '[.[] | select(.name == $name)] as $a | ($a | length) == 1 and $a[0].size == $bytes and $a[0].digest == $checksum' \
+              .ci-publication/existing-media-assets.json > /dev/null
+          fi
+          gh release view "$MEDIA_RELEASE" --repo "$GITHUB_REPOSITORY" --json isDraft \
+            --jq 'if .isDraft then true else error("context release must remain a draft") end' > /dev/null
+          gh release upload "$MEDIA_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            "${upload[@]}" "$manifest" "$context"
+          printf 'Published metadata context and exact plan mirror are staged in the unpublished draft. Original WAV/private-history and bit-identical regeneration are not claimed.\n' >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve stage state without publishing a release
         if: always()
         env:

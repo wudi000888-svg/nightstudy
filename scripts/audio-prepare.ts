@@ -167,7 +167,11 @@ export async function releaseInstalledAudioArchive(
     if (!folder.isDirectory() || folder.isSymbolicLink())
       throw new Error('audio_archive_cleanup_directory_invalid');
     const before = await fs.lstat(archive, { bigint: true });
-    if (!before.isFile() || before.isSymbolicLink() || before.size !== BigInt(source.source.sizeBytes))
+    if (
+      !before.isFile() ||
+      before.isSymbolicLink() ||
+      before.size !== BigInt(source.source.sizeBytes)
+    )
       throw new Error('audio_archive_cleanup_file_invalid');
     const checksum = await fileHash(archive);
     const after = await fs.lstat(archive, { bigint: true });
@@ -177,7 +181,8 @@ export async function releaseInstalledAudioArchive(
       identity(before) !== identity(after) ||
       !currentFolder.isDirectory() ||
       currentFolder.isSymbolicLink() ||
-      folder.dev !== currentFolder.dev || folder.ino !== currentFolder.ino
+      folder.dev !== currentFolder.dev ||
+      folder.ino !== currentFolder.ino
     )
       throw new Error('audio_archive_cleanup_unverified');
     await fs.unlink(archive);

@@ -48,7 +48,9 @@ describe('pinned audio archive installation and filesystem cache recovery', () =
     python: string,
     cache: string,
     source: PackSource;
-  let originalCache: string | undefined, originalPython: string | undefined, originalRetain: string | undefined;
+  let originalCache: string | undefined,
+    originalPython: string | undefined,
+    originalRetain: string | undefined;
   let network: ReturnType<typeof rejectNetwork>;
   const tone = pcmTone(),
     toneHash = sha256(tone),
@@ -244,24 +246,34 @@ describe('pinned audio archive installation and filesystem cache recovery', () =
     fs.copyFileSync(archive, cachedArchive);
     const marker = path.join(cache, 'audio-v1.manifest.json');
     const markerInode = fs.statSync(marker).ino;
-    const removal = vi.spyOn(fsp, 'unlink').mockRejectedValue(Object.assign(new Error('denied'), { code: 'EACCES' }));
+    const removal = vi
+      .spyOn(fsp, 'unlink')
+      .mockRejectedValue(Object.assign(new Error('denied'), { code: 'EACCES' }));
     try {
       await expect(installAudioFiles(source)).rejects.toThrow('audio_archive_cleanup_failed');
       expect(fs.statSync(marker).ino).toBe(markerInode);
       expect(fs.existsSync(cachedArchive)).toBe(true);
       expect(fs.readFileSync(path.join(cache, fileKey))).toEqual(tone);
       expect(removal).toHaveBeenCalledTimes(1);
-    } finally { removal.mockRestore(); }
+    } finally {
+      removal.mockRestore();
+    }
     await installAudioFiles(source);
     expect(fs.existsSync(cachedArchive)).toBe(false);
   }, 120000);
 });
 
 describe('verified archive release uses only the current immutable cache leaf', () => {
-  const archiveBytes = Buffer.from('Original tiny archive-cache fixture; no audio or real archive.');
+  const archiveBytes = Buffer.from(
+    'Original tiny archive-cache fixture; no audio or real archive.',
+  );
   const source: Parameters<typeof releaseInstalledAudioArchive>[0] = {
     id: 'sentence-audio-v4-0101',
-    source: { url: 'https://example.test/not-downloaded.tar.gz', sha256: sha256(archiveBytes), sizeBytes: archiveBytes.length },
+    source: {
+      url: 'https://example.test/not-downloaded.tar.gz',
+      sha256: sha256(archiveBytes),
+      sizeBytes: archiveBytes.length,
+    },
   };
   let directory: string, archive: string, other: string;
   let originalCache: string | undefined, originalRetain: string | undefined;
@@ -271,61 +283,99 @@ describe('verified archive release uses only the current immutable cache leaf', 
     fs.mkdirSync(path.join(directory, 'downloads'));
     archive = path.join(directory, 'downloads', source.id + '.tar.gz');
     other = path.join(directory, 'downloads/sentence-audio-v4-0102.tar.gz');
-    fs.writeFileSync(archive, archiveBytes); fs.writeFileSync(other, 'another package');
+    fs.writeFileSync(archive, archiveBytes);
+    fs.writeFileSync(other, 'another package');
     for (const name of ['files', 'licenses']) fs.mkdirSync(path.join(directory, name));
     fs.writeFileSync(path.join(directory, 'files/ready.mp3'), 'installed media sentinel');
     fs.writeFileSync(path.join(directory, 'licenses/NOTICE.txt'), 'retained license sentinel');
-    fs.writeFileSync(path.join(directory, source.id + '.manifest.json'), 'retained marker sentinel');
-    fs.writeFileSync(path.join(directory, source.id + '.sources.manifest.json'), 'retained source sentinel');
-    originalCache = process.env.AUDIO_CACHE_DIR; originalRetain = process.env.AUDIO_RETAIN_ARCHIVES;
-    process.env.AUDIO_CACHE_DIR = directory; delete process.env.AUDIO_RETAIN_ARCHIVES;
+    fs.writeFileSync(
+      path.join(directory, source.id + '.manifest.json'),
+      'retained marker sentinel',
+    );
+    fs.writeFileSync(
+      path.join(directory, source.id + '.sources.manifest.json'),
+      'retained source sentinel',
+    );
+    originalCache = process.env.AUDIO_CACHE_DIR;
+    originalRetain = process.env.AUDIO_RETAIN_ARCHIVES;
+    process.env.AUDIO_CACHE_DIR = directory;
+    delete process.env.AUDIO_RETAIN_ARCHIVES;
     network = rejectNetwork();
   });
   afterEach(() => {
-    try { expect(network).not.toHaveBeenCalled(); }
-    finally {
+    try {
+      expect(network).not.toHaveBeenCalled();
+    } finally {
       network.mockRestore();
-      if (originalCache === undefined) delete process.env.AUDIO_CACHE_DIR; else process.env.AUDIO_CACHE_DIR = originalCache;
-      if (originalRetain === undefined) delete process.env.AUDIO_RETAIN_ARCHIVES; else process.env.AUDIO_RETAIN_ARCHIVES = originalRetain;
+      if (originalCache === undefined) delete process.env.AUDIO_CACHE_DIR;
+      else process.env.AUDIO_CACHE_DIR = originalCache;
+      if (originalRetain === undefined) delete process.env.AUDIO_RETAIN_ARCHIVES;
+      else process.env.AUDIO_RETAIN_ARCHIVES = originalRetain;
       fs.rmSync(directory, { recursive: true, force: true });
     }
   });
 
   it('deletes only this verified compressed archive by default and is absent-file idempotent', async () => {
-    await releaseInstalledAudioArchive(source); await releaseInstalledAudioArchive(source);
-    expect(fs.existsSync(archive)).toBe(false); expect(fs.readFileSync(other, 'utf8')).toBe('another package');
-    expect(fs.readFileSync(path.join(directory, 'files/ready.mp3'), 'utf8')).toBe('installed media sentinel');
-    expect(fs.readFileSync(path.join(directory, 'licenses/NOTICE.txt'), 'utf8')).toBe('retained license sentinel');
-    expect(fs.readFileSync(path.join(directory, source.id + '.manifest.json'), 'utf8')).toBe('retained marker sentinel');
-    expect(fs.readFileSync(path.join(directory, source.id + '.sources.manifest.json'), 'utf8')).toBe('retained source sentinel');
+    await releaseInstalledAudioArchive(source);
+    await releaseInstalledAudioArchive(source);
+    expect(fs.existsSync(archive)).toBe(false);
+    expect(fs.readFileSync(other, 'utf8')).toBe('another package');
+    expect(fs.readFileSync(path.join(directory, 'files/ready.mp3'), 'utf8')).toBe(
+      'installed media sentinel',
+    );
+    expect(fs.readFileSync(path.join(directory, 'licenses/NOTICE.txt'), 'utf8')).toBe(
+      'retained license sentinel',
+    );
+    expect(fs.readFileSync(path.join(directory, source.id + '.manifest.json'), 'utf8')).toBe(
+      'retained marker sentinel',
+    );
+    expect(
+      fs.readFileSync(path.join(directory, source.id + '.sources.manifest.json'), 'utf8'),
+    ).toBe('retained source sentinel');
   });
 
   it('retains a cache explicitly for offline maintenance', async () => {
     process.env.AUDIO_RETAIN_ARCHIVES = 'true';
-    await releaseInstalledAudioArchive(source); expect(fs.readFileSync(archive)).toEqual(archiveBytes);
+    await releaseInstalledAudioArchive(source);
+    expect(fs.readFileSync(archive)).toEqual(archiveBytes);
   });
 
   it('rejects an invalid retention flag without deleting its archive', async () => {
     process.env.AUDIO_RETAIN_ARCHIVES = 'yes';
-    await expect(releaseInstalledAudioArchive(source)).rejects.toThrow('invalid_audio_retain_archives');
+    await expect(releaseInstalledAudioArchive(source)).rejects.toThrow(
+      'invalid_audio_retain_archives',
+    );
     expect(fs.readFileSync(archive)).toEqual(archiveBytes);
   });
 
   it('retains same-size wrong bytes rather than deleting a filename match', async () => {
-    const wrong = Buffer.from(archiveBytes); wrong[0] = wrong[0]! ^ 1; fs.writeFileSync(archive, wrong);
-    await expect(releaseInstalledAudioArchive(source)).rejects.toThrow('audio_archive_cleanup_failed');
+    const wrong = Buffer.from(archiveBytes);
+    wrong[0] = wrong[0]! ^ 1;
+    fs.writeFileSync(archive, wrong);
+    await expect(releaseInstalledAudioArchive(source)).rejects.toThrow(
+      'audio_archive_cleanup_failed',
+    );
     expect(fs.readFileSync(archive)).toEqual(wrong);
   });
 
   it('does not follow a compressed archive symlink', async () => {
-    const target = path.join(directory, 'private.tar.gz'); fs.renameSync(archive, target); fs.symlinkSync(target, archive);
-    await expect(releaseInstalledAudioArchive(source)).rejects.toThrow('audio_archive_cleanup_failed');
-    expect(fs.lstatSync(archive).isSymbolicLink()).toBe(true); expect(fs.readFileSync(target)).toEqual(archiveBytes);
+    const target = path.join(directory, 'private.tar.gz');
+    fs.renameSync(archive, target);
+    fs.symlinkSync(target, archive);
+    await expect(releaseInstalledAudioArchive(source)).rejects.toThrow(
+      'audio_archive_cleanup_failed',
+    );
+    expect(fs.lstatSync(archive).isSymbolicLink()).toBe(true);
+    expect(fs.readFileSync(target)).toEqual(archiveBytes);
   });
 
   it('does not follow a downloads directory symlink', async () => {
-    const target = path.join(directory, 'private-downloads'); fs.renameSync(path.dirname(archive), target); fs.symlinkSync(target, path.dirname(archive));
-    await expect(releaseInstalledAudioArchive(source)).rejects.toThrow('audio_archive_cleanup_failed');
+    const target = path.join(directory, 'private-downloads');
+    fs.renameSync(path.dirname(archive), target);
+    fs.symlinkSync(target, path.dirname(archive));
+    await expect(releaseInstalledAudioArchive(source)).rejects.toThrow(
+      'audio_archive_cleanup_failed',
+    );
     expect(fs.readFileSync(path.join(target, path.basename(archive)))).toEqual(archiveBytes);
   });
 });

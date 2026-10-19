@@ -1,0 +1,1191 @@
+{
+  "entries": [
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-aa4ac64a9a409dab466dcd9c06d7d2f8965f80066cfa3a94f656343ae316fe76",
+      "id": "sentence-audio-hold-c50d52fe37a24a11614ef3e7d5084a043071a47d86f89d5e2b3d4c914081a06a",
+      "learningSenseId": "learning-sense-57605832d8928b9494d9f120754423ae022db7bbdbdf05c8e46d97b87bb38b8c",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "sediment四句均为动词，当前弱末节同名词，存在词性尾音范围风险。成功直读的Collins British与Oxford/Cambridge只明确名词，American动词/-ment/不能直接冒称UK区域依据，OED动词及Oxford_2访问失败。保留当前数组待独立UK动词读法核实，不计为已确认正确，也不伪称当前已证明不合法。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The fine particles began to sediment at the bottom of the jar.",
+      "textHash": "0d6240d5d22c9a40bc3c8667e80e111204423883f880250e1f11b903cf6b338c"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-53b2884523f8efe497414e0a7650eaea84fe7fe4d08ccaef550f5d65d4bf0531",
+      "id": "sentence-audio-hold-455dd675f9c926a7c5db1d27f51b4296391a520f6735e70390de64f9726032bd",
+      "learningSenseId": "learning-sense-4d8012e02fd5a68f7b532d930911873ffea94c63fb53517ae2b188f3cdd121a3",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "已审具体借词语境与当前词汇读法有差异，目标地区读法或可编码方案仍待核；仅该句该口音暂留空。 此处patron明确是法语旅店店主。Collins英国单独列法语鼻化读法，未认证可编码的英国借词读法；美国词典对旅店主义允许/peɪtrən/不能跨地区冒证英国。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The inn's patron welcomed the cyclists into the courtyard.",
+      "textHash": "0d901dc1525b67fc7eac4479199d8952e7a08f21c6b85ec331cc9563ff81be07"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-b0839fac2f030ee9e2328cc4d8968b763a6df3dbf90ea25a9be0826fe19b656e",
+      "id": "sentence-audio-hold-104aefe7a5f4b69090fe7b62e890300c7143491db3adc6a9349dc6b0db1b89e5",
+      "learningSenseId": "learning-sense-47df512857fd54897ecbd462a7c8f99d6abf9beffff7126ce367587ffe8f6220",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "完整语境为征税动词 excise，原 ɛksˈaɪz。已读旧0016 UK uncertain 原因：美式税动词后重音有MW依据，Collins英国税名词也许后重音，但仍缺英国征税动词直接区域依据。本次相同公开资料不足以解除该缺口；不硬套切除义或税名词，保留文本并暂停此UK句音。 Sources: https://www.merriam-webster.com/dictionary/excise https://www.collinsdictionary.com/dictionary/english/excise",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The lesson asks why a government might excise a particular product.",
+      "textHash": "0e1376982bcc6d744be32123e6c917bd04e1dfdd159efc1d6d4e707d7691be3e"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-95099177df62ed51ff76debf54fca556aa1ed5e6dfc134f033a14d47c5f2c3a5",
+      "id": "sentence-audio-hold-93ddb6b5db316f5d906b07830fc85189d4bf6cfea0dd4d12af3a4d851e54422e",
+      "learningSenseId": "learning-sense-47df512857fd54897ecbd462a7c8f99d6abf9beffff7126ce367587ffe8f6220",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "历史 regional-evidence uncertain 仍未获准确UK征税动词证据。Collins British只分列税名词和删除动词，税动词读法在American区；Cambridge UK动词也仅切除义，不能拿该证据或美式变体替本次UK征税义背书。暂留空，等待明确义项与口音共同证据。 Sources: https://www.collinsdictionary.com/dictionary/english/excise https://dictionary.cambridge.org/dictionary/english/excise",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The old account says the authorities chose to excise the goods.",
+      "textHash": "26552af147430c206bafecf787b240abb40bff0a466538b631303299a6f9e318"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-5f8fe969242caa162f8271e7aa09e02a09fcb50ca079268683036f0459c49bc1",
+      "id": "sentence-audio-hold-b07692918ed8266245d9d15364678f48305fafefeb84f37785b7f060b977ef3e",
+      "learningSenseId": "learning-sense-aae0ca11dd9603f202d095ff91fa5c86c86c2be46181023678d8a7a0f15450e5",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "sediment四句均为动词，当前弱末节同名词，存在词性尾音范围风险。成功直读的Collins British与Oxford/Cambridge只明确名词，American动词/-ment/不能直接冒称UK区域依据，OED动词及Oxford_2访问失败。保留当前数组待独立UK动词读法核实，不计为已确认正确，也不伪称当前已证明不合法。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The laboratory used the process to sediment fine material from the sample.",
+      "textHash": "282df122483ff25ed9c75f6411dc127e8eaabee86bc187d01d85ff976fed8008"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-863149ae948db6903c79c262a9204621a5d49351386520eefb739231dc0a0aa8",
+      "id": "sentence-audio-hold-6cba806e89675a7d7e8aa10644e3049d333aff2f15e5755cde9878fdb3437e5e",
+      "learningSenseId": "learning-sense-75245964890fa9e43b572fbc5a749a20c4305d3c16b88781af4d0b069aec5dd2",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前imprint名词后主重音与多个专门名词条目的首重音冲突，唯一相反线索是Collins翻译区标记；该矛盾不应被升级为已确认合法名词变体。保留原审计但暂缓这八句UK。 澄清翻译区范围或以明确名词主源作新精确校正并验证；不改动现固定review或US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The port's history left an imprint on its music.",
+      "textHash": "2ec5bb3058fa65ce432f479226fad3f39d6fdc34aef9c7a265997a247ef776f0"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-7bea95edadcfd8a7daf8a24b090ca44c83c3c0991c6a9e5312183ff927f5e015",
+      "id": "sentence-audio-hold-013b64ce5c54068b96c3fdb2136bf147e39c01cfed98088f29cd697b62558108",
+      "learningSenseId": "learning-sense-ee01a7bd7c78c0f77b6003232ea9716d7cc02a900b4429059932dd92b7a6217f",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前首重音且强/eɪt/尾，现有UK专门形容词证据给另一重音；US允许变体不能证明这个UK形容词组合已经审核。是具体词性/地区词汇风险，不等同泛泛缺少听审，也未宣称现串已被证明绝对错误。 取得支持该UK形容词完整组合的主源或新精确校正及小包验证；只解除对应两句UK，不动US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The display included a bifurcate tool with two narrow prongs.",
+      "textHash": "3399218569288a83d578903efe8db600cb560db5aee008a3a8c361c717c1f4d9"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-f79c28bd6ad333496411c786d7baa62580588fad8d6f48b14a7ab4d49a664363",
+      "id": "sentence-audio-hold-4c1a8733615f95780a1cbfe92b6f72567cbff74d098c7b657d7d71edd6215fe8",
+      "learningSenseId": "learning-sense-b7ce78188aeff92ea7c9e15cd08c1e28b3cf97ba257974a13b050d58b2bee352",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "Inc读/ɪŋk/有直接US缩写依据，并非词汇错误已获证明；但本轮UK仍明确pending且未确定该地区公司后缀的缩写朗读策略。列为策略性暂缓候选，不能悄悄把US依据写成UK认证。风险低于entr/Er，根任务可用明确策略另行批准。 明确允许UK声线对公司名缩写沿用已核/ɪŋk/读法，或取得UK直接依据/新核读法；US现合法读法不受影响。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "The fictional company is listed on the card as Harbour Music Inc.",
+      "textHash": "3497ee8ff7d8bbf34dde01dcd5d2c89325f8513c49c3c0172350076764653d49"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-de41b921ff5a9ea028e77d8cc72b76e6848a54625fefd463477f56a4c8ab5662",
+      "id": "sentence-audio-hold-94945134b20eba8cf91230c73085e9bc7ea5b2bb67e6a2657f93a5fc4120e2fd",
+      "learningSenseId": "learning-sense-6212d192faa988a2b0424a9d5e40379ad1be07b67126cd15d405d3a4b5e3d303",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "该精确语境与地区读法的证据尚不足，成品暂留空；不把未证实读法统称为已证错音。 该旧式及物动词很可能以/z/结尾；现已直接取得美式动词证据及英式disused的浊音词干旁证，但尚未取得精确英式未屈折旧动词的直接主词典条目，OED访问失败。保留原串待地区词性复核，不宣称已证错或借美式直接认证英式。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The historical account says the village chose to disuse the old gate.",
+      "textHash": "4ad08bcf69adde5068b95371a348ca798a2b99d236f27e59395213efebfd9cd4"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-f4a9bc24f81114f65a49bb1d31bf4bc10d7991ea28f9450b395a991dfca4000e",
+      "id": "sentence-audio-hold-ce0e0a5b39c4df0006c595ceab1502c7156ebe332fe075657020428330d3c7da",
+      "learningSenseId": "learning-sense-1bc846a0c89ad51e57dfdbd5ff7ba7034d9969a55ef668894106e4c6a84b6e97",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "欧仁苏肖像指French /sy/姓氏，现/suː/不同；本声线法语元音安全读取未核，不借动词合法读法解除暂缓。 Sources: https://www.collinsdictionary.com/dictionary/english/sue",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "A portrait of Sue hung beside the display of nineteenth-century fiction.",
+      "textHash": "5c1c4504f639e0f1c285d7913e6a96bf5007bea8adf39fd41cabc45eadca0407"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-f4a9bc24f81114f65a49bb1d31bf4bc10d7991ea28f9450b395a991dfca4000e",
+      "id": "sentence-audio-hold-f4bd2d428ce81a3a77f67ede0f4b8b8ea3f74e9eeb8549bf92823675c0e20db9",
+      "learningSenseId": "learning-sense-1bc846a0c89ad51e57dfdbd5ff7ba7034d9969a55ef668894106e4c6a84b6e97",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "肖像中的Sue为法国小说家，尚无取得该姓精确US英语读法或已验证法语/y/编码；不能把Susan/suː/当姓氏证据。 Sources: https://www.collinsdictionary.com/dictionary/english/sue",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "A portrait of Sue hung beside the display of nineteenth-century fiction.",
+      "textHash": "5c1c4504f639e0f1c285d7913e6a96bf5007bea8adf39fd41cabc45eadca0407"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-51c8e6f2ba571b25c127b9910ad0a2c19b975b6be1ce4e415b0a957ef95e5e78",
+      "id": "sentence-audio-hold-d905c2427aea4fa2313f654f2bd6278b29ebcc0eca3accdc7a13596a0b4c0ae1",
+      "learningSenseId": "learning-sense-06c693c9f7d53eb29cf16c82e0058ff5796efe4fc3aae5d5c94f50e70ff2678a",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "该精确语境与地区读法的证据尚不足，成品暂留空；不把未证实读法统称为已证错音。 钴的化学符号Co意义已由主出版者条目确认，但没有核到该符号在这两个具体语境中应读全称、字母还是允许co词形的精确主源。不能拿co-前缀或公司Co的合法读音替符号认证；当前串不标为已证错音。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "She placed the card marked Co beside nickel in the periodic table exercise.",
+      "textHash": "5e7c3c487dd591ca7ea54269ffb5ced9b49b0ac1b07c8f08145982ce0cadeb6b"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-51c8e6f2ba571b25c127b9910ad0a2c19b975b6be1ce4e415b0a957ef95e5e78",
+      "id": "sentence-audio-hold-7bcdf6abb9bfc811bf76e88f82292b6ec50c70144e87fdb7efdb3b64b1e568be",
+      "learningSenseId": "learning-sense-06c693c9f7d53eb29cf16c82e0058ff5796efe4fc3aae5d5c94f50e70ff2678a",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "该精确语境与地区读法的证据尚不足，成品暂留空；不把未证实读法统称为已证错音。 钴的化学符号Co意义已由主出版者条目确认，但没有核到该符号在这两个具体语境中应读全称、字母还是允许co词形的精确主源。不能拿co-前缀或公司Co的合法读音替符号认证；当前串不标为已证错音。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "She placed the card marked Co beside nickel in the periodic table exercise.",
+      "textHash": "5e7c3c487dd591ca7ea54269ffb5ced9b49b0ac1b07c8f08145982ce0cadeb6b"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-e88837a773b0aa969ec46b021bc14d7fccc9021273812ac09deecfb3334b76eb",
+      "id": "sentence-audio-hold-8a7c38587ecab0c69d8f7f2ed355761c9897dbe75c64af85e367cd86fcda1cfc",
+      "learningSenseId": "learning-sense-b13c5e9141a25ff9311b45f109a00028ec308043d5fe2ae193270ee84bb2a06c",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "The story introduces the deity Lug. Current common-verb lʌg has no verified British name support; the only distinct primary name pronunciation found is Collins' American lux. Hold until regional name and encodable rendering are resolved. Sources: https://www.collinsdictionary.com/dictionary/english/lug",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The retelling introduces Lug before the contest begins.",
+      "textHash": "5fd6e3da1e87f7791cb9c532c53211791dc99113cf039ee4c26b9617dcd86527"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-e88837a773b0aa969ec46b021bc14d7fccc9021273812ac09deecfb3334b76eb",
+      "id": "sentence-audio-hold-f5c78da5b154111801ed2f78dc44913280bea560144162f0b4c1e28107b24dbd",
+      "learningSenseId": "learning-sense-b13c5e9141a25ff9311b45f109a00028ec308043d5fe2ae193270ee84bb2a06c",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "Capital Lug denotes the Celtic deity, not carry lug. The actual lʌg is the common verb; Collins' separate deity entry gives lux, but an appropriate regional rendering and voice-map treatment of its fricative have not been established. Do not silently substitute native or approximate name sounds. Sources: https://www.collinsdictionary.com/dictionary/english/lug",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The retelling introduces Lug before the contest begins.",
+      "textHash": "5fd6e3da1e87f7791cb9c532c53211791dc99113cf039ee4c26b9617dcd86527"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-a0f22d977a52c5c5eac94f3460ef081546b585e9d494074d2da507df7e0dabf4",
+      "id": "sentence-audio-hold-7043e028425c8d10a4377551957b3bbdec914887c3b871ffeb3b8b7cde32e1b8",
+      "learningSenseId": "learning-sense-f2dd9f7e0911bb1ffd1ccedb56284c24ba3f35b8d5002b16232f7996599629d0",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前撞击动词首重音只找到其他影响义的UK变体证据；不能据另一义或US变体自动给本撞击义通行，也不强判所有impact前重音错误。 核实碰撞义的UK完整合法重音或提交新的具体词汇校正及验证；不扩到US或影响义。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "In the simulation, the small rock will impact the metal plate.",
+      "textHash": "6b80033eb9fe7414866717eb86cc0156b7be6cab4f2549fa7a22439dccdba5cd"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-9070a3edf62548f4fd9786911207cebfddc6782825636cae61f6d9e9b967a4bc",
+      "id": "sentence-audio-hold-d361b523874ddaa026744a6f5e0897bfc6b6e48aa2104e313954aeb6290cce9c",
+      "learningSenseId": "learning-sense-f2dd9f7e0911bb1ffd1ccedb56284c24ba3f35b8d5002b16232f7996599629d0",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前撞击动词首重音只找到其他影响义的UK变体证据；不能据另一义或US变体自动给本撞击义通行，也不强判所有impact前重音错误。 核实碰撞义的UK完整合法重音或提交新的具体词汇校正及验证；不扩到US或影响义。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The test allows the falling weight to impact the padded surface.",
+      "textHash": "6f9554999c7a629ad0a4807d8735731bea9706cecd78053360ed143d84c2dd3f"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-ba1254b61a30a0a83bbbe78d21a5db9e5ff7d23b760cf037ef37eb3c4c0ce2f0",
+      "id": "sentence-audio-hold-561396d00948660605e4a5999f41ac3ee7ecb7f86a053a1e145c98cebfaa7caa",
+      "learningSenseId": "learning-sense-1e8c946368665ff9912c30460a674dff3aa50ab0511df098170576272a66420d",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "英式Melodie与French mélodie不可共套；原名字音未明确证实，暂不发布该句音。 Sources: https://www.behindthename.com/name/melodie https://www.behindthename.com/name/melody",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "We asked Melodie to bring her photographs to the gathering.",
+      "textHash": "72926e9e6c3913bdde9ba59246010df0be14d3fb81974e5aea7cf7fa5baf7384"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-ba1254b61a30a0a83bbbe78d21a5db9e5ff7d23b760cf037ef37eb3c4c0ce2f0",
+      "id": "sentence-audio-hold-d9a7ca9c565a9f300ce0d05f4cbe4e637a2c1437c96f3c535d7370f276396c8b",
+      "learningSenseId": "learning-sense-1e8c946368665ff9912c30460a674dff3aa50ab0511df098170576272a66420d",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "美式Melodie人名原中间əʊ无独立可靠对应证据，不将用户提交的拼写变体冒充已核发音。 Sources: https://www.behindthename.com/name/melodie https://www.behindthename.com/name/melody",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "We asked Melodie to bring her photographs to the gathering.",
+      "textHash": "72926e9e6c3913bdde9ba59246010df0be14d3fb81974e5aea7cf7fa5baf7384"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-fc8f06e2c5d72e1298d3d1857232deed082a3beec6a9329cd72ef0bcf8cafe64",
+      "id": "sentence-audio-hold-63cb9a6630ead3757ef6972874028c106a370f912a363691c8f664378721f208",
+      "learningSenseId": "learning-sense-ee01a7bd7c78c0f77b6003232ea9716d7cc02a900b4429059932dd92b7a6217f",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前首重音且强/eɪt/尾，现有UK专门形容词证据给另一重音；US允许变体不能证明这个UK形容词组合已经审核。是具体词性/地区词汇风险，不等同泛泛缺少听审，也未宣称现串已被证明绝对错误。 取得支持该UK形容词完整组合的主源或新精确校正及小包验证；只解除对应两句UK，不动US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The drawing shows a bifurcate stem.",
+      "textHash": "72af5d4e27ab9c59718d1ddf968283d2674d53548dbb9c7721f7e73d240f328e"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-7cc277861af543265f6d71929c01b0afe6d8b4e025508ca9d901a39c37d03d22",
+      "id": "sentence-audio-hold-7cdf4e8b94e7ec1492e899e570dd9fd2a4107e96d978589132974ec64f307c76",
+      "learningSenseId": "learning-sense-5393c6f8124f02bd6818a28b52e8a2f7a13b5b5f0c2a5777f5821a987725c812",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "UK拘留动词当前首主重音与UK专门动词条目冲突，Collins翻译区相反标记的范围未澄清。US首重音明确合法但不能替UK证明；暂缓这一句UK，不把US合法读法判错。 澄清UK专门动词合法变体或建立新精确校正并验证；保留同一句US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The authorities decided to intern the foreign residents during the war.",
+      "textHash": "742612661c7a63ed24f6f7c3218225a914e64625a7eb08cb39a8af750b72c736"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-3b37b9e7bd4ca4878e5adb134fb219eef443cb538fe7cab90d8ec7b3e67bbddd",
+      "id": "sentence-audio-hold-4243184b4cb3bc6c3a30b81a1c00b683814f7b3bf8cd8c635e30ace4cba75b05",
+      "learningSenseId": "learning-sense-9d0d337f0c42d1fdd141c7b1812c92a34bc0c5aae1c1a151ee995bde5bd26e13",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前书面entr被读成近enter /ɛntə(ɹ)/；目标是entrance缩写，未获拼字或展开策略。这是具体错误词汇替代风险，不只是缺少专家听审。 确定缩写朗读策略并以精确文本+口音校正重新核验；不猜造不存在的缩写音标。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The guide's key explains entr as entrance.",
+      "textHash": "742caba612c4df2d40f4afb6278e9055a58767cc5bae5170e0bd99ee1c80d750"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-3b37b9e7bd4ca4878e5adb134fb219eef443cb538fe7cab90d8ec7b3e67bbddd",
+      "id": "sentence-audio-hold-0cf82313fcbaa079105815511ef8dfa88dda5c51390830d6f033670cf133a53c",
+      "learningSenseId": "learning-sense-9d0d337f0c42d1fdd141c7b1812c92a34bc0c5aae1c1a151ee995bde5bd26e13",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前书面entr被读成近enter /ɛntə(ɹ)/；目标是entrance缩写，未获拼字或展开策略。这是具体错误词汇替代风险，不只是缺少专家听审。 确定缩写朗读策略并以精确文本+口音校正重新核验；不猜造不存在的缩写音标。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The guide's key explains entr as entrance.",
+      "textHash": "742caba612c4df2d40f4afb6278e9055a58767cc5bae5170e0bd99ee1c80d750"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-cd9a6b5d515a8d2d36d02f563449d430a880668aa31272fa68518a0b7efce7d4",
+      "id": "sentence-audio-hold-1a2fceefc0b1be4a85aec8d83eed564d9e08eb9674c604e4d257bcc7f68dd952",
+      "learningSenseId": "learning-sense-c09572e5ec177d6192f71ba7344855de83e13bfcc4927e30b4e4fdad7a1dd28a",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前imprint名词后主重音与多个专门名词条目的首重音冲突，唯一相反线索是Collins翻译区标记；该矛盾不应被升级为已确认合法名词变体。保留原审计但暂缓这八句UK。 澄清翻译区范围或以明确名词主源作新精确校正并验证；不改动现固定review或US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The librarian checked the imprint to identify the publisher.",
+      "textHash": "75a9ad4a9b495dbc3a1065b97d99ca17ce7609723e9b054ae0c33df53877b088"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-0e896c700fa27626704e13ddaf30f42c4ced9cf2ac6500f817bdb16d628881de",
+      "id": "sentence-audio-hold-3bc58495ca82ea90940bf358c6acdb25e38f21e3ce7a83b31fdfd6fb8d3959b7",
+      "learningSenseId": "learning-sense-1e8c946368665ff9912c30460a674dff3aa50ab0511df098170576272a66420d",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "英式Melodie虚构人名未给目标读法，原əʊ中元音未证；暂留空待明确人名音而非歌曲词音。 Sources: https://www.behindthename.com/name/melodie https://www.behindthename.com/name/melody",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "Melodie joined our design team last spring.",
+      "textHash": "7c233a0e6bdb8f17dd007e586e9387681fa57ee3cb5abb410de159e30515e6db"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-0e896c700fa27626704e13ddaf30f42c4ced9cf2ac6500f817bdb16d628881de",
+      "id": "sentence-audio-hold-94e38868878c739a5a7a2fcd32b37d7711ef51e7f0224fd158b4522b95fb8fed",
+      "learningSenseId": "learning-sense-1e8c946368665ff9912c30460a674dff3aa50ab0511df098170576272a66420d",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "美式Melodie英语人名原中间GOAT音可疑；公开专名主条未提供此拼写确证，不凭Melody近形直接替换。 Sources: https://www.behindthename.com/name/melodie https://www.behindthename.com/name/melody",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "Melodie joined our design team last spring.",
+      "textHash": "7c233a0e6bdb8f17dd007e586e9387681fa57ee3cb5abb410de159e30515e6db"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-ff22ecb20975114e79551a097fc6dd35ab133ac71bfa07f3a7265eb27765bc6e",
+      "id": "sentence-audio-hold-7c8629a0a334d639ff1959b7265060afdb7c6658ac71f6a4ae9d5a5abb16145d",
+      "learningSenseId": "learning-sense-d8a099bd9359039e9763ea5d0c2a75a8b39bd52071359d53ff5c574b9db6c46e",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前imprint名词后主重音与多个专门名词条目的首重音冲突，唯一相反线索是Collins翻译区标记；该矛盾不应被升级为已确认合法名词变体。保留原审计但暂缓这八句UK。 澄清翻译区范围或以明确名词主源作新精确校正并验证；不改动现固定review或US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The snow preserved the imprint of a bird's wing.",
+      "textHash": "7d8f3e9e737f30fba954e9559355f4e279d8fcbcc526a858bbf186ae1489c5cf"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-5c722689c0706c5ac7765a2e150df72e9109298a4062880548418421d2a70978",
+      "id": "sentence-audio-hold-0b36602f1b5c91386763f7e8638d6c9e528e22f5559d9b38e7725d1719eec39d",
+      "learningSenseId": "learning-sense-53c757bc4d24e390fd78bc998140f38c3a001c18b6244b6876d4c7c69532b8c6",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "经独立逐句复核，暂缺该精确语境与地区读法的可靠证据，成品暂留空；不将未证实读法统称已证错音。 kong为锡矿含矿砾石下的无矿基岩这一罕见矿业名词；尚未找到可直接核定该精确义项与地区读法的主词典证据。保留原串待核，既不借King Kong专名认证，也不叫作已证错音。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "The drilling log marked the kong beneath the tin-bearing gravel.",
+      "textHash": "8262ed67cbf38730c36e1c7d27a89cb8ea8a151b072a8eee0fe50c8ac3c0af05"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-5c722689c0706c5ac7765a2e150df72e9109298a4062880548418421d2a70978",
+      "id": "sentence-audio-hold-2ed5b37108ce5bac815984412d29b9413dd744f9524dfdc2c1b4df1fc4ffeec5",
+      "learningSenseId": "learning-sense-53c757bc4d24e390fd78bc998140f38c3a001c18b6244b6876d4c7c69532b8c6",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "经独立逐句复核，暂缺该精确语境与地区读法的可靠证据，成品暂留空；不将未证实读法统称已证错音。 kong为锡矿含矿砾石下的无矿基岩这一罕见矿业名词；尚未找到可直接核定该精确义项与地区读法的主词典证据。保留原串待核，既不借King Kong专名认证，也不叫作已证错音。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "The drilling log marked the kong beneath the tin-bearing gravel.",
+      "textHash": "8262ed67cbf38730c36e1c7d27a89cb8ea8a151b072a8eee0fe50c8ac3c0af05"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-45fad74db05a9c695928d2baefb0c5148df5ba28ddbd73a6cc54ca948c496f70",
+      "id": "sentence-audio-hold-88345a179bcbd06221e08fdefe01a8684850f87cee64e83a8d93f0fd5593c820",
+      "learningSenseId": "learning-sense-8c9d5a749860d8b602fb5bc155bb0a7d431119358be24b5545f72e97a236b97a",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前imprint名词后主重音与多个专门名词条目的首重音冲突，唯一相反线索是Collins翻译区标记；该矛盾不应被升级为已确认合法名词变体。保留原审计但暂缓这八句UK。 澄清翻译区范围或以明确名词主源作新精确校正并验证；不改动现固定review或US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The novel appeared under the publisher's new fiction imprint.",
+      "textHash": "848774901654e917f6bda0bb145fd82a4152b93a9cb09c59b3603080cf4f2bb8"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-0c2913bbabacaebb3fadf9a70ec43fc0306b0a1d5a03ccdcf0d44e39ddae49d9",
+      "id": "sentence-audio-hold-9a5153ad15a18d3d832af59674458612246b7ad161ace7e7dfbf66e22f6d3cc2",
+      "learningSenseId": "learning-sense-4bce15fa2534eede3fd62f1137720f9ebe55f905ba50252b90bb7580844df343",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "经独立逐句复核，暂缺该精确语境与地区读法的可靠证据，成品暂留空；不将未证实读法统称已证错音。 已查Collins英国明确项只覆盖城市/动词，鸡种名后重音的直接音标在American分区；尚无可靠英国鸡种专门读法证据。不可用城市或US鸡种读法替代英国义项认证，暂留待地区证据，不称已证错。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The nineteenth-century catalogue lists a Shanghai among the large poultry breeds.",
+      "textHash": "85511246235779253255d056e28251ea512c6576053738039e227a1e1a6fab79"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-0e5a8edce275ade34c1979b320f8f0154faf0dc528602ee0b77a29a352648cab",
+      "id": "sentence-audio-hold-81fcdf1b6c8cb95f6ae5353c12f0823bc2b845fc018f40aeecbb6e1da6f56feb",
+      "learningSenseId": "learning-sense-36bb70ee949379cf195bd386d8485b6fab797e11aa3da396ee3801b2ad384054",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "US indurate形容词后主重音本身明确合法；未确认的是该重音与强/eɪt/尾的组合。WNW强尾总头注范围含糊，不能把一家的重音变体与另一家的尾音范围拼成已认证整词变体。 核实完整US形容词组合或为该义建立新逐句尾音校正及验证；不机械改成所有-ate形容词同一弱尾。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The tale presents an indurate ruler who rejects every plea for mercy.",
+      "textHash": "8b59a0cfcff60081c30ed999ade715336721cbde76b7d6da2dc5848a3e12286e"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-c7edcdc4592a2475733babc96234de63309b440b72b8f8837d2b7a90c6743f2d",
+      "id": "sentence-audio-hold-5de48aa0569211de7b9ea703cfc029ec5c1f4280db63357533e9ab8e8aa195f3",
+      "learningSenseId": "learning-sense-b3aa922bffd2f8f951086e3733771a59bcb49ad28be1027335822aae3aba7f86",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "传播故事者retailer缺乏已核UK派生名词重音边界；当前零售商式首重音不能因相关动词不同就强改，也不能因可解码就默认为目标义已审。暂缓这个义的两句UK，不封禁零售商义或US。 找到该派生名词传播故事义的明确UK头注或完成新逐句词汇校正；不从retail动词自动推导。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "He became known as a gifted retailer of travellers' tales.",
+      "textHash": "8c11435c1049f92f2def3c92cdf381e3f161879ee8354ff672da4d81cdda03a7"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-6be64d47614e84fcf1d2ba5d5c2f8e6b1235e505aa8d914f0fe75fb3a6835e4d",
+      "id": "sentence-audio-hold-ce2e19862c7c5e2b4fd106f1059097f4258cc2c306099ff4d7fd5cff965416b5",
+      "learningSenseId": "learning-sense-5306c86348079dd15a4fad6de88fe75a26c5c4114183ef5ace9bd350a822137c",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "目标equipe队伍当前/ɪkwɪp/对应equip装备动词；已核UK队伍词读法与其不同，而US目标读法未确认。不能把UK替换强称US，也不能把原equip音发布为已审US词音。 找到US equipe词汇读法或经明确语义/地区审核的新精确替换并验证；UK已有独立校正不被封禁。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The story follows an equipe preparing for a competition.",
+      "textHash": "8fe18fa45b97f483886ebf6f18d25b4bddf8cce217bcd58d6f42aaf7e5b1f239"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-faae02ec8bbfeb40dc61d1c0a6b7a7f12cd3de4295c56a434f46763b97779f5c",
+      "id": "sentence-audio-hold-f95f2a84a876baa9bbb97e5c196132734635bde0e93408b7e0f0463cd6e76a4e",
+      "learningSenseId": "learning-sense-a7fdb87c4e72c24921db492b54a881bcce17cccea43d52ee291e820a4a6da472",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "经独立逐句复核，暂缺该精确语境与地区读法的可靠证据，成品暂留空；不将未证实读法统称已证错音。 英国serrate动词主源只明确后重音/səˈreɪt/，未找到独立许可英国动词初重音的可靠证据；American的合法初重音和未分POS的英国发音页不能跨用。现串暂留待地区/POS核对，不称所有初重音已证错。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "A special machine was used to serrate the metal strip.",
+      "textHash": "94c081c182c3dcd9d6031d71ecd8df62d4c7b3622c76beed42e17caf1c603dab"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-dae3f9ad510a566c264a3116ed494914abfd3a3e25ad99b47ec87ef056f1b61a",
+      "id": "sentence-audio-hold-8fbc15b936a7d7f39f1ccddf92ceade76df9a215a74c959ad0b7d950e5e4baa6",
+      "learningSenseId": "learning-sense-b0b7dd5c857e6f482ac612da222d08e8bb2222c5b745ab096a1d97638ffb4291",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "Chapter II当前读成Chapter Roman two；数值二未错，但引擎加入Roman并非显示句子的普通连续朗读。属未批准的书面标记展开策略，不把它说成two读错。 明确章节罗马数字的朗读策略并审核一条新的精确读法；不全局禁止Roman一词或其他II语境。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "The heading reads Chapter II.",
+      "textHash": "995f449b61688e09a176e9b97ba955e66bb36ef47489af2b766c97cee6002ac0"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-dae3f9ad510a566c264a3116ed494914abfd3a3e25ad99b47ec87ef056f1b61a",
+      "id": "sentence-audio-hold-1ba7cfb80f006023e9dcfce2091c71c5ce94803b114957fd15e2bc1e75d726d1",
+      "learningSenseId": "learning-sense-b0b7dd5c857e6f482ac612da222d08e8bb2222c5b745ab096a1d97638ffb4291",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "Chapter II当前读成Chapter Roman two；数值二未错，但引擎加入Roman并非显示句子的普通连续朗读。属未批准的书面标记展开策略，不把它说成two读错。 明确章节罗马数字的朗读策略并审核一条新的精确读法；不全局禁止Roman一词或其他II语境。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "The heading reads Chapter II.",
+      "textHash": "995f449b61688e09a176e9b97ba955e66bb36ef47489af2b766c97cee6002ac0"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-6b4f85ccc3a093f5042887f0b06c6c7e15d0574b1594d18fb9fd05c8a5a4112c",
+      "id": "sentence-audio-hold-1e2bbfbc0976ee672ba73eabb015c77f9f16fdf2c2ef13d56ec8c79cfef0bdc3",
+      "learningSenseId": "learning-sense-8c9d5a749860d8b602fb5bc155bb0a7d431119358be24b5545f72e97a236b97a",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前imprint名词后主重音与多个专门名词条目的首重音冲突，唯一相反线索是Collins翻译区标记；该矛盾不应被升级为已确认合法名词变体。保留原审计但暂缓这八句UK。 澄清翻译区范围或以明确名词主源作新精确校正并验证；不改动现固定review或US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The company launched an imprint devoted to poetry.",
+      "textHash": "9a2fd0b10a0e8784d54759e569a5831384e2acc5c19804414b38dd6d230d0f29"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-0db78cb176f8effd42ad33275405c4a641250d0cb803c0adcc956f2aaf78e3c3",
+      "id": "sentence-audio-hold-4778ac69b67dbc02360352f8adc85ee69b0f08d6d7fc42f9bc2b99a08bec98d4",
+      "learningSenseId": "learning-sense-2e7fc0da79f43f7dcdb9ec0a617150e18a0ce73585df481e9cf1fe4df58d7501",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "UK satiate形容词当前强尾与动词相同，但尚无明确UK形容词头注；US强尾形容词合法不能代替UK词性边界确认。只暂缓两句UK形容词，不禁US合法强尾。 取得该UK形容词强尾依据或新的明确弱尾校正及小包验证。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The satiate guests had no interest in another course.",
+      "textHash": "9d1e1e8946eb5167ce28201c5850c399c65331b5873413c39834dcebe457e25c"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-ac872056a1b5969a9e23b1ca3b8399798b2c8de875b9ad4992fa851e48173343",
+      "id": "sentence-audio-hold-d7b67ce68e08ea2cbf2c7f78a26de710f305fb95d14757a3e05dfd720d8aa01f",
+      "learningSenseId": "learning-sense-d8a099bd9359039e9763ea5d0c2a75a8b39bd52071359d53ff5c574b9db6c46e",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前imprint名词后主重音与多个专门名词条目的首重音冲突，唯一相反线索是Collins翻译区标记；该矛盾不应被升级为已确认合法名词变体。保留原审计但暂缓这八句UK。 澄清翻译区范围或以明确名词主源作新精确校正并验证；不改动现固定review或US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "A faint imprint of the seal remained on the paper.",
+      "textHash": "9d41f3c318262a2feb8e189828530dd810766ac4d4280c4a5b9ff26443714e9a"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-ea257bcf9837ad24471c0e0bd999f6b6dc580fe0ee4cbc4f13778ba41efa4ced",
+      "id": "sentence-audio-hold-f246bec679db3c865246a14b3c22b1be3372a025d83f9d3dbb0e68311f5baf2d",
+      "learningSenseId": "learning-sense-a7fdb87c4e72c24921db492b54a881bcce17cccea43d52ee291e820a4a6da472",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "经独立逐句复核，暂缺该精确语境与地区读法的可靠证据，成品暂留空；不将未证实读法统称已证错音。 英国serrate动词主源只明确后重音/səˈreɪt/，未找到独立许可英国动词初重音的可靠证据；American的合法初重音和未分POS的英国发音页不能跨用。现串暂留待地区/POS核对，不称所有初重音已证错。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The artist chose to serrate the edge of the paper crown.",
+      "textHash": "9e3a29776af80f67f500c7eb6907c445f460813caacae4eefc8cd300a4c2e10a"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-42edd35d83a271534e06181a79a2ba19d87151cd5aaf8345cb887ef17b875a6d",
+      "id": "sentence-audio-hold-af78c3fe011a37b16e53916c5acc433e958daa9cffeea3f94025c760caae8735",
+      "learningSenseId": "learning-sense-1bc846a0c89ad51e57dfdbd5ff7ba7034d9969a55ef668894106e4c6a84b6e97",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "French novelist Sue是姓氏，Collins British专条标French /sy/而非动词/suː/；法语圆唇元音的本UK编码与读取尚待独立校验，暂不强造音素。 Sources: https://www.collinsdictionary.com/dictionary/english/sue",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The catalogue lists Sue as the author of the old French novel.",
+      "textHash": "a05c451ff15eb901147d63ac114f2369dd0d1321a59f5fc7ca3797f8d2cbb834"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-42edd35d83a271534e06181a79a2ba19d87151cd5aaf8345cb887ef17b875a6d",
+      "id": "sentence-audio-hold-fbb0106de23a644045db1e1c1958144d9fc68ce203afa5976a66465aec31bd99",
+      "learningSenseId": "learning-sense-1bc846a0c89ad51e57dfdbd5ff7ba7034d9969a55ef668894106e4c6a84b6e97",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "Sue明确欧仁苏而非Susan或起诉，现/suː/不能凭同形认定；Collins只取得French /sy/身份条，尚无本US声线可核的该姓英语读取方案，暂留空。 Sources: https://www.collinsdictionary.com/dictionary/english/sue",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The catalogue lists Sue as the author of the old French novel.",
+      "textHash": "a05c451ff15eb901147d63ac114f2369dd0d1321a59f5fc7ca3797f8d2cbb834"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-c1ec5ada16da24e51d55d7a2002145437fc09b5565c660469ff7afb1f74c5106",
+      "id": "sentence-audio-hold-b15c6ea094e8dc9be03dfc4fb669efe70b0136c63e52d6edcd96107f5561d5dd",
+      "learningSenseId": "learning-sense-7d969b0305928984f0a91daddc696820c9c5fd5af40f2f965bc8cd0f7fb41e7d",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "segregate为分离的形容词，US AHD明确强尾合法，但此次British词典主体仅列动词、没有该形容词区域读法。OED adjective及Oxford_2访问失败；不把US合法性直接冒称UK认证，也未取得足够UK特定依据证明现串必错。保留待独立地区词性证据。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The survey compares two segregate populations of the plant.",
+      "textHash": "a0f6ade40302e4b33f53466770795a5f446e72e3efb27e2e0dcccbf794416361"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-494da156e88853802b5495f20361cab6dba654f84b53c6cbbb9327427065ef73",
+      "id": "sentence-audio-hold-a6d3cc07e779b2d9398da498c7665332eefe1bdd52be6ab2e0472522f321f132",
+      "learningSenseId": "learning-sense-5d7d5db5436064d87b1eedc64c40686b6d0afb66bc821490e3be35e3168c354f",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "该精确语境与地区读法的证据尚不足，成品暂留空；不把未证实读法统称为已证错音。 本句是月神专名Sin，美式AHD明确短音、Collins美式段另有长音；目前未取得该神名的直接英式地区主词典证据，不能借普通罪过sin或美式变体替英式认证。原串待核，非已证明错误。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The chapter compares worship of Sin with traditions centred on other deities.",
+      "textHash": "a872ab2b6d37c9480b7d4bd6b1b5fef8b1a1c94eedaa2c363817e48e8c2871b7"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-b5f88639aeefb2eaf0791cd7f561fcc407e76eba590241624ae733a5138901e4",
+      "id": "sentence-audio-hold-b694e35f5d45290913575bd8ba8a32c2285acfea7f86114f17ecf02ed9b347a7",
+      "learningSenseId": "learning-sense-2e7fc0da79f43f7dcdb9ec0a617150e18a0ce73585df481e9cf1fe4df58d7501",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "UK satiate形容词当前强尾与动词相同，但尚无明确UK形容词头注；US强尾形容词合法不能代替UK词性边界确认。只暂缓两句UK形容词，不禁US合法强尾。 取得该UK形容词强尾依据或新的明确弱尾校正及小包验证。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The satiate lion rested in the shade.",
+      "textHash": "b04ca48f07a1bf4f1029997aac1c15cad9d2443ce68e34c0e8dbed3686b7f985"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-35cda010f0913de510787f1284e7bc3b733d79b68202aa1fe37de6c0e0976a23",
+      "id": "sentence-audio-hold-50602d12f511476e705fbca9990ab2dfba6c5762c50b8fd55b3c5ab25a915dbd",
+      "learningSenseId": "learning-sense-5306c86348079dd15a4fad6de88fe75a26c5c4114183ef5ace9bd350a822137c",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "目标equipe队伍当前/ɪkwɪp/对应equip装备动词；已核UK队伍词读法与其不同，而US目标读法未确认。不能把UK替换强称US，也不能把原equip音发布为已审US词音。 找到US equipe词汇读法或经明确语义/地区审核的新精确替换并验证；UK已有独立校正不被封禁。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The report introduces a new cycling equipe.",
+      "textHash": "b18a730016b89ef4ed6689a22d1d4606218a6f88f146f5ab4ad84ab8998e2c79"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-0f024062a24e77312a4c714e29b50b35740bb09d30282fb20b81624a4cd27cd9",
+      "id": "sentence-audio-hold-ba8eabb0bdca5bf08f5615521429d8e0cc7fa86a5f0347e5cbdbf1de5a053b07",
+      "learningSenseId": "learning-sense-b7ce78188aeff92ea7c9e15cd08c1e28b3cf97ba257974a13b050d58b2bee352",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "Inc读/ɪŋk/有直接US缩写依据，并非词汇错误已获证明；但本轮UK仍明确pending且未确定该地区公司后缀的缩写朗读策略。列为策略性暂缓候选，不能悄悄把US依据写成UK认证。风险低于entr/Er，根任务可用明确策略另行批准。 明确允许UK声线对公司名缩写沿用已核/ɪŋk/读法，或取得UK直接依据/新核读法；US现合法读法不受影响。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "The publisher's full name ends with Inc.",
+      "textHash": "b1bff7235cdf1eac3a65854f3543ad95ead06bfb102adebd776ede93e0d33fc2"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-e147119ba4c297f94b9416ed311d82b7c9ea731ffe6d9deace548593c5d3513d",
+      "id": "sentence-audio-hold-655eea6b418fb8254fc56d18acfbf403f24ddbc29aa2ee0d944a0913d7acdb24",
+      "learningSenseId": "learning-sense-b13c5e9141a25ff9311b45f109a00028ec308043d5fe2ae193270ee84bb2a06c",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "The target is the deity name, not the carry verb. No British primary name entry here licenses actual lʌg, and the American lux evidence does not establish a British correction. Leave unavailable pending name-specific review. Sources: https://www.collinsdictionary.com/dictionary/english/lug",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The panel compares stories associated with Lug.",
+      "textHash": "b306514b6484e62edddcdce27b6fd6491c460809e5c595ba6090acc8e0c5e61c"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-e147119ba4c297f94b9416ed311d82b7c9ea731ffe6d9deace548593c5d3513d",
+      "id": "sentence-audio-hold-1e15c646bc540d06c3839f7f97a459ea4ea4e9395ec9ffd57ae13c5710d52ff0",
+      "learningSenseId": "learning-sense-b13c5e9141a25ff9311b45f109a00028ec308043d5fe2ae193270ee84bb2a06c",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "Stories associated with Lug refer to the deity. Actual common lug lʌg cannot be approved from that shared spelling; Collins' distinct lux name requires confirmed regional rendering and voice-map handling before a literal correction can be justified. Sources: https://www.collinsdictionary.com/dictionary/english/lug",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The panel compares stories associated with Lug.",
+      "textHash": "b306514b6484e62edddcdce27b6fd6491c460809e5c595ba6090acc8e0c5e61c"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-7acec141158b262c837453d17902b9c7c1b3017c628da0980767e50f13e43eda",
+      "id": "sentence-audio-hold-ddc1d7b31d54ec9a87d8310e18c2de9567029737fef74d37c4227257ae3de630",
+      "learningSenseId": "learning-sense-aae0ca11dd9603f202d095ff91fa5c86c86c2be46181023678d8a7a0f15450e5",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "sediment四句均为动词，当前弱末节同名词，存在词性尾音范围风险。成功直读的Collins British与Oxford/Cambridge只明确名词，American动词/-ment/不能直接冒称UK区域依据，OED动词及Oxford_2访问失败。保留当前数组待独立UK动词读法核实，不计为已确认正确，也不伪称当前已证明不合法。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The procedure was designed to sediment the suspended particles.",
+      "textHash": "bb58cafbad749123cd4e4eaf0fab0972037016d85e4babb22ddc2d8311926dac"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-dfbb43617ef970f302a7c912723a297d3ce943e496442b18f8eb7b1c0dc706dc",
+      "id": "sentence-audio-hold-8beee22842f35fe75d832a658e59b37789786ff5b986adbf97565b6088f4fc4c",
+      "learningSenseId": "learning-sense-c0f3dbab59eb2aa547330a4abd2a838c9845d5737cb09a8a6fdb943777ae1884",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "已审具体借词语境与当前词汇读法有差异，目标地区读法或可编码方案仍待核；仅该句该口音暂留空。 欧洲供膳宿旅馆义pension在Collins英美条目及Merriam-Webster另列法语借词读法，原养老金/pɛnʃən/误配词义。尚未认证本声线可编码的鼻化借词读法，精确留空，不把养老金与发津贴动词一起禁用。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The diary describes breakfast at the pension before a day in the hills.",
+      "textHash": "bfa158df9fb5e91925df9fe1d74dc80169eec874ceb403cb09b926aa9a4a84fd"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-dfbb43617ef970f302a7c912723a297d3ce943e496442b18f8eb7b1c0dc706dc",
+      "id": "sentence-audio-hold-66bab23dad4062a39e59ff4399d6ca1be95930fc8391c29387824f78e4f93645",
+      "learningSenseId": "learning-sense-c0f3dbab59eb2aa547330a4abd2a838c9845d5737cb09a8a6fdb943777ae1884",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "已审具体借词语境与当前词汇读法有差异，目标地区读法或可编码方案仍待核；仅该句该口音暂留空。 欧洲供膳宿旅馆义pension在Collins英美条目及Merriam-Webster另列法语借词读法，原养老金/pɛnʃən/误配词义。尚未认证本声线可编码的鼻化借词读法，精确留空，不把养老金与发津贴动词一起禁用。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The diary describes breakfast at the pension before a day in the hills.",
+      "textHash": "bfa158df9fb5e91925df9fe1d74dc80169eec874ceb403cb09b926aa9a4a84fd"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-b12ff555e262dd18a4b47103c1daf8254099a6eb0cab3dbf5d7db87bad4544ca",
+      "id": "sentence-audio-hold-cbb3ee2d57fd4d3e93cadefa5858d1f1b946908ad0a18e5b39ea0a3db6abbc1c",
+      "learningSenseId": "learning-sense-b7fad8c8ff1e0d032f93df70f4dfdfa0e9ddee028c73d32242aa8786863ce912",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "英式Street展开有误且第二raw段为空，尚无已批准空段渲染合同；保留原始分段并暂不发句音。 Sources: https://www.collinsdictionary.com/dictionary/english/st",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "The model town's map labelled the road \"Maple St.\".",
+      "textHash": "d27fbb1cd37376eb10aec1eb7d9ccde7bde552321e91ad7064207c94b485065b"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-b12ff555e262dd18a4b47103c1daf8254099a6eb0cab3dbf5d7db87bad4544ca",
+      "id": "sentence-audio-hold-63dd928986a82498ef699e9ca031a86ddb79f8b2be2f2ba4618fd5c8f407ced7",
+      "learningSenseId": "learning-sense-b7fad8c8ff1e0d032f93df70f4dfdfa0e9ddee028c73d32242aa8786863ce912",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "美式Maple St.应Street而原读Saint；raw又含空末段，现runtime correction禁止空原段，必须暂缓不删除原段绕过。 Sources: https://www.collinsdictionary.com/dictionary/english/st",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "The model town's map labelled the road \"Maple St.\".",
+      "textHash": "d27fbb1cd37376eb10aec1eb7d9ccde7bde552321e91ad7064207c94b485065b"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-5007d72ccfa9426680aae02e986ef9758712b2f5c65b40b51cf92adee585c1c5",
+      "id": "sentence-audio-hold-80d77fdd71292668cf92e06d5f891335811a0a525b14ddedcaa3715c8fc07f58",
+      "learningSenseId": "learning-sense-c0f3dbab59eb2aa547330a4abd2a838c9845d5737cb09a8a6fdb943777ae1884",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "已审具体借词语境与当前词汇读法有差异，目标地区读法或可编码方案仍待核；仅该句该口音暂留空。 欧洲供膳宿旅馆义pension在Collins英美条目及Merriam-Webster另列法语借词读法，原养老金/pɛnʃən/误配词义。尚未认证本声线可编码的鼻化借词读法，精确留空，不把养老金与发津贴动词一起禁用。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The travellers stayed in a small pension near the station.",
+      "textHash": "d59b7a5774563b1503fada0d47e88f8d94017e258eca63e45c18e876251bb05b"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-5007d72ccfa9426680aae02e986ef9758712b2f5c65b40b51cf92adee585c1c5",
+      "id": "sentence-audio-hold-21526df5acd12a6343c611015cc036d21bb9940a78d7e0b534629eedc8a58267",
+      "learningSenseId": "learning-sense-c0f3dbab59eb2aa547330a4abd2a838c9845d5737cb09a8a6fdb943777ae1884",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "已审具体借词语境与当前词汇读法有差异，目标地区读法或可编码方案仍待核；仅该句该口音暂留空。 欧洲供膳宿旅馆义pension在Collins英美条目及Merriam-Webster另列法语借词读法，原养老金/pɛnʃən/误配词义。尚未认证本声线可编码的鼻化借词读法，精确留空，不把养老金与发津贴动词一起禁用。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The travellers stayed in a small pension near the station.",
+      "textHash": "d59b7a5774563b1503fada0d47e88f8d94017e258eca63e45c18e876251bb05b"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-ffc40aa7038b2e3f77a6390dd92805bbf3e0a18e1f94420ae4e89bd1faac3df7",
+      "id": "sentence-audio-hold-c27168f66007fda0ecb438740c58c654e6c90813de6548d7e55a69799336e78b",
+      "learningSenseId": "learning-sense-9d0d337f0c42d1fdd141c7b1812c92a34bc0c5aae1c1a151ee995bde5bd26e13",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前书面entr被读成近enter /ɛntə(ɹ)/；目标是entrance缩写，未获拼字或展开策略。这是具体错误词汇替代风险，不只是缺少专家听审。 确定缩写朗读策略并以精确文本+口音校正重新核验；不猜造不存在的缩写音标。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The old plan marks the main doorway as entr.",
+      "textHash": "d672e0c89e12208b8bb64f15663ed9feec0b7a39adaa54e2e83fc04aa6cd9b86"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-ffc40aa7038b2e3f77a6390dd92805bbf3e0a18e1f94420ae4e89bd1faac3df7",
+      "id": "sentence-audio-hold-6f35cf7802d8d1d7dc0a096adee7ae16771f90f9ced9d4340d63105ba03e92a8",
+      "learningSenseId": "learning-sense-9d0d337f0c42d1fdd141c7b1812c92a34bc0c5aae1c1a151ee995bde5bd26e13",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前书面entr被读成近enter /ɛntə(ɹ)/；目标是entrance缩写，未获拼字或展开策略。这是具体错误词汇替代风险，不只是缺少专家听审。 确定缩写朗读策略并以精确文本+口音校正重新核验；不猜造不存在的缩写音标。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The old plan marks the main doorway as entr.",
+      "textHash": "d672e0c89e12208b8bb64f15663ed9feec0b7a39adaa54e2e83fc04aa6cd9b86"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-9ae79b4deb8269769801670bcbbad6e4ffc4a0fe3eb683d984412befdfd970ee",
+      "id": "sentence-audio-hold-e789eb6e14103f100f3d3164c9546b72acdffca34c40c25fcb168a1d11dbe4ce",
+      "learningSenseId": "learning-sense-6157af7e74792e5c8b78bdf73cac4a7402d0acf384d5abf563a4bde5846fb7e5",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "屋檐突出部为overhang名词；Cambridge UK前主重音与Collins翻译区明确British noun后重音冲突，暂缺对冲突的可靠解释，保持该口音留空。 Sources: https://dictionary.cambridge.org/pronunciation/english/overhang https://www.collinsdictionary.com/dictionary/english/overhang",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The roof has a deep overhang above the porch.",
+      "textHash": "d78e5bd4369e1ec26bf4a6258f0516cf23759f7f5c816e687242aea2e6e40c8f"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-c579b5ebb584fbbe2fc425c6fd8e4e60bfc7cae24c8909c3b10551f6639fcf6c",
+      "id": "sentence-audio-hold-a2fcec87acfb908da0f00fa2861a1103abd3b7d0762e1284b1f7d91d56eab3f4",
+      "learningSenseId": "learning-sense-36bb70ee949379cf195bd386d8485b6fab797e11aa3da396ee3801b2ad384054",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "US indurate形容词后主重音本身明确合法；未确认的是该重音与强/eɪt/尾的组合。WNW强尾总头注范围含糊，不能把一家的重音变体与另一家的尾音范围拼成已认证整词变体。 核实完整US形容词组合或为该义建立新逐句尾音校正及验证；不机械改成所有-ate形容词同一弱尾。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The essay criticises his indurate refusal to reconsider.",
+      "textHash": "d7c3e87db1668101b187f254ecff7f50b385f8e98a7393526e82a8051bf6e271"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-d3de16abe484e9092f2c3a4bf548f5ed21932ab4c279ba922898e43b77542bd0",
+      "id": "sentence-audio-hold-9d9e1191d61fbd8959608a4b8fc13dbd538afee274168516c1bc7fab2d258c68",
+      "learningSenseId": "learning-sense-c09572e5ec177d6192f71ba7344855de83e13bfcc4927e30b4e4fdad7a1dd28a",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前imprint名词后主重音与多个专门名词条目的首重音冲突，唯一相反线索是Collins翻译区标记；该矛盾不应被升级为已确认合法名词变体。保留原审计但暂缓这八句UK。 澄清翻译区范围或以明确名词主源作新精确校正并验证；不改动现固定review或US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The faded imprint still shows the publisher's name and the date.",
+      "textHash": "db6426767c9b057bfa0f2563414764fddee09375c196ce444d524380e5d27d3c"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-b20970a29833aa5aa9a37fee11560396db4cf55766e65960c6ba93cbee9b61ca",
+      "id": "sentence-audio-hold-2cdffd9aa60fdd63b66df698ae1497f16e42a7a0786828da1a47fde5953dda27",
+      "learningSenseId": "learning-sense-5d7d5db5436064d87b1eedc64c40686b6d0afb66bc821490e3be35e3168c354f",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "该精确语境与地区读法的证据尚不足，成品暂留空；不把未证实读法统称为已证错音。 本句是月神专名Sin，美式AHD明确短音、Collins美式段另有长音；目前未取得该神名的直接英式地区主词典证据，不能借普通罪过sin或美式变体替英式认证。原串待核，非已证明错误。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The museum label identifies Sin as a Mesopotamian moon god.",
+      "textHash": "e1a4e2a5db157efefac00dd8c99de27357703b1ea37ab43d87ec980077694bef"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-42d9e1254b353cf35b830093d2e095152be6763df2685fa0925ada86dc960096",
+      "id": "sentence-audio-hold-de7170deea0844a21c8ba87be636d2aeb870a7261f11888f82c3975ddd06b7ce",
+      "learningSenseId": "learning-sense-6157af7e74792e5c8b78bdf73cac4a7402d0acf384d5abf563a4bde5846fb7e5",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "岩石突出部为名词；Cambridge UK明确前主重音，但Collins In other languages明标British noun后重音，与当前串一致。具体地区名词证据冲突，暂缓而不当已证合法或强纠。 Sources: https://dictionary.cambridge.org/pronunciation/english/overhang https://www.collinsdictionary.com/dictionary/english/overhang",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The sketch shows a narrow overhang above the cave entrance.",
+      "textHash": "e1afafa9c09e6996a8532f4467232413d4bfa4351e1e26863421dae4bde47ba7"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-144ad2c1baa8e67e70f6e10fa07efaf70f66566b306935ed71d86d5065d463df",
+      "id": "sentence-audio-hold-a0f82dfad9d5db936bdcd9c2e933607ab0fc8181d7358e3b7eb59ee3e8b845ed",
+      "learningSenseId": "learning-sense-06c693c9f7d53eb29cf16c82e0058ff5796efe4fc3aae5d5c94f50e70ff2678a",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "该精确语境与地区读法的证据尚不足，成品暂留空；不把未证实读法统称为已证错音。 钴的化学符号Co意义已由主出版者条目确认，但没有核到该符号在这两个具体语境中应读全称、字母还是允许co词形的精确主源。不能拿co-前缀或公司Co的合法读音替符号认证；当前串不标为已证错音。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "The alloy report listed Co as one of the metallic components.",
+      "textHash": "e25ac31d4abcc58201beae857abbf2c1b5b0562b08dce9de67ba5f1f7b6823c6"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-144ad2c1baa8e67e70f6e10fa07efaf70f66566b306935ed71d86d5065d463df",
+      "id": "sentence-audio-hold-6546280deac0260d62391a3b723b245baa2cdba202adf3500febb0e0c66b459f",
+      "learningSenseId": "learning-sense-06c693c9f7d53eb29cf16c82e0058ff5796efe4fc3aae5d5c94f50e70ff2678a",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "该精确语境与地区读法的证据尚不足，成品暂留空；不把未证实读法统称为已证错音。 钴的化学符号Co意义已由主出版者条目确认，但没有核到该符号在这两个具体语境中应读全称、字母还是允许co词形的精确主源。不能拿co-前缀或公司Co的合法读音替符号认证；当前串不标为已证错音。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "The alloy report listed Co as one of the metallic components.",
+      "textHash": "e25ac31d4abcc58201beae857abbf2c1b5b0562b08dce9de67ba5f1f7b6823c6"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-5d4a555383edcab29a355515ce7bf5cea275cbfd6d9f0eade3a9de4d16f4da6d",
+      "id": "sentence-audio-hold-ff723a01643e0b4e3404f691ebbd06d06156e8cb99bdb0fc4625a38c9ed32b72",
+      "learningSenseId": "learning-sense-3c777abb173dc3e5a5832023111e5c890127d016304dd2c7cd6d47c295f3d592",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "化学符号Er当前读成/ɜː/犹豫音；主源把符号与感叹词分项，感叹词音标不是符号依据。不能用可播放/可编码把异义读法当认证。 明确符号拼字或元素名展开策略，保留显示Er文本并经精确口音路径核验；ER急诊室与er犹豫义不受影响。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The label identifies the element with the symbol Er.",
+      "textHash": "e52b7e114fba5a9a20b73a12033033cf3e1b87f1b053c77eb89f336dd23b8c5d"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-5d4a555383edcab29a355515ce7bf5cea275cbfd6d9f0eade3a9de4d16f4da6d",
+      "id": "sentence-audio-hold-78b8200a2a5f9d54f19fded692d25788b7f1ab48c9c43ff845037d3a074ecbe5",
+      "learningSenseId": "learning-sense-3c777abb173dc3e5a5832023111e5c890127d016304dd2c7cd6d47c295f3d592",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "化学符号Er当前读成/ɜː/犹豫音；主源把符号与感叹词分项，感叹词音标不是符号依据。不能用可播放/可编码把异义读法当认证。 明确符号拼字或元素名展开策略，保留显示Er文本并经精确口音路径核验；ER急诊室与er犹豫义不受影响。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The label identifies the element with the symbol Er.",
+      "textHash": "e52b7e114fba5a9a20b73a12033033cf3e1b87f1b053c77eb89f336dd23b8c5d"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-fa4e70954e19bb65ef5a142e30bc9f30694e84eb608dba93b4ca35778bc274c4",
+      "id": "sentence-audio-hold-cf1d689dafa728bd143bbcb86f4ed5ce9c59ba2c848156c031d648bae79d2e3e",
+      "learningSenseId": "learning-sense-6212d192faa988a2b0424a9d5e40379ad1be07b67126cd15d405d3a4b5e3d303",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "该精确语境与地区读法的证据尚不足，成品暂留空；不把未证实读法统称为已证错音。 该旧式及物动词很可能以/z/结尾；现已直接取得美式动词证据及英式disused的浊音词干旁证，但尚未取得精确英式未屈折旧动词的直接主词典条目，OED访问失败。保留原串待地区词性复核，不宣称已证错或借美式直接认证英式。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The old rule encouraged writers to disuse that spelling.",
+      "textHash": "ea1798775422a9eea2bd1b1671b11b10f0581f92f4a9e73f2b7a4c782c2642c0"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-2b4591309fd060123c8cb7e0915e70dd28a7b9ad25f9e12971c1a048c61f58ff",
+      "id": "sentence-audio-hold-7ea41ed28f33876015912f9434cb95803bc912b27821aaf88fbda682686ebde5",
+      "learningSenseId": "learning-sense-4bce15fa2534eede3fd62f1137720f9ebe55f905ba50252b90bb7580844df343",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "经独立逐句复核，暂缺该精确语境与地区读法的可靠证据，成品暂留空；不将未证实读法统称已证错音。 已查Collins英国明确项只覆盖城市/动词，鸡种名后重音的直接音标在American分区；尚无可靠英国鸡种专门读法证据。不可用城市或US鸡种读法替代英国义项认证，暂留待地区证据，不称已证错。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "A drawing of a Shanghai shows the breed's feathered legs.",
+      "textHash": "ebfc4a78c27f2dcfcf2a832750db93cd769d9a4868cc2186a46c6f007f8bce54"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-71cab6ec66b917f5a2f36654373064701f06c1c4855287637a64164a4c177a7b",
+      "id": "sentence-audio-hold-01129204d1932f9e2757cf8cbed345cca5ecb6360f5113233e383080955b9152",
+      "learningSenseId": "learning-sense-57605832d8928b9494d9f120754423ae022db7bbdbdf05c8e46d97b87bb38b8c",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "sediment四句均为动词，当前弱末节同名词，存在词性尾音范围风险。成功直读的Collins British与Oxford/Cambridge只明确名词，American动词/-ment/不能直接冒称UK区域依据，OED动词及Oxford_2访问失败。保留当前数组待独立UK动词读法核实，不计为已确认正确，也不伪称当前已证明不合法。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The material will sediment when the current slows.",
+      "textHash": "ed7c90a89941d529ea73da2ccdec0569eed27976ccbcf9130c23fe741d792b0f"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-b697d2f10302c7003646364bb0a0d32cb0cce0b01fbd29244a18f2c71a7928ac",
+      "id": "sentence-audio-hold-9d5fa79d1578d2cf6088c3011c278eceb0708c84e5f979f2c53b95d36a2192fe",
+      "learningSenseId": "learning-sense-75245964890fa9e43b572fbc5a749a20c4305d3c16b88781af4d0b069aec5dd2",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "当前imprint名词后主重音与多个专门名词条目的首重音冲突，唯一相反线索是Collins翻译区标记；该矛盾不应被升级为已确认合法名词变体。保留原审计但暂缓这八句UK。 澄清翻译区范围或以明确名词主源作新精确校正并验证；不改动现固定review或US。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "Her teacher's imprint is visible in the early paintings.",
+      "textHash": "f5a2a099f726ce6deec00d3b12b92a794ff7ab198ad4599fce1b913443f8dfcf"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-4e9ea557a87ae735a72d3089af3b9d12e2abdca9ccbc21ec84560c1274ae7b4f",
+      "id": "sentence-audio-hold-1fb429ff818c6db38c92a9e8440e3590a555fc38e7fad74901cfe19309836b99",
+      "learningSenseId": "learning-sense-7d969b0305928984f0a91daddc696820c9c5fd5af40f2f965bc8cd0f7fb41e7d",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "segregate为分离的形容词，US AHD明确强尾合法，但此次British词典主体仅列动词、没有该形容词区域读法。OED adjective及Oxford_2访问失败；不把US合法性直接冒称UK认证，也未取得足够UK特定依据证明现串必错。保留待独立地区词性证据。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The report describes the material as a segregate layer.",
+      "textHash": "f6fbce17e9f46d30cd45b0659938915763b4f2c9148ada247e94dc778d81277d"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-7e2795d7e4fca89224ff78a82104ff6e9d7ad8220def8cf5e98495060ca47bef",
+      "id": "sentence-audio-hold-4d61a9b1e26091111623ec90cdedafb5ff8cfe8e52a43225b07df52b24456dc1",
+      "learningSenseId": "learning-sense-53c757bc4d24e390fd78bc998140f38c3a001c18b6244b6876d4c7c69532b8c6",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "经独立逐句复核，暂缺该精确语境与地区读法的可靠证据，成品暂留空；不将未证实读法统称已证错音。 kong为锡矿含矿砾石下的无矿基岩这一罕见矿业名词；尚未找到可直接核定该精确义项与地区读法的主词典证据。保留原串待核，既不借King Kong专名认证，也不叫作已证错音。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "After the gravel was removed, the miners exposed the kong.",
+      "textHash": "f88493ca85e35d89df64e74f5bec704ae84fc769fd1e7f8d55f8ec8a5ba9f929"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-7e2795d7e4fca89224ff78a82104ff6e9d7ad8220def8cf5e98495060ca47bef",
+      "id": "sentence-audio-hold-0cf0492576b4456ea6ff6f65074f2b88db2c61038a04e5f3438dbbbea7d9db90",
+      "learningSenseId": "learning-sense-53c757bc4d24e390fd78bc998140f38c3a001c18b6244b6876d4c7c69532b8c6",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "经独立逐句复核，暂缺该精确语境与地区读法的可靠证据，成品暂留空；不将未证实读法统称已证错音。 kong为锡矿含矿砾石下的无矿基岩这一罕见矿业名词；尚未找到可直接核定该精确义项与地区读法的主词典证据。保留原串待核，既不借King Kong专名认证，也不叫作已证错音。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-reading-evidence",
+      "text": "After the gravel was removed, the miners exposed the kong.",
+      "textHash": "f88493ca85e35d89df64e74f5bec704ae84fc769fd1e7f8d55f8ec8a5ba9f929"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-65757e7eb040e58b50866692fbe954fa027138c7e648583cc6f5609efea16efe",
+      "id": "sentence-audio-hold-566b412940d986b80e8e008f9a0d94c6446f2046e87cbc008569d3c57ee674be",
+      "learningSenseId": "learning-sense-b3aa922bffd2f8f951086e3733771a59bcb49ad28be1027335822aae3aba7f86",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "传播故事者retailer缺乏已核UK派生名词重音边界；当前零售商式首重音不能因相关动词不同就强改，也不能因可解码就默认为目标义已审。暂缓这个义的两句UK，不封禁零售商义或US。 找到该派生名词传播故事义的明确UK头注或完成新逐句词汇校正；不从retail动词自动推导。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "insufficient-regional-evidence",
+      "text": "The innkeeper is portrayed as an eager retailer of village gossip.",
+      "textHash": "f9211bb817a7a487c16e1ae2fd7ba91338bde9ec8dd4433547b659f450958b66"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-6ef524ec95282696cf602c76443553e2389e69f5a295d90a8578daa73afd7e5e",
+      "id": "sentence-audio-hold-12b095e7fc07670dc7cffa4cbf3f566246cdc9e2ea11f8a02ec69966080530a7",
+      "learningSenseId": "learning-sense-3c777abb173dc3e5a5832023111e5c890127d016304dd2c7cd6d47c295f3d592",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "化学符号Er当前读成/ɜː/犹豫音；主源把符号与感叹词分项，感叹词音标不是符号依据。不能用可播放/可编码把异义读法当认证。 明确符号拼字或元素名展开策略，保留显示Er文本并经精确口音路径核验；ER急诊室与er犹豫义不受影响。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The periodic table uses Er for erbium.",
+      "textHash": "fc1876d04985a3af1a1f94fd449ed9a2014abca70383b7c34a4108b227b347a1"
+    },
+    {
+      "accent": "US",
+      "exampleId": "sense-example-6ef524ec95282696cf602c76443553e2389e69f5a295d90a8578daa73afd7e5e",
+      "id": "sentence-audio-hold-457846f5390196f9bc407fe29e864964286d31dc2990ba61d52b633ec41658a2",
+      "learningSenseId": "learning-sense-3c777abb173dc3e5a5832023111e5c890127d016304dd2c7cd6d47c295f3d592",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "化学符号Er当前读成/ɜː/犹豫音；主源把符号与感叹词分项，感叹词音标不是符号依据。不能用可播放/可编码把异义读法当认证。 明确符号拼字或元素名展开策略，保留显示Er文本并经精确口音路径核验；ER急诊室与er犹豫义不受影响。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The periodic table uses Er for erbium.",
+      "textHash": "fc1876d04985a3af1a1f94fd449ed9a2014abca70383b7c34a4108b227b347a1"
+    },
+    {
+      "accent": "UK",
+      "exampleId": "sense-example-757d9267078380ee67962f050e35c393b54f3df35941081c51c11881eb2f2176",
+      "id": "sentence-audio-hold-3fca8cc192f0ac11ca4940593371e6817e08fa14fa187b42d4ec93b2f0e2fc2a",
+      "learningSenseId": "learning-sense-4d8012e02fd5a68f7b532d930911873ffea94c63fb53517ae2b188f3cdd121a3",
+      "review": {
+        "decision": "hold",
+        "expertCertified": false,
+        "reason": "已审具体借词语境与当前词汇读法有差异，目标地区读法或可编码方案仍待核；仅该句该口音暂留空。 此处patron明确是法语旅店店主。Collins英国单独列法语鼻化读法，未认证可编码的英国借词读法；美国词典对旅店主义允许/peɪtrən/不能跨地区冒证英国。",
+        "reviewer": "Codex"
+      },
+      "riskCategory": "wrong-lexeme",
+      "text": "The travel memoir describes a friendly patron at a small inn.",
+      "textHash": "fc5aa5e3b5ed11b2bc1a74b75f4d87dce9a282c8d7956a7c7b5f6a69d90b5f57"
+    }
+  ],
+  "formatVersion": 1,
+  "id": "sentence-audio-holds-v1"
+}

@@ -16,7 +16,7 @@ services:
     disk:
       name: nightstudy-audio
       mountPath: /app/.local/audio
-      sizeGB: 5
+      sizeGB: 10
     healthCheckPath: /health/ready
     envVars:
       - key: NODE_ENV

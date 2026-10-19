@@ -165,6 +165,35 @@ class IndependentAcceptanceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'no_symlink_input_components'):
                 check.Inputs().checked_fd(link, 1024)
 
+    def test_decoder_transport_is_seekable_and_keeps_full_input_eof_proof(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            file = root / 'fixture.mp3'
+            file.write_bytes(b'pinned encoded descriptor fixture')
+            test = self
+            class SeekableDecoder:
+                returncode = 0
+                def __init__(self, command, **kwargs):
+                    # Regression for the observed Linux LAME-padding failure:
+                    # pipe: is nonseekable and cannot stand in for this protocol.
+                    test.assertEqual(command[command.index('-i') + 1], 'fd:')
+                    test.assertEqual(command[command.index('-protocol_whitelist') + 1], 'file,fd')
+                    test.assertNotIn('-t', command)
+                    test.assertNotIn('-ss', command)
+                    fd = int(command[command.index('-fd') + 1])
+                    test.assertEqual(kwargs['pass_fds'], (fd,))
+                    os.lseek(fd, 0, os.SEEK_END)
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    while os.read(fd, 4096):
+                        pass
+                    Path(command[-1]).write_bytes(pcm_wav())
+                def poll(self):
+                    return 0
+            with patch.object(check.subprocess, 'Popen', SeekableDecoder):
+                actual = check.decode_mp3(check.Inputs(), file, check.sha(file.read_bytes()), file.stat().st_size,
+                                          root / 'unused-ffmpeg', root)
+            self.assertEqual(actual['decodedDurationSeconds'], .1)
+
 
 if __name__ == '__main__':
     unittest.main()

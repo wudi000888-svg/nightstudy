@@ -505,8 +505,8 @@ def decode_mp3(inputs, path, expected_sha, expected_bytes, ffmpeg, temporary):
             output, errors = Path(folder) / 'pcm.wav', Path(folder) / 'decoder.stderr'
             with errors.open('xb') as stderr:
                 command = [str(ffmpeg), '-nostdin', '-v', 'error', '-xerror', '-threads', '1',
-                           '-filter_threads', '1', '-filter_complex_threads', '1', '-protocol_whitelist', 'file,pipe',
-                           '-i', 'pipe:' + str(fd), '-map', '0:a:0', '-vn', '-sn', '-dn',
+                           '-filter_threads', '1', '-filter_complex_threads', '1', '-protocol_whitelist', 'file,fd',
+                           '-fd', str(fd), '-i', 'fd:', '-map', '0:a:0', '-vn', '-sn', '-dn',
                            '-c:a', 'pcm_s16le', '-threads', '1', '-f', 'wav', str(output)]
                 child = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=stderr,
                                          pass_fds=(fd,), start_new_session=True)
@@ -679,6 +679,7 @@ def verify(args):
                 allCurrentReferencesBound=True, reviewedFrozenRawCallsVerified=True,
                 baseFrontendObservationsArePrechecksOnly=True, completeMp3EofDecodes=len(checked_media),
                 originalWavsFullyRead=len(checked_media), decoderThreads=1, decoderBinarySha256=ffmpeg_sha,
+                decoderInputProtocol='fd', seekablePinnedInput=True,
                 media=checked_media, expertCertified=False, listened=False, publicationAuthorized=False)
 
 

@@ -202,10 +202,7 @@ try {
       .rows.find((word) => word.wordId === member.id);
     need(fixed, 'representative_in_exact_pinned_leaf');
     const word = (await api('words/' + encodeURIComponent(member.id))).word;
-    check(
-      'new_word_has_all_atomic_senses',
-      hasExactPublicWordIdentity(word, fixed),
-    );
+    check('new_word_has_all_atomic_senses', hasExactPublicWordIdentity(word, fixed));
     for (const sense of fixed.senses) {
       const actual = word.senses.find((item) => item.id === sense.id);
       check(

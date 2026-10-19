@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  hasExactPublicWordIdentity,
-  normalizeDictionaryLemma,
-} from './all-book-http-contract.mjs';
+import { hasExactPublicWordIdentity, normalizeDictionaryLemma } from './all-book-http-contract.mjs';
 
 const fixed = {
   wordId: 'pinned-word-id',

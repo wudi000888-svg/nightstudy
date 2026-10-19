@@ -16,6 +16,22 @@ const mib = 1024 ** 2;
 const sha = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const normalize = (value) =>
   value.normalize('NFKC').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/gu, ' ').trim();
+const displayedPos = (sense) =>
+  sense.pos.trim()
+    ? sense.pos
+    : sense.contentMetadata?.authoredDisplayPosSource?.kind === 'original-authoring' &&
+        [
+          'phr. v.',
+          'prep. phr.',
+          'adv. phr.',
+          'adj. phr.',
+          'conj. phr.',
+          'det. phr.',
+          'pron. phr.',
+          'modal phr.',
+        ].includes(sense.contentMetadata?.authoredDisplayPos)
+      ? sense.contentMetadata.authoredDisplayPos
+      : '';
 const need = (condition, code) => {
   if (!condition) throw new Error(code);
 };
@@ -192,7 +208,7 @@ try {
       check(
         'sense_pos_bilingual_and_binding',
         actual?.kind === 'learning' &&
-          actual.pos === sense.pos &&
+          actual.pos === displayedPos(sense) &&
           actual.definitionEn === sense.definitionEn &&
           actual.definitionZh === sense.definitionZh &&
           actual.bindingHash === sense.bindingHash &&
@@ -237,7 +253,7 @@ try {
       senseId: sense.id,
       definitionEn: sense.definitionEn,
       definitionZh: sense.definitionZh,
-      pos: sense.pos,
+      pos: displayedPos(sense),
       examples: sense.examples.map((e) => ({
         id: e.id,
         english: e.exampleEn,

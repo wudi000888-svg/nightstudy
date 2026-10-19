@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { existsSync, createWriteStream, constants } from 'node:fs';
+import { existsSync, createWriteStream, constants, type BigIntStats } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { Transform } from 'node:stream';
@@ -149,6 +149,44 @@ async function fileHash(filename: string) {
   }
   return hash.digest('hex');
 }
+
+/** Call only after full pack/media/sidecar validation; never trust a cache name alone. */
+export async function releaseInstalledAudioArchive(
+  source: Pick<z.infer<typeof packSource>, 'id' | 'source'>,
+) {
+  const retain = process.env.AUDIO_RETAIN_ARCHIVES ?? 'false';
+  if (!['true', 'false'].includes(retain)) throw new Error('invalid_audio_retain_archives');
+  if (retain === 'true') return;
+  if (!/^[a-z0-9-]+$/.test(source.id)) throw new Error('audio_archive_cleanup_source_invalid');
+  const directory = path.join(audioCacheRoot(), 'downloads');
+  const archive = path.join(directory, `${source.id}.tar.gz`);
+  const identity = (value: BigIntStats) =>
+    `${value.dev}:${value.ino}:${value.size}:${value.mtimeNs}:${value.ctimeNs}`;
+  try {
+    const folder = await fs.lstat(directory, { bigint: true });
+    if (!folder.isDirectory() || folder.isSymbolicLink())
+      throw new Error('audio_archive_cleanup_directory_invalid');
+    const before = await fs.lstat(archive, { bigint: true });
+    if (!before.isFile() || before.isSymbolicLink() || before.size !== BigInt(source.source.sizeBytes))
+      throw new Error('audio_archive_cleanup_file_invalid');
+    const checksum = await fileHash(archive);
+    const after = await fs.lstat(archive, { bigint: true });
+    const currentFolder = await fs.lstat(directory, { bigint: true });
+    if (
+      checksum !== source.source.sha256 ||
+      identity(before) !== identity(after) ||
+      !currentFolder.isDirectory() ||
+      currentFolder.isSymbolicLink() ||
+      folder.dev !== currentFolder.dev || folder.ino !== currentFolder.ino
+    )
+      throw new Error('audio_archive_cleanup_unverified');
+    await fs.unlink(archive);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw new Error('audio_archive_cleanup_failed', { cause: error });
+  }
+}
+
 async function pinnedDownload(filename: string, source: z.infer<typeof pinnedSource>) {
   await ensureCacheDirectory(path.dirname(filename));
   const stat = await fs.lstat(filename).catch(() => null);
@@ -437,9 +475,13 @@ export async function installAudioFiles(source: z.infer<typeof packSource>) {
       await validateAudioPublicationSidecars(source, manifest, metadata, (name) =>
         smallAudioMetadata(path.join(root, `${source.id}.${name}`), 4 * 1024 * 1024),
       );
-      return manifest;
     } catch {
       manifest = undefined; /* Recover lost or corrupt media from the pinned archive. */
+    }
+    // Cleanup errors are not a reason to download or repair validated media.
+    if (manifest) {
+      await releaseInstalledAudioArchive(source);
+      return manifest;
     }
   }
   if (!manifest) {
@@ -485,6 +527,7 @@ export async function installAudioFiles(source: z.infer<typeof packSource>) {
     }
   }
   await validateAudioPack(manifest, source);
+  await releaseInstalledAudioArchive(source);
   return manifest;
 }
 export async function validateAudioPack(
@@ -759,9 +802,11 @@ async function main() {
   }
 }
 if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url))
-  main().catch(() => {
+  main().catch((error: unknown) => {
     console.error(
-      'Audio installation failed; check the pinned pack, disk space and source availability. No partial database transaction was committed.',
+      error instanceof Error && error.message === 'audio_archive_cleanup_failed'
+        ? 'Audio files passed validation, but compressed archive cleanup failed. Installed files and the archive are retained; check cache permissions or explicitly set AUDIO_RETAIN_ARCHIVES=true.'
+        : 'Audio installation failed; check the pinned pack, disk space and source availability. No partial database transaction was committed.',
     );
     process.exitCode = 1;
   });

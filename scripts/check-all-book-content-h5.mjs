@@ -45,6 +45,24 @@ need(
     base.pathname === checkedBase.pathname,
   'real_complete_isolated_http_receipt',
 );
+need(
+  prior.samples.every(
+    (sample) =>
+      Array.isArray(sample.senses) &&
+      new Set(sample.senses.map((sense) => sense.id)).size === sample.senses.length &&
+      sample.senses.some((sense) => sense.id === sample.senseId) &&
+      sample.senses.every(
+        (sense) =>
+          typeof sense.id === 'string' &&
+          [sense.pos, sense.definitionEn, sense.definitionZh].every(
+            (value) => typeof value === 'string' && value.trim(),
+          ) &&
+          Array.isArray(sense.examples) &&
+          sense.examples.length >= 2,
+      ),
+  ),
+  'complete_api_ordered_pinned_meaning_samples',
+);
 const out = path.resolve(values.output);
 need(
   !fs.existsSync(out) && fs.realpathSync(path.dirname(out)) === path.dirname(out),
@@ -62,11 +80,13 @@ const receipt = {
   checks: [],
   screenshots: [],
   playback: [],
+  meaningNavigation: [],
   blockedWrites: [],
   failures: [],
   limitations: [
     'Desktop Chromium emulates mobile viewports; no physical iPhone, Safari or installed PWA certification.',
     'Every built-in book has a DOM sample outside the original 35 words; two sentences have real US/UK playback.',
+    'Two distinct multi-sense words have real next/previous meaning navigation; mobile tap-to-open word cards are not covered here.',
   ],
 };
 const { chromium } = await import(pathToFileURL(path.resolve(values['playwright-module'])).href);
@@ -175,6 +195,105 @@ async function exactMeaning(detail, sample) {
           posParts[1] === sample.pos.trim())),
   );
 }
+function focusSample(sample, sense) {
+  return {
+    ...sample,
+    senseId: sense.id,
+    pos: sense.pos,
+    definitionEn: sense.definitionEn,
+    definitionZh: sense.definitionZh,
+    examples: sense.examples,
+  };
+}
+async function selectedMeaning(page, sample, senseIndex) {
+  await page.waitForURL(
+    (url) =>
+      url.pathname === new URL('lookup', base).pathname &&
+      url.searchParams.get('q') === sample.lemma &&
+      url.searchParams.get('entry') === sample.wordId &&
+      url.searchParams.get('sense') === sample.senseId,
+    { timeout: 30000 },
+  );
+  await page.waitForFunction(
+    ({ index, count }) => {
+      const entry = [...document.querySelectorAll('.lookup-entry')].find(
+        (element) => element.closest('.h5-screen')?.dataset.screenActive === 'true',
+      );
+      const counter = entry?.querySelector('.study-meaning-controls > span');
+      return counter?.textContent.replace(/\s+/g, ' ').trim() === `${index + 1} / ${count} 义`;
+    },
+    { index: senseIndex, count: sample.senses.length },
+    { timeout: 30000 },
+  );
+  const url = new URL(page.url());
+  check(
+    'meaning_navigation_preserves_lookup_query_identity',
+    url.searchParams.get('q') === sample.lemma &&
+      url.searchParams.get('entry') === sample.wordId &&
+      url.searchParams.get('sense') === sample.senseId,
+  );
+}
+async function meaningNavigation(page, sample) {
+  const first = focusSample(sample, sample.senses[0]);
+  const second = focusSample(sample, sample.senses[1]);
+  const detail = await open(page, first);
+  await selectedMeaning(page, first, 0);
+  await exactMeaning(detail, first);
+  await exactContext(detail, first, 0);
+  check(
+    'first_meaning_has_disabled_previous_control',
+    await detail.getByRole('button', { name: '上一义项', exact: true }).isDisabled(),
+  );
+  await detail.getByRole('button', { name: '下一条例句', exact: true }).click();
+  await exactContext(detail, first, 1);
+  await detail.getByRole('button', { name: '下一义项', exact: true }).click();
+  await selectedMeaning(page, second, 1);
+  await exactMeaning(detail, second);
+  await exactContext(detail, second, 0);
+  check(
+    'next_meaning_resets_to_first_context',
+    await detail.getByRole('button', { name: '上一条例句', exact: true }).isDisabled(),
+  );
+  await detail.getByRole('button', { name: '下一条例句', exact: true }).click();
+  await exactContext(detail, second, 1);
+  await detail.getByRole('button', { name: '上一义项', exact: true }).click();
+  await selectedMeaning(page, first, 0);
+  await exactMeaning(detail, first);
+  await exactContext(detail, first, 0);
+  check(
+    'previous_meaning_resets_to_first_context',
+    await detail.getByRole('button', { name: '上一条例句', exact: true }).isDisabled(),
+  );
+  const lastIndex = sample.senses.length - 1;
+  const last = focusSample(sample, sample.senses[lastIndex]);
+  await open(page, last);
+  await selectedMeaning(page, last, lastIndex);
+  await exactMeaning(detail, last);
+  await exactContext(detail, last, 0);
+  check(
+    'last_meaning_has_disabled_next_control',
+    await detail.getByRole('button', { name: '下一义项', exact: true }).isDisabled(),
+  );
+  await open(page, sample);
+  await selectedMeaning(
+    page,
+    sample,
+    sample.senses.findIndex((sense) => sense.id === sample.senseId),
+  );
+  await exactMeaning(detail, sample);
+  await exactContext(detail, sample, 0);
+  receipt.meaningNavigation.push({
+    bookId: sample.bookId,
+    wordId: sample.wordId,
+    fromSenseId: first.senseId,
+    toSenseId: second.senseId,
+    directions: ['next', 'previous'],
+    changedMeaningAfterContextIndex: 1,
+    contextIndexAfterEachMeaningChange: 0,
+    restoredFocusSenseId: sample.senseId,
+    realQueryAndCounterChecked: true,
+  });
+}
 async function layout(page, name) {
   check(
     name + '_no_document_horizontal_overflow',
@@ -270,6 +389,16 @@ try {
     isMobile: true,
     hasTouch: true,
   });
+  const meaningSamples = [];
+  const meaningWords = new Set();
+  for (const sample of prior.samples) {
+    if (sample.senses.length < 2 || meaningWords.has(sample.wordId)) continue;
+    meaningSamples.push(sample);
+    meaningWords.add(sample.wordId);
+    if (meaningSamples.length === 2) break;
+  }
+  check('two_real_multisense_book_samples', meaningSamples.length === 2);
+  const meaningBooks = new Set(meaningSamples.map((sample) => sample.bookId));
   for (const [index, sample] of prior.samples.entries()) {
     const detail = await open(page, sample);
     await exactMeaning(detail, sample);
@@ -278,6 +407,7 @@ try {
     await exactContext(detail, sample, 1);
     await detail.getByRole('button', { name: '上一条例句', exact: true }).click();
     await exactContext(detail, sample, 0);
+    if (meaningBooks.has(sample.bookId)) await meaningNavigation(page, sample);
     await layout(page, 'book_' + index);
     if (index < 2) {
       const desired = sample.examples.findIndex((e) => e.english === sample.audioText);
@@ -322,6 +452,7 @@ try {
       await screenshot(page, 'mobile-book-' + (index + 1));
     }
   }
+  check('both_multisense_books_completed_real_navigation', receipt.meaningNavigation.length === 2);
   await page.setViewportSize({ width: 320, height: 568 });
   const smallDetail = await open(page, prior.samples[0]);
   await exactMeaning(smallDetail, prior.samples[0]);

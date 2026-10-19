@@ -10,6 +10,7 @@ import {
 } from './check-learning-senses-install.mjs';
 import { readSentenceAudioPolicy } from './check-sentence-audio-policy.mjs';
 import { readSentenceAudioCollectionPins } from './check-audio-install.mjs';
+import { hasExactPublicWordIdentity } from './all-book-http-contract.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const mib = 1024 ** 2;
@@ -186,6 +187,10 @@ try {
     const page = await api('books/' + encodeURIComponent(bookId) + '?limit=50');
     check('book_identity_and_nonempty_members', page.book.id === bookId && page.items.length > 0);
     const member =
+      page.items.find(
+        (word) => !baseline.has(word.id) && !selected.has(word.id) && word.senseCount > 1,
+      ) ??
+      page.items.find((word) => !baseline.has(word.id) && word.senseCount > 1) ??
       page.items.find((word) => !baseline.has(word.id) && !selected.has(word.id)) ??
       page.items.find((word) => !baseline.has(word.id));
     need(member, 'new_content_representative_in_every_book');
@@ -199,9 +204,7 @@ try {
     const word = (await api('words/' + encodeURIComponent(member.id))).word;
     check(
       'new_word_has_all_atomic_senses',
-      word.id === fixed.wordId &&
-        word.normalizedLemma === fixed.normalizedLemma &&
-        word.senses.length === fixed.senses.length,
+      hasExactPublicWordIdentity(word, fixed),
     );
     for (const sense of fixed.senses) {
       const actual = word.senses.find((item) => item.id === sense.id);
@@ -234,7 +237,17 @@ try {
           ),
         );
     }
-    const sense = fixed.senses.find((s) =>
+    const orderedSenses = word.senses.map((actual) => {
+      const sense = fixed.senses.find((item) => item.id === actual.id);
+      if (!sense) return null;
+      const examples = actual.examples.map((example) =>
+        sense.examples.find((item) => item.id === example.id),
+      );
+      need(examples.every(Boolean), 'every_public_example_has_exact_pinned_identity');
+      return { ...sense, examples };
+    });
+    need(orderedSenses.every(Boolean), 'every_public_sense_has_exact_pinned_identity');
+    const sense = orderedSenses.find((s) =>
       s.examples.some(
         (e) =>
           !['US', 'UK'].some((a) => policy.byIdentity.has(sha(normalize(e.exampleEn)) + '\0' + a)),
@@ -249,7 +262,7 @@ try {
       bookId,
       wordId: word.id,
       lemma: word.lemma,
-      normalizedLemma: word.normalizedLemma,
+      normalizedLemma: fixed.normalizedLemma,
       senseId: sense.id,
       definitionEn: sense.definitionEn,
       definitionZh: sense.definitionZh,
@@ -259,6 +272,18 @@ try {
         english: e.exampleEn,
         chinese: e.exampleZh,
         contextLabel: e.contextLabel,
+      })),
+      senses: orderedSenses.map((s) => ({
+        id: s.id,
+        pos: displayedPos(s),
+        definitionEn: s.definitionEn,
+        definitionZh: s.definitionZh,
+        examples: s.examples.map((e) => ({
+          id: e.id,
+          english: e.exampleEn,
+          chinese: e.exampleZh,
+          contextLabel: e.contextLabel,
+        })),
       })),
       audioText: example.exampleEn,
       textHash: sha(normalize(example.exampleEn)),

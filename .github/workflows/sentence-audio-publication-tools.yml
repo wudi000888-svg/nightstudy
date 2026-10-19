@@ -37,6 +37,7 @@ jobs:
             scripts/check-ci-sentence-audio-selected-installer.mjs \
             scripts/check-ci-sentence-audio-selected-installer.test.mjs \
             scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs \
+            scripts/all-book-http-contract.mjs scripts/all-book-http-contract.test.mjs \
             scripts/check-all-book-recognition-http.mjs scripts/check-all-book-recognition-http.test.mjs \
             scripts/audio-prepare.ts scripts/audio-prepare-cache.test.ts scripts/audio-prepare-profile.test.ts compose.yaml \
             apps/api/src/modules/content.ts apps/api/src/audio.integration.test.ts \
@@ -51,6 +52,7 @@ jobs:
           set -euo pipefail
           node --test scripts/check-ci-sentence-audio-installer.test.mjs \
             scripts/check-ci-sentence-audio-selected-installer.test.mjs \
+            scripts/all-book-http-contract.test.mjs \
             scripts/check-all-book-recognition-http.test.mjs
           python3 scripts/select-ci-sentence-audio-publication.test.py
           python3 scripts/run-ci-sentence-audio-publication.test.py
@@ -121,6 +123,7 @@ jobs:
             scripts/check-ci-sentence-audio-selected-installer.mjs \
             scripts/check-ci-sentence-audio-selected-installer.test.mjs \
             scripts/check-all-book-content-http.mjs scripts/check-all-book-content-h5.mjs \
+            scripts/all-book-http-contract.mjs scripts/all-book-http-contract.test.mjs \
             scripts/check-all-book-recognition-http.mjs scripts/check-all-book-recognition-http.test.mjs \
             scripts/audio-prepare.ts scripts/audio-prepare-cache.test.ts scripts/audio-prepare-profile.test.ts compose.yaml \
             apps/api/src/modules/content.ts apps/api/src/audio.integration.test.ts \

@@ -1,0 +1,33 @@
+{
+  "activeBookWords": 18767,
+  "bilingualOverlaySha256": "bafce91547bcb181520fbde8f595cd9a924e5addb614f978e5969bfb6a6f552e",
+  "bytes": 533790,
+  "draftsSha256": "432c99063e988292bd80fb7af5b578f7ef08bbc0070dd0e41af6847d88cbc4b5",
+  "editorialReview": "codex-reviewed",
+  "exampleCount": 1166,
+  "exhaustiveBookCoverage": false,
+  "fileName": "learning-senses-v2-staging-0025-part-0012.jsonl.gz",
+  "formatVersion": 1,
+  "id": "learning-senses-v2-staging-0025-part-0012",
+  "jsonlSha256": "3e795cd8d5aec7a3609afcff1a1ddc206032eb5c013a788b64a4704d9cf2a257",
+  "license": "MIT",
+  "scope": "Explicitly curated atomic senses; all remaining meanings stay incomplete.",
+  "semanticQualityCertified": false,
+  "senseCount": 583,
+  "sha256": "f94771f66f8185a0f01afab7b1d1e341e3dfbd5610ab85fb04f6db175ee11ce3",
+  "sourceAdditions": {
+    "bytes": 44390,
+    "fileName": "learning-sense-sources-v2-staging-0025-part-0012.jsonl.gz",
+    "jsonlSha256": "b3f6635cae714a943f9f38b7ed600cf523674f4bfe021f0638a023a7c578d343",
+    "rowCount": 144,
+    "sha256": "fe74808504fe27c2e65d48d92958fbb2f577ad67730bc47d98badccab5561433"
+  },
+  "sourceExportSha256": "614374f14db7a11141877e3a38c8f1e1f419ad49ca686cc1a23516195f5ce19c",
+  "sourceUrl": "https://github.com/wudi000888-svg/nightstudy",
+  "totalRemainingAtomicMeaningCount": null,
+  "version": "learning-senses-v2-staging-0025-part-0012",
+  "wordCount": 200,
+  "wordLevelCandidateCount": 200,
+  "wordsAwaitingAtomicReview": 18567,
+  "wordsWithCuratedMeanings": 200
+}

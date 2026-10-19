@@ -1,0 +1,873 @@
+{
+  "bilingualOverlaySha256": "bafce91547bcb181520fbde8f595cd9a924e5addb614f978e5969bfb6a6f552e",
+  "editorialReview": "codex-reviewed",
+  "exampleCount": 99984,
+  "exhaustiveBookCoverage": false,
+  "formatVersion": 2,
+  "id": "learning-senses-collection-v2",
+  "kind": "learning-senses-collection",
+  "requiredWordCount": 18767,
+  "requiredWordsSha256": "bdb6b048b9b6c79b5228ec70d2a854144c7f082f01430ad56da81c0359985cf2",
+  "semanticQualityCertified": false,
+  "senseCount": 49992,
+  "shards": [
+    {
+      "bytes": 1116,
+      "exampleCount": 196,
+      "id": "learning-senses-v1",
+      "manifestFileName": "learning-senses-v1.manifest.json",
+      "senseCount": 98,
+      "sha256": "de8852d30321f4915d93a3ed7d87adb4ef23810249b4bc3537ddedfa9a8d636a",
+      "wordCount": 35
+    },
+    {
+      "bytes": 1498,
+      "exampleCount": 736,
+      "id": "learning-senses-v2-staging-0025-part-0001",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0001.manifest.json",
+      "senseCount": 368,
+      "sha256": "ebeeb70318d0e9909d5bd4e4d2891e697e3f925855e920f7d2d76811eb2ebd50",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1187,
+      "exampleCount": 678,
+      "id": "learning-senses-v2-staging-0025-part-0002",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0002.manifest.json",
+      "senseCount": 339,
+      "sha256": "595f390a7e3ad1362282b527569b476c4ee8bb2be960e945fcb5d476eba6457f",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 774,
+      "id": "learning-senses-v2-staging-0025-part-0003",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0003.manifest.json",
+      "senseCount": 387,
+      "sha256": "62b66c1c0b347adc062f517a94ac68e1b21079b7fcbaa788369bd19b1139547a",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 734,
+      "id": "learning-senses-v2-staging-0025-part-0004",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0004.manifest.json",
+      "senseCount": 367,
+      "sha256": "39a1637e000122a7d55d9bb941670357ec9f9bd604a0cd6fa091af87475973b6",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 852,
+      "id": "learning-senses-v2-staging-0025-part-0005",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0005.manifest.json",
+      "senseCount": 426,
+      "sha256": "2517c3569fd254a90b385d8aeb9000a5125a4f4530b574dad8cf28fe176b7ce1",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 746,
+      "id": "learning-senses-v2-staging-0025-part-0006",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0006.manifest.json",
+      "senseCount": 373,
+      "sha256": "6b63c0db08f7051b7f67e85b74ddd4dbd2f354feeb1ee3b7255b19e5d3e7774f",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 900,
+      "id": "learning-senses-v2-staging-0025-part-0007",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0007.manifest.json",
+      "senseCount": 450,
+      "sha256": "9b1bc85306cda23965afe52efe8e6932b562eea9181046b64aaa1e326a886be5",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 848,
+      "id": "learning-senses-v2-staging-0025-part-0008",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0008.manifest.json",
+      "senseCount": 424,
+      "sha256": "30b6a3d1c0a5beebec9d604379aaba9d32f3dc28ba91559b1c0fae4ba69d3e43",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 926,
+      "id": "learning-senses-v2-staging-0025-part-0009",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0009.manifest.json",
+      "senseCount": 463,
+      "sha256": "005b40a33a43c60e6a2cba5df7ee3af69bb6ae6383ae716f2cca94a7d87009ea",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1238,
+      "id": "learning-senses-v2-staging-0025-part-0010",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0010.manifest.json",
+      "senseCount": 619,
+      "sha256": "4d24ef27588627e678862942fcebc1d0b098a29fe9b856278fd7997fa516adf1",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1312,
+      "id": "learning-senses-v2-staging-0025-part-0011",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0011.manifest.json",
+      "senseCount": 656,
+      "sha256": "e5c23ab5c97ff52da40ba5c6445a40cd38927926d70e64714d24d5406b4794e7",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1166,
+      "id": "learning-senses-v2-staging-0025-part-0012",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0012.manifest.json",
+      "senseCount": 583,
+      "sha256": "1f9366bc22f353b2a8089ebb0f294ddddfde0f9a25f3c0e1132d11704e5007b6",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1234,
+      "id": "learning-senses-v2-staging-0025-part-0013",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0013.manifest.json",
+      "senseCount": 617,
+      "sha256": "69aef3530b1b137ece4b7aaa40f19d07166ca56604012c992eab92014f2de141",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1170,
+      "id": "learning-senses-v2-staging-0025-part-0014",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0014.manifest.json",
+      "senseCount": 585,
+      "sha256": "6510ae3dcca5bde3e4d5b7986207b868dc5578f4462665103596362651c260cd",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1242,
+      "id": "learning-senses-v2-staging-0025-part-0015",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0015.manifest.json",
+      "senseCount": 621,
+      "sha256": "195f9ba1da70a631b5a55889f3904ad8e0cdb78811c626bd5510701157bbe909",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1066,
+      "id": "learning-senses-v2-staging-0025-part-0016",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0016.manifest.json",
+      "senseCount": 533,
+      "sha256": "75c1da013f3702f1c26e86249a20095a54f7d536afbdb42f120b9adbfa38ed96",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1012,
+      "id": "learning-senses-v2-staging-0025-part-0017",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0017.manifest.json",
+      "senseCount": 506,
+      "sha256": "a09bdca1a24889c7ddc3858a1c3f49e520ac1366d41d4ebfc622854c2d971482",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1032,
+      "id": "learning-senses-v2-staging-0025-part-0018",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0018.manifest.json",
+      "senseCount": 516,
+      "sha256": "8637dd324064593ce5897783360483f49e3a70c03304b5ced4fcd2aa007ee004",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1296,
+      "id": "learning-senses-v2-staging-0025-part-0019",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0019.manifest.json",
+      "senseCount": 648,
+      "sha256": "b73bf4db74b41770cff00a7526b7ab133d1673b2ccca7e6d5a5c538b0ebf7d68",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1596,
+      "id": "learning-senses-v2-staging-0025-part-0020",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0020.manifest.json",
+      "senseCount": 798,
+      "sha256": "f7eaa31008dc1fbbaf2de18f42e814ed7cb101d8c5566ec9e746ef2ab99de8ac",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1434,
+      "id": "learning-senses-v2-staging-0025-part-0021",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0021.manifest.json",
+      "senseCount": 717,
+      "sha256": "31dc9a85e591627ed88ecf9995194c64ebdfa90f9e8a493ea04acae6a0487326",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1116,
+      "id": "learning-senses-v2-staging-0025-part-0022",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0022.manifest.json",
+      "senseCount": 558,
+      "sha256": "b98dd4785c6218a470322ba480a344d7459143904efbfe8f57f6a869249673e6",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1256,
+      "id": "learning-senses-v2-staging-0025-part-0023",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0023.manifest.json",
+      "senseCount": 628,
+      "sha256": "6d9f6aaa684cf3267b0867364b31bedf767e5055991591deaa7958e2afd3b0af",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1518,
+      "id": "learning-senses-v2-staging-0025-part-0024",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0024.manifest.json",
+      "senseCount": 759,
+      "sha256": "b18ba01f2fe0fd337559351b5aba96305533d43577096a02bacd942c97d722b5",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1050,
+      "id": "learning-senses-v2-staging-0025-part-0025",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0025.manifest.json",
+      "senseCount": 525,
+      "sha256": "1a64fb9f07f54f1fed900927892592d91c0edb4c5c3fbc3e6555a9ddf6960890",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1300,
+      "id": "learning-senses-v2-staging-0025-part-0026",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0026.manifest.json",
+      "senseCount": 650,
+      "sha256": "e5bb3df1b104a173bda2db33d9f977c62da63249f9b4b4f173e02f07b0de4527",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 916,
+      "id": "learning-senses-v2-staging-0025-part-0027",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0027.manifest.json",
+      "senseCount": 458,
+      "sha256": "eec0a2627fbbfd5b3dcd78e66c80b0ed49634853acbc8413226b2b3db437ef06",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 894,
+      "id": "learning-senses-v2-staging-0025-part-0028",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0028.manifest.json",
+      "senseCount": 447,
+      "sha256": "5c143b396f068fe19fb7b2e08709b77c9ad1664e9adfd2da49d11185f6e71786",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 822,
+      "id": "learning-senses-v2-staging-0025-part-0029",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0029.manifest.json",
+      "senseCount": 411,
+      "sha256": "33c1114785ef639b85dd53fed0b6fdcd9b6426b26f5157beff7ab289b8328ae9",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 922,
+      "id": "learning-senses-v2-staging-0025-part-0030",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0030.manifest.json",
+      "senseCount": 461,
+      "sha256": "e51b874df70d670d3de95ae6ba2bd03bcb72218134efc13a355ac8e7ff201247",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1104,
+      "id": "learning-senses-v2-staging-0025-part-0031",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0031.manifest.json",
+      "senseCount": 552,
+      "sha256": "c92ad839edb3ca30c798775942c14cef4173459d62e38bc6b5ab06eb0373d10f",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 786,
+      "id": "learning-senses-v2-staging-0025-part-0032",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0032.manifest.json",
+      "senseCount": 393,
+      "sha256": "3d7d4414c49a0f393e28476a61d22abc5cef37932584456ac0f13369229f8cbe",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 802,
+      "id": "learning-senses-v2-staging-0025-part-0033",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0033.manifest.json",
+      "senseCount": 401,
+      "sha256": "8b9420bd94b104e7377fd544f6fb4689a29d90221ac74cbe7264f23a79021abc",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 712,
+      "id": "learning-senses-v2-staging-0025-part-0034",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0034.manifest.json",
+      "senseCount": 356,
+      "sha256": "62000a39fa99a8b200fb7cc2dd3e49e43a45611b1fda8d7e509c89d56b5d7fce",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 704,
+      "id": "learning-senses-v2-staging-0025-part-0035",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0035.manifest.json",
+      "senseCount": 352,
+      "sha256": "f4f608eef914fa13cead6aa05fa46f13327bb82cb49229e86c2f95dd7ff36415",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 746,
+      "id": "learning-senses-v2-staging-0025-part-0036",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0036.manifest.json",
+      "senseCount": 373,
+      "sha256": "712422bc0b3dec7479dde851b7217238e472493326e8948905f41019901dfee9",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 928,
+      "id": "learning-senses-v2-staging-0025-part-0037",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0037.manifest.json",
+      "senseCount": 464,
+      "sha256": "ec2f2b9f38687b8491f00613fec2363e2fcb692c34e8100fd1bb84714ffe02bd",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1020,
+      "id": "learning-senses-v2-staging-0025-part-0038",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0038.manifest.json",
+      "senseCount": 510,
+      "sha256": "7894b2e493a930222c2ca55317c1a52b14802c56483aa9bb617ddb592b23eb59",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 948,
+      "id": "learning-senses-v2-staging-0025-part-0039",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0039.manifest.json",
+      "senseCount": 474,
+      "sha256": "d6e09569c7235284f31518628b6199d9bb140c3955a083de7588d3be0e10182f",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 804,
+      "id": "learning-senses-v2-staging-0025-part-0040",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0040.manifest.json",
+      "senseCount": 402,
+      "sha256": "82a4dd90709598cf4aa79e328a3e2f1df9ad34cdfa3e843e665fc22ed999a98f",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1096,
+      "id": "learning-senses-v2-staging-0025-part-0041",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0041.manifest.json",
+      "senseCount": 548,
+      "sha256": "396d8c5e2462036af99be2fbe41455d66b86cfcf61ba7fc2c27f4f683035ddf6",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 908,
+      "id": "learning-senses-v2-staging-0025-part-0042",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0042.manifest.json",
+      "senseCount": 454,
+      "sha256": "5e2dd5d9e2aa70e531e8f416227ea03f5ec78f1d5e609df5931617d9f349a06b",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 766,
+      "id": "learning-senses-v2-staging-0025-part-0043",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0043.manifest.json",
+      "senseCount": 383,
+      "sha256": "0f9437158e6ff147418e80be20b0b268d6f31fd5bd72cc38cec441f61d17bd77",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 662,
+      "id": "learning-senses-v2-staging-0025-part-0044",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0044.manifest.json",
+      "senseCount": 331,
+      "sha256": "19926caf76d91ad2724bfbfbc3f4d177744082d12d6e52b253b7841e92ffd7f5",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 810,
+      "id": "learning-senses-v2-staging-0025-part-0045",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0045.manifest.json",
+      "senseCount": 405,
+      "sha256": "a704fc3bdf2ccaa13c1a66dba7aa59bbcf7ce0d609bb1f2b23b54e850e65d272",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 886,
+      "id": "learning-senses-v2-staging-0025-part-0046",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0046.manifest.json",
+      "senseCount": 443,
+      "sha256": "696c564b42ecfd9e1c3f658f043b14fb7958aee6f04c3e48c26d6e97554709cb",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 904,
+      "id": "learning-senses-v2-staging-0025-part-0047",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0047.manifest.json",
+      "senseCount": 452,
+      "sha256": "2c06da4e1ebd429f5acd69e4da0a14abb8d83e2f58df2d284053cd245ab629c5",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1124,
+      "id": "learning-senses-v2-staging-0025-part-0048",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0048.manifest.json",
+      "senseCount": 562,
+      "sha256": "354540ebc1afc2c783f3088e1a9f510095d1cefbc8650eed76881426f8c68e0a",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1222,
+      "id": "learning-senses-v2-staging-0025-part-0049",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0049.manifest.json",
+      "senseCount": 611,
+      "sha256": "cdfd8a08dddcdedfa6ba0468fa4b1c089e5d22cf15ae77e0b4d07aee0fc79450",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1354,
+      "id": "learning-senses-v2-staging-0025-part-0050",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0050.manifest.json",
+      "senseCount": 677,
+      "sha256": "8bd08a81c9c19d91f74226d04deddfba7026510019e6ea63baa5aa15b4290c99",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1158,
+      "id": "learning-senses-v2-staging-0025-part-0051",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0051.manifest.json",
+      "senseCount": 579,
+      "sha256": "85101c35be22a3495f290469efc02001a2671ff2bbc6c30c303db91e1ae69a78",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1002,
+      "id": "learning-senses-v2-staging-0025-part-0052",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0052.manifest.json",
+      "senseCount": 501,
+      "sha256": "951ae92e45a99c938e2c9e4fe8efd665cae0c5a70b1207a66abc68060d7e6e30",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1122,
+      "id": "learning-senses-v2-staging-0025-part-0053",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0053.manifest.json",
+      "senseCount": 561,
+      "sha256": "4c2a2a4fbc197dd893e1338d738a2562cb10056f37fe77ba819e972b2b8df5d4",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 924,
+      "id": "learning-senses-v2-staging-0025-part-0054",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0054.manifest.json",
+      "senseCount": 462,
+      "sha256": "99e4d321b3961d1c237d4af57ba349296d1512d783b66c483826856de3461a72",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1156,
+      "id": "learning-senses-v2-staging-0025-part-0055",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0055.manifest.json",
+      "senseCount": 578,
+      "sha256": "9ab27759af6ce871a45b9f004e50e78fbe4cee5d09ad50e93383ce12bd62f891",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1162,
+      "id": "learning-senses-v2-staging-0025-part-0056",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0056.manifest.json",
+      "senseCount": 581,
+      "sha256": "f1992024ccf0013437f9e5bf988db2fed0fc8c8adf1a10ed7f6605dd8299c184",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1174,
+      "id": "learning-senses-v2-staging-0025-part-0057",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0057.manifest.json",
+      "senseCount": 587,
+      "sha256": "5ee9651e8c8fd9d2df691819ccc6a8990c1c59e82b184c46dc86da7ca6423709",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1186,
+      "id": "learning-senses-v2-staging-0025-part-0058",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0058.manifest.json",
+      "senseCount": 593,
+      "sha256": "1b4811786ed8da9c4f1751f5a8fa12630bb85cf4816e6404b83199bdab92f0e2",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 932,
+      "id": "learning-senses-v2-staging-0025-part-0059",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0059.manifest.json",
+      "senseCount": 466,
+      "sha256": "010d71cd84ca2666bd7922b0569943b3600fc83ef460fa8ac11ba3dcdda0097d",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1010,
+      "id": "learning-senses-v2-staging-0025-part-0060",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0060.manifest.json",
+      "senseCount": 505,
+      "sha256": "009d560394ab6423a3fdd4ac49f61f9fd98fe19d06a1844773180378a032b260",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1106,
+      "id": "learning-senses-v2-staging-0025-part-0061",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0061.manifest.json",
+      "senseCount": 553,
+      "sha256": "4dafa86fa36bb9dc0225769291f279e6a2d69d07de62fbcda719b5fea4f58ddc",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 940,
+      "id": "learning-senses-v2-staging-0025-part-0062",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0062.manifest.json",
+      "senseCount": 470,
+      "sha256": "2191f7846833b0852920bf0f3d9f667c8d51fd4d6579c3c6b6af114f982b4877",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 808,
+      "id": "learning-senses-v2-staging-0025-part-0063",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0063.manifest.json",
+      "senseCount": 404,
+      "sha256": "a74430245bfdd206561d97938dcfde704123c4abec88219bd874098852c88e17",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1498,
+      "exampleCount": 770,
+      "id": "learning-senses-v2-staging-0025-part-0064",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0064.manifest.json",
+      "senseCount": 385,
+      "sha256": "3ad7e64fe83d75f9de8d757fda08986e468b71c2f3f74547be4ed8632705d27f",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1498,
+      "exampleCount": 754,
+      "id": "learning-senses-v2-staging-0025-part-0065",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0065.manifest.json",
+      "senseCount": 377,
+      "sha256": "e2dacc9895c456d3e7930f14ffbedc61845e8cab08669cd9f9a1da4b2b1584a8",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 770,
+      "id": "learning-senses-v2-staging-0025-part-0066",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0066.manifest.json",
+      "senseCount": 385,
+      "sha256": "4f0196b784a6fb27cdf69911e91b141e41af73b55c0d9dacaae3163948f25932",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1498,
+      "exampleCount": 676,
+      "id": "learning-senses-v2-staging-0025-part-0067",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0067.manifest.json",
+      "senseCount": 338,
+      "sha256": "071f6e8d9241cfd8ceacc7afcf574352fec7977fc581263a3f0c35700909960c",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 984,
+      "id": "learning-senses-v2-staging-0025-part-0068",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0068.manifest.json",
+      "senseCount": 492,
+      "sha256": "de17c507a9e79eb6014cb148c5e301a82a81b4755628d57f1ad78bcc5e113d3b",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1020,
+      "id": "learning-senses-v2-staging-0025-part-0069",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0069.manifest.json",
+      "senseCount": 510,
+      "sha256": "07d9811295c9e84946d20e780b4212cf2f84542499886275eaa7095b9284dfe8",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 994,
+      "id": "learning-senses-v2-staging-0025-part-0070",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0070.manifest.json",
+      "senseCount": 497,
+      "sha256": "4b520b8ad83b99399be27c6808841329a138089f4389bb68e535fb41270d1ae3",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 996,
+      "id": "learning-senses-v2-staging-0025-part-0071",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0071.manifest.json",
+      "senseCount": 498,
+      "sha256": "6f4f81f71e0f4f88bba5fc41cca4b612c65ae533acd0006060a67e7768d66c38",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1162,
+      "id": "learning-senses-v2-staging-0025-part-0072",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0072.manifest.json",
+      "senseCount": 581,
+      "sha256": "a7678d6c7916cab0162c0abfa6cc564598caccbed175754ba71d7ad99fe9335d",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1168,
+      "id": "learning-senses-v2-staging-0025-part-0073",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0073.manifest.json",
+      "senseCount": 584,
+      "sha256": "0baa8fd191d2ad6014011d3cbed9897fe87632f5c1b30e0cc2368f96e167acf6",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1298,
+      "id": "learning-senses-v2-staging-0025-part-0074",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0074.manifest.json",
+      "senseCount": 649,
+      "sha256": "4d88b241f25a72dca674f2f870f8e69492d0f38a9413c617c2bf30d02bebccfd",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1332,
+      "id": "learning-senses-v2-staging-0025-part-0075",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0075.manifest.json",
+      "senseCount": 666,
+      "sha256": "63b04cfdea4854c224b125c7269d1e4bfc7ca24cf91a2e263fa3b469d9b26471",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1606,
+      "id": "learning-senses-v2-staging-0025-part-0076",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0076.manifest.json",
+      "senseCount": 803,
+      "sha256": "8d4c3ca99d50c7e242a86f934611717d23c0a1bce0bb0f668098070c200ed7c0",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1696,
+      "id": "learning-senses-v2-staging-0025-part-0077",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0077.manifest.json",
+      "senseCount": 848,
+      "sha256": "261fd4a9a1d935995e69d244a0f087751d87d1a5e1e8f6267b862a848fd727a9",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1760,
+      "id": "learning-senses-v2-staging-0025-part-0078",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0078.manifest.json",
+      "senseCount": 880,
+      "sha256": "4dd82acb896d9f197aee170da102a315632a619b092dd3a55f3d3e4d77b47e0a",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1570,
+      "id": "learning-senses-v2-staging-0025-part-0079",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0079.manifest.json",
+      "senseCount": 785,
+      "sha256": "215db685c9afc652db2d862a2a72b39ba08bf493445946cf5965aef0a5fedfe2",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1504,
+      "exampleCount": 2110,
+      "id": "learning-senses-v2-staging-0025-part-0080",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0080.manifest.json",
+      "senseCount": 1055,
+      "sha256": "9bae3e1ace9e840d7fe90eb695289271317c832ca4b195aa72482f9e62f83583",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1505,
+      "exampleCount": 2492,
+      "id": "learning-senses-v2-staging-0025-part-0081",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0081.manifest.json",
+      "senseCount": 1246,
+      "sha256": "9797375b5057b45adf9444a7f73797539e6fb49089d0e236f25d80f7a5e179a5",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1466,
+      "id": "learning-senses-v2-staging-0025-part-0082",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0082.manifest.json",
+      "senseCount": 733,
+      "sha256": "6cd2d14ba6ded2ab8a9b96df0770dfe397c167f8310496f1f514802a6bb59524",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1670,
+      "id": "learning-senses-v2-staging-0025-part-0083",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0083.manifest.json",
+      "senseCount": 835,
+      "sha256": "7e97e24e4bb935d5fb67dda7ccae16e493d99c244dc8299ed1b39ec184752027",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1502,
+      "exampleCount": 1190,
+      "id": "learning-senses-v2-staging-0025-part-0084",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0084.manifest.json",
+      "senseCount": 595,
+      "sha256": "2b0227dc2ead8fe6ddc2246d54940b6b38a93000b0a70729e25a850a7ac33103",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1110,
+      "id": "learning-senses-v2-staging-0025-part-0085",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0085.manifest.json",
+      "senseCount": 555,
+      "sha256": "863c1d7c1923d30c07d8ba0e12cf7d5c777661633e6c1b8cd71583c66b2dff80",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1501,
+      "exampleCount": 1064,
+      "id": "learning-senses-v2-staging-0025-part-0086",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0086.manifest.json",
+      "senseCount": 532,
+      "sha256": "d96c69b8d0ec39a62a56b423f22c99c158588294f9759808a32ac5c028656f12",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 992,
+      "id": "learning-senses-v2-staging-0025-part-0087",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0087.manifest.json",
+      "senseCount": 496,
+      "sha256": "03573b61cfb04dc39da6779c7f98cbfec2ac03e0a97a32f319796108f17c1681",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 838,
+      "id": "learning-senses-v2-staging-0025-part-0088",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0088.manifest.json",
+      "senseCount": 419,
+      "sha256": "7c6265b756ba6019f125c301ee8d62a1962949525d5f2c23fe8a9dbd800dea3f",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 666,
+      "id": "learning-senses-v2-staging-0025-part-0089",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0089.manifest.json",
+      "senseCount": 333,
+      "sha256": "775594c13f6fed7c06e79ca6ab84e2e24da6543ba209f1d95162f626847c172c",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 798,
+      "id": "learning-senses-v2-staging-0025-part-0090",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0090.manifest.json",
+      "senseCount": 399,
+      "sha256": "fa04551abf40a1b7c2c4f8ffa62eceab0194e638f4b66b283d507d73f75a3bde",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 746,
+      "id": "learning-senses-v2-staging-0025-part-0091",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0091.manifest.json",
+      "senseCount": 373,
+      "sha256": "23388e79d77ae30237873047942000e548ea53bd3801e55e5930731c51047a99",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 884,
+      "id": "learning-senses-v2-staging-0025-part-0092",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0092.manifest.json",
+      "senseCount": 442,
+      "sha256": "2626ed12d80f2120a9226b7877a2cb42ce6ea20217e3eb74c1ed2833a98d63a2",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1500,
+      "exampleCount": 878,
+      "id": "learning-senses-v2-staging-0025-part-0093",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0093.manifest.json",
+      "senseCount": 439,
+      "sha256": "7813446be9a52d642741e543bb857c1243750930270f02fdee3e419ea366d693",
+      "wordCount": 200
+    },
+    {
+      "bytes": 1499,
+      "exampleCount": 576,
+      "id": "learning-senses-v2-staging-0025-part-0094",
+      "manifestFileName": "learning-senses-v2-staging-0025-part-0094.manifest.json",
+      "senseCount": 288,
+      "sha256": "211110e1c9e46d3f8114df41a653ba6969a8f1dc315ff64de20a3be451235704",
+      "wordCount": 132
+    }
+  ],
+  "sourceExportSha256": "614374f14db7a11141877e3a38c8f1e1f419ad49ca686cc1a23516195f5ce19c",
+  "version": "learning-senses-collection-v2",
+  "wordCount": 18767
+}

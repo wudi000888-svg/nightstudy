@@ -7,15 +7,15 @@
 
 **在线使用：[english.minminlove.top](https://english.minminlove.top)**
 
-<img src="docs/media/mobile-word-0.12.jpg" alt="0.12 移动词卡：分义项双语解释、语境与英美发音" width="260">
+<img src="docs/media/mobile-word-0.13.png" alt="0.13 云端隔离手机视口：分义项双语解释、语境与英美发音" width="260">
 
-0.12 线上真实词卡：独立义项、双语语境和英美发音。
+0.13 云端隔离手机视口实图：独立义项、双语语境和英美发音；当前 Native / VPS 部署仍为 0.12。
 
 [查看个人记忆页面](docs/media/memory-preview.png) · [开发路线与问题](https://github.com/wudi000888-svg/nightstudy/issues) · [部署指南](docs/DEPLOYMENT.md)
 
-**本分支为 `0.13.0-alpha.1` 候选，应用版本尚未发行或部署。** 完整 95 叶文本冷安装、18 本书的真实普通用户辨义接口验收，以及 [101 个新句音包与全局内容绑定验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39263429979) 已通过；[独立句音媒体](https://github.com/wudi000888-svg/nightstudy/releases/tag/media-sentence-v4-014-20261019) 已公开，完整音频冷安装、H5 与最终 main / 发行 CI 仍待完成。Native / VPS 部署保持 [0.12.0-alpha.1](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.12.0-alpha.1)，其历史验证与数据保护结果见 [H5 记录](docs/REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
+**应用版本 `0.13.0-alpha.1`：全词书逐义内容与语境句音。** 覆盖范围与验证边界见 [0.13 记录](docs/ALL_BOOK_SENSES_AUDIO_013.md)，最终 main / 发行 CI 与固定镜像摘要统一见 [版本发行页](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.13.0-alpha.1)。[独立句音媒体](https://github.com/wudi000888-svg/nightstudy/releases/tag/media-sentence-v4-014-20261019) 与应用分别发行；Native / VPS 最近核验的部署仍为 [0.12.0-alpha.1](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.12.0-alpha.1)，其历史数据保护与部署事实见 [H5 记录](docs/REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
 
-查词支持智能、前缀、包含、精确匹配及显式错拼建议，公共查词与本人生词本独立，服务端全局排序和签名游标保证分页条件。本分支的原子内容覆盖 18 本内置词书的 18,767 个有效词目、49,992 个义项和 99,984 条中英双语语境例句记录，按意思分别组织词性、成对释义与不同语境。规范化去重后为 99,940 个英文句子；范围是这些学习词书，不是基础词典 770,611 词的全部义项，也不等于逐条专家认证。原 35 词首包保持固定身份与历史来源。实际范围见 [0.13 内容记录](docs/ALL_BOOK_SENSES_AUDIO_013.md)；早期方案见 [查词与义项改造](docs/LOOKUP_SENSES_011.md)。
+查词支持智能、前缀、包含、精确匹配及显式错拼建议，公共查词与本人生词本独立，服务端全局排序和签名游标保证分页条件。本版的原子内容覆盖 18 本内置词书的 18,767 个有效词目、49,992 个义项和 99,984 条中英双语语境例句记录，按意思分别组织词性、成对释义与不同语境。规范化去重后为 99,940 个英文句子；范围是这些学习词书，不是基础词典 770,611 词的全部义项，也不等于逐条专家认证。原 35 词首包保持固定身份与历史来源。实际范围见 [0.13 内容记录](docs/ALL_BOOK_SENSES_AUDIO_013.md)；早期方案见 [查词与义项改造](docs/LOOKUP_SENSES_011.md)。
 
 新词辨义已扩展到全部内置词书的当前义项，候选不足时回退到回忆。完整矩阵完成 1,139 片、678,336 次实际抽测，739 个跨书焦点在三次抽测中没有可用选择题；不保证所有未来随机组合均可出题。独立云端临时站点的 18 个普通账号自然取得 90 题：84 题辨义（81 题来自原 35 词之外）、6 题回忆；选择与揭晓后实际评分、FSRS 和完成数保持不变，未调用 AI。完整范围与限制见下方验证记录。
 
@@ -76,9 +76,9 @@ Docker Compose首次安装可使用脚本生成私有配置并启动。已有 `.
 bash scripts/install.sh
 ```
 
-默认访问 `http://127.0.0.1:5198`。新站用户名为 admin，密码为本站随机值；脚本将初始凭据从仅 init 挂载的私密卷导出到服务器 `.local/admin/credentials.json`（目录0700、文件0600），只由部署者读取和保管。文件不会通过 Web 下载，不放入 Git；之后改密不会更新此初始记录。既有管理员继续使用原登录方式，`ADMIN_BOOTSTRAP=manual` 保留初始化口令/setup流程。`init` 负责新站迁移、种子、首次管理员与完整内容安装，PG/内容缓存/音频缓存/私密凭据分别持久化。默认内容采用 95 叶原子义项 collection；音频安装四个旧成品包及 v4 collection 的 101 个子包，以固定资源的公开可下载性和摘要校验为准，完整音频首装仍待验收。压缩缓存默认在本包媒体验证通过后删除，`AUDIO_RETAIN_ARCHIVES=true` 显式保留，失败缓存保留。安装等待默认 1800 秒，可用 `NIGHTSTUDY_INSTALL_WAIT_SECONDS` 设置 60..7200 秒。升级已有站点先备份并审阅增量步骤，不用重新 seed 替代升级。安装和运行不下载语音模型或执行即时合成。`CONTENT_PACK=demo` 可显式选 40 词最小体验。完整变量、凭据备份、HTTPS与多站见 [部署文档](docs/DEPLOYMENT.md)。不要对需保留数据的安装使用 `down --volumes`。
+默认访问 `http://127.0.0.1:5198`。新站用户名为 admin，密码为本站随机值；脚本将初始凭据从仅 init 挂载的私密卷导出到服务器 `.local/admin/credentials.json`（目录0700、文件0600），只由部署者读取和保管。文件不会通过 Web 下载，不放入 Git；之后改密不会更新此初始记录。既有管理员继续使用原登录方式，`ADMIN_BOOTSTRAP=manual` 保留初始化口令/setup流程。`init` 负责新站迁移、种子、首次管理员与完整内容安装，PG/内容缓存/音频缓存/私密凭据分别持久化。默认内容采用 95 叶原子义项 collection；音频安装四个旧成品包及 v4 collection 的 101 个子包，核对固定资源的字节数、摘要与当前内容绑定。压缩缓存默认在本包媒体验证通过后删除，`AUDIO_RETAIN_ARCHIVES=true` 显式保留，失败缓存保留。安装等待默认 1800 秒，可用 `NIGHTSTUDY_INSTALL_WAIT_SECONDS` 设置 60..7200 秒。升级已有站点先备份并审阅增量步骤，不用重新 seed 替代升级。安装和运行不下载语音模型或执行即时合成。`CONTENT_PACK=demo` 可显式选 40 词最小体验。完整变量、凭据备份、HTTPS与多站见 [部署文档](docs/DEPLOYMENT.md)。不要对需保留数据的安装使用 `down --volumes`。
 
-101 个新句音归档共 4,008,058,272 字节，加上旧四包为 105 个归档、4,897,752,989 字节。这只是压缩包总量，解包媒体、安装暂存峰值、文本、数据库和备份另计；不能据此证明 5GB 或 10GB 磁盘足够。新版本的固定镜像摘要及最终 main / 发行结果以 [0.13 发行页](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.13.0-alpha.1) 发布后的记录为准，历史 0.12 镜像不是本版安装目标。
+101 个新句音归档共 4,008,058,272 字节，加上旧四包为 105 个归档、4,897,752,989 字节。隔离 Compose 安装后的音频目录稳定逻辑占用为 5,643,375,385 字节；它不是安装峰值或文件系统实际分配量，PG、词典内容缓存和备份另算。显式留存全部归档还需额外预算压缩包空间，不能据此保证 10GB 磁盘足够。新版本的固定镜像摘要及最终 main / 发行结果以 [0.13 发行页](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.13.0-alpha.1) 记录为准，历史 0.12 镜像不是本版安装目标。
 
 Native 开发使用 Node 24、pnpm 11.25.0 和 Python 3.11 以上，并自行准备可访问的 PG 数据库。成品音包只需 Python 标准库进行受限解包，无需语音模型或推理依赖；Python 不在 PATH 中时可设置私有 `.env` 的 `AUDIO_PYTHON` 为解释器路径。在 `.env` 填入真实 DATABASE_URL 与两个随机密钥后：
 
@@ -97,9 +97,11 @@ Native的db:prepare也默认创建首次admin，将私密初始记录写到 `.lo
 
 ## 验证记录
 
-0.13 候选已在 [18书辨义接口 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/39246905655) 完成 95 叶完整文本冷安装与 18 个独立普通账号的真实流程，共 360 次请求、90 道自然发题，其中 84 题辨义、6 题正常回忆回退；每本书均出现原 35 词之外的辨义题。18 次揭晓及重试后的 GET 确认评分、FSRS、完成数和未评分游标未推进；未调用评分、拼写答案、AI 或支付接口。实际收据 SHA-256 为 `3138f733e608e399d8fd22ef89bbc293e8cf5e9e30efba11a9aea1341d72ad7d`。这不是所有随机组合、实体手机或专家语义验收。
+0.13 已在 [隔离真实账号验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39277036602) 完成完整内容安装与 18 个独立普通账号的真实流程，共 360 次请求、90 道自然发题，其中 84 题辨义、6 题正常回忆回退；81 题辨义来自原 35 词之外，每本书均有新内容辨义题。18 次揭晓及重试后的 GET 确认评分、FSRS、完成数和未评分游标未推进；未调用评分、拼写答案、AI 或支付接口。实际收据 SHA-256 为 `db314c75d1f4e50fd393615118d1da2e236c45f2d1a120219401e81338bf314e`。这不是所有随机组合、实体手机或专家语义验收。
 
-[全量媒体验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39263429979) 已完成 101 包的独立成品校验、明确选择、全局内容引用和暂缓分区核对，并保存公开语境与固定计划镜像；当前根为 199,801 个可用口音键、79 个不可用键。媒体发行已公开，全局收据与语境清单的匿名下载摘要复核通过；该媒体任务的应用 verify 未运行，不能替代全部音包下载、完整音频冷安装、H5 或最终 main / 发行 CI，这些仍待完成。当前候选不表示生产部署。
+[全量媒体验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39263429979) 已完成 101 包的独立成品校验、明确选择、全局内容引用和暂缓分区核对，并保存公开语境与固定计划镜像；当前根为 199,801 个可用口音键、79 个不可用键。独立媒体已公开，完整文本、105 个音包的隔离冷安装及数据库独立检查已有通过记录。
+
+[隔离应用验收收据](https://github.com/wudi000888-svg/nightstudy/actions/runs/39277036602) 确认 18 本书的 548 项匿名 HTTP 检查通过，实际发送 101 次 GET / HEAD；Chromium 的 323 项 H5 检查通过，包含两个不同多义词的真实前后切换与例句重置、两条句子的四次英美播放事件及四幅截图。浏览器未提交业务写请求；手机视口模拟不等于实体手机、Safari 或安装态 PWA。安装、接口和浏览器验收各自记录，最终 main / 发行状态及固定镜像摘要统一见 [版本发行页](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.13.0-alpha.1)，不以分项通过代替整轮 CI 或生产部署。
 
 历史 0.12.0-alpha.1 的 107 份测试文件、918 项测试、类型/格式和冻结构建通过。[main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881203417) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881311451) 均成功，包含双 PG17 回归、Python/检查器和默认完整 Compose 冷安装。独立 H5 环境完成 32 项浏览器交互检查，并验证 320×568、844×390 的评价操作与桌面悬停。Native 与 VPS 均完成 19→20 迁移、50 张旧表原行/原列保护和零变更重放；两端各 347 项公开 HTTP 断言 / 123 次匿名请求通过。Native 6 项匿名浏览器检查与 VPS 12 项公开页面/音频/导航检查通过；VPS 浏览器保留既有登录，不将其称为匿名。4 个隔离测试库和 6 份临时凭据已精确清理，测试集群停止并移除。真实 iPhone / Android、Safari、实体软键盘和主屏幕安装态未据此验收；没有在生产创建测试账户或评分。本轮新备份仅核验 catalog，另用真实旧备份完成过隔离恢复演练。详见 [真机方案实施记录](docs/REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
 

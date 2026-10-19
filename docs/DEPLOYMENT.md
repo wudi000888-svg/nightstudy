@@ -1,14 +1,14 @@
 # Alpha 运行与部署
 
-本分支是 `0.13.0-alpha.1` 候选，应用版本尚未发行或部署。95 叶完整文本冷安装、[18 书真实辨义接口验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39246905655) 及 [101 包与全局内容绑定验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39263429979) 已通过；[独立句音媒体](https://github.com/wudi000888-svg/nightstudy/releases/tag/media-sentence-v4-014-20261019) 已公开，完整音频冷安装、H5 与最终 main / 发行 CI 仍待完成。源码、固定媒体发行和站点部署分别验收，候选代码不表示既有站点已经升级。
+本文对应应用版本 `0.13.0-alpha.1`。完整文本与音频的隔离冷安装、数据库独立检查、[18 书真实账号与 HTTP / H5 分项验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39277036602) 及 [101 包与全局内容绑定验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39263429979) 各有独立记录；[固定句音媒体](https://github.com/wudi000888-svg/nightstudy/releases/tag/media-sentence-v4-014-20261019) 单独发行。源码、镜像与站点部署分别验收，分项通过不表示整轮 CI 成功或既有站点已经升级。
 
-0.13 的固定镜像摘要及最终 main / 发行结果以 [该版本发行页](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.13.0-alpha.1) 发布后的记录为准；本源码文档不预写未验收的镜像摘要。安装时核对所选发行的版本、源码 revision 和固定 digest，下文的历史 0.12 镜像不作为本版新站安装目标。
+0.13 的固定镜像摘要及最终 main / 发行结果以 [该版本发行页](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.13.0-alpha.1) 记录为准；本源码文档不预写未验收的镜像摘要。安装时核对所选发行的版本、源码 revision 和固定 digest，下文的历史 0.12 镜像不作为本版新站安装目标。
 
-当前公开版本及 Native / VPS 部署仍为 [`0.12.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.12.0-alpha.1)，运行源码为 [`b8cde5bb`](https://github.com/wudi000888-svg/nightstudy/commit/b8cde5bb8283da2f2f0b20daffd86515b9d2270f)。该版 [main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881203417) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881311451) 均成功，公开镜像已匿名核验；两端的数据保护与部署事实见 [0.12 H5 记录](REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
+Native / VPS 最近核验的部署仍为 [`0.12.0-alpha.1`](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.12.0-alpha.1)，运行源码为 [`b8cde5bb`](https://github.com/wudi000888-svg/nightstudy/commit/b8cde5bb8283da2f2f0b20daffd86515b9d2270f)。该版 [main CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881203417) 与 [发行 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/38881311451) 均成功，公开镜像已匿名核验；两端的数据保护与部署事实见 [0.12 H5 记录](REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
 
 历史 0.12 两端各完成 347 项公开 HTTP 断言、123 次匿名请求，包括 PWA 完整摘要和成品音频。Native 通过 6 项匿名浏览器检查；VPS 通过 12 项公开页面、音频和导航检查，其浏览器保留既有登录，不称为匿名。隔离环境完成 32 项浏览器交互及小屏、横屏和桌面悬停检查；没有在生产创建测试账户或进行收藏、偏好、评分写请求。这些不包含实体手机、Safari、主屏幕安装态或逐条专家听辨，也不是 0.13 的验收结果。
 
-0.13 候选覆盖 18 本书、18,767 个有效词目与 69,840 条书成员关系，95 个文本叶共含 49,992 个原子义项、99,984 条中英双语语境例句记录。原 35 词 / 98 义 / 196 例固定基线保留；0.10 词级内容继续作为来源或未绑定候选，不借给另一个意思。范围不是基础词典 770,611 词的全部义项，不代表专家全面校对。新增复习焦点指针迁移后源码共有 21 个迁移；从 0.12 的 20 个迁移升级没有因该迁移新增业务表。实际生产迁移尚未执行，早期范围和部署记录保留在 [0.11 记录](LOOKUP_SENSES_011.md#15-发行与保数据升级状态) 与 [0.12 记录](REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
+0.13 覆盖 18 本书、18,767 个有效词目与 69,840 条书成员关系，95 个文本叶共含 49,992 个原子义项、99,984 条中英双语语境例句记录。原 35 词 / 98 义 / 196 例固定基线保留；0.10 词级内容继续作为来源或未绑定候选，不借给另一个意思。范围不是基础词典 770,611 词的全部义项，不代表专家全面校对。新增复习焦点指针迁移后源码共有 21 个迁移；从 0.12 的 20 个迁移升级没有因该迁移新增业务表。实际生产迁移尚未执行，早期范围和部署记录保留在 [0.11 记录](LOOKUP_SENSES_011.md#15-发行与保数据升级状态) 与 [0.12 记录](REAL_DEVICE_H5_ROADMAP.md#6-本轮实施与验收记录)。
 
 Render、主机断电恢复、异机/密钥灾备、高并发容量及音源逐条专家听辨未验收。下文保留各历史版本的对应证据，标明版本的旧镜像与检查结果不代表当前运行版本。
 
@@ -32,7 +32,7 @@ docker compose up --build --detach --wait --wait-timeout 1800 app
 
 `init` 是新站完整初始化入口，运行 `pnpm db:prepare`：generate、逐站迁移、seed、首次管理员准备，再按 `CONTENT_PACK` 安装内容、按 `AUDIO_PACK` 安装音频并刷新音标覆盖统计。默认 `ecdict` 依次准备完整 ECDICT、考试词书、独立英美 IPA、词组、v1/v2 双语文本及 `learning-senses-collection-v2` 的 95 个义项叶。默认有效目录为 18 本、18,767 个词目与 69,840 条成员关系；原子义项和双语例句范围见本页开头。文本全集先预校验，再逐叶有界读取、在同一事务内顺序导入，最终文件身份检查在提交前执行；精确重放不重写原内容。安装成功后 app 启动，请求进程不重复运行迁移或初始化管理员。
 
-`AUDIO_PACK=standard` 先安装 word-audio-v2、sentence-audio-v1、sentence-audio-v2、sentence-audio-v3，再安装 `data/sentence-audio-v4.collection.json` 中的 101 个新句音子包，总共 105 个归档。101 包和全局绑定检查已通过，媒体已公开；全部归档的下载与完整数据库冷安装仍需分别验收，缺少 collection 或显式 `AUDIO_PACK=none` 的文本首装不算完整音频安装通过。应用只播放已发布并验证的静态成品。
+`AUDIO_PACK=standard` 先安装 word-audio-v2、sentence-audio-v1、sentence-audio-v2、sentence-audio-v3，再安装 `data/sentence-audio-v4.collection.json` 中的 101 个新句音子包，总共 105 个归档。安装逐包核对完整媒体与当前内容绑定；缺少 collection 或显式 `AUDIO_PACK=none` 的文本首装不算完整音频安装通过。应用只播放已发布并验证的静态成品。
 
 `scripts/install.sh` 的等待上限默认 1800 秒，可用 `NIGHTSTUDY_INSTALL_WAIT_SECONDS` 设置为 60..7200 秒。手动 Compose 的 `--wait-timeout` 单独设置；上限不是安装耗时保证，慢下载应检查 init 日志、网络和实际资源后再决定是否调整。
 
@@ -59,9 +59,11 @@ PG 业务数据、内容源缓存与音频分别保存在 postgres-data、conten
 
 上述四包压缩总量为 889,694,717 字节；新 v4 的 101 个子包实际压缩总量为 4,008,058,272 字节，105 个归档合计 4,897,752,989 字节。真实来源 URL 和摘要以对应 data descriptor 为准，旧公开包保持不可变。这些是固定压缩附件的字节数，不是解包成品的稳定占用或安装峰值；词典、其他文本/音标包、数据库索引、WAL、备份及升级暂存另计。独立验证档案和语境/计划镜像不属于安装音包。
 
+完整冷安装与数据库检查后，`du -sb /app/.local/audio` 实测稳定逻辑占用为 5,643,375,385 字节，包含该音频目录内的成品及安装元数据。它不是文件系统实际分配量，也不是安装期间的峰值；PG、词典内容缓存与备份不在此数内。该观测来自隔离 Compose 环境，不能推导 Render 可用容量或性能保证。
+
 v4 已完成当前内容根的全局核对：99,940 组去重英文句子 / 199,880 个英美口音键，由 199,377 条本轮新选择、32 条既有 v1/v2 明确复用、392 条 v3 基线及 79 个暂缓键组成；当前可用为 199,801 个口音键，当前纠音记录为 1,758 条。79 键涉及 18 组双口音暂缓和 43 组单口音暂缓；已批准的另一口音不受影响。全局暂缓侧件不能按每包重复携带的数量累加。199,377 是口音条目数，不必等于物理 MP3 文件数；这些结果不表示生产数据库已经安装新媒体。
 
-`AUDIO_RETAIN_ARCHIVES=false` 为默认：本包完整媒体验证通过后，仅删除其已核身份的压缩缓存，解包成品保留；失败缓存保留供排查。`true` 显式保留验证成功的 tar 以便离线修复，磁盘须额外预算全部压缩包。清理失败时保留已安装文件和归档并明确报错，不静默当作安装成功。该候选行为的 10 项云端回归已通过，完整 101 包的空间峰值尚未实测。
+`AUDIO_RETAIN_ARCHIVES=false` 为默认：本包完整媒体验证通过后，仅删除其已核身份的压缩缓存，解包成品保留；失败缓存保留供排查。`true` 显式保留验证成功的 tar 以便离线修复，磁盘须额外预算全部压缩包。清理失败时保留已安装文件和归档并明确报错，不静默当作安装成功。缓存删除、留存和失败保留的 10 项云端边界回归已通过；安装空间峰值未据稳定目录观测进行推断。
 
 本次全量句音经授权使用已有英美声线在 GitHub 免费环境离线生成，全量生成期间本机不运行模型，没有下载新模型或调用付费内容接口；早期本机小批试验不选入本轮全量新包。安装与运行无需 Piper、声学模型或翻译权重，线上不即时合成，也不使用浏览器设备语音兜底。完整 WAV / MP3 解码、质量与身份检查不是逐句专家听审；复用的旧 32 条也是合成成品，不称真人录音。
 
@@ -150,7 +152,7 @@ PgBouncer、完整分布式队列、活动 Realm LRU、公平调度及高并发�
 
 根 `render.yaml` 描述一个 Docker Web 与一个 PG17 首站数据库，使用付费资源规格、内部 DB URL、随机认证/初始化密钥、`AUDIO_PACK=none pnpm db:prepare` pre-deploy、2GB Web计算实例、10GB音频持久磁盘及 ready 检查；PG 磁盘仍为 5GB。默认 `autoDeployTrigger: off`，不因上游 push 自动升级所有使用者实例。
 
-本轮仅将源码模板的音频盘从 5GB 调为 10GB，没有创建或扩容 Render 资源，也没有验证 10GB 足够。105 个音频归档的压缩总量已实测为 4,897,752,989 字节，仍不能据此推断解包稳定占用或安装暂存峰值；最终容量要结合 `AUDIO_RETAIN_ARCHIVES` 策略和完整安装观测决定，数据库和备份空间另计。下文的 Render 创建、首装与恢复没有因候选源码而变为已验收。
+本轮仅将源码模板的音频盘从 5GB 调为 10GB，没有创建或扩容 Render 资源，也没有验证 10GB 足够。隔离 Compose 音频目录的稳定逻辑占用为 5,643,375,385 字节；若保留全部压缩归档，还需额外预算 4,897,752,989 字节及安装暂存，数据库和备份另计。容量须结合 `AUDIO_RETAIN_ARCHIVES` 策略、文件系统实际占用与安装峰值审阅；Render 创建、首装与恢复不因模板更改而视为已验收。
 
 该文件不会自行创建云资源。部署者在Render审阅费用、创建资源并检查构建/ready/catalog；PUBLIC_URL从RENDER_EXTERNAL_URL引用。INITIAL_ADMIN_PASSWORD使用平台generateValue独立生成，部署者从Render私有环境保管，避免依赖临时pre-deploy文件；不是所有实例共用默认密码，既有管理员也不因重部署重置。pre-deploy默认准备完整词典/音标，临时内容缓存可能重新下载，已提交词义/用户保存在PG。Render的pre-deploy不能访问运行磁盘，因此dockerCommand在启动前单独执行audio:prepare，将成品媒体保存在/app/.local/audio持久磁盘；后续重启校验并复用。持久磁盘仅供一个实例，不支持此模板多副本或零停机更新；费用与平台实测由部署者确认。参见[Render磁盘限制](https://render.com/docs/disks)。实际首装、耗时、负载与恢复仍待平台实测。[Render Blueprint规范](https://render.com/docs/blueprint-spec)、[Docker部署](https://render.com/docs/docker)
 
@@ -257,13 +259,15 @@ alpha 不提供自动无损跨版本恢复保证；0.10的“无新增迁移”�
 
 ## CI 与镜像发行
 
-### 0.13 候选状态
+### 0.13 验证与发行记录
 
-[真实辨义接口 CI](https://github.com/wudi000888-svg/nightstudy/actions/runs/39246905655) 已完成 95 叶完整文本冷安装，18 个独立普通账号经真实选书、目标确认、偏好、发题、揭晓和重试，共 360 次请求。90 道自然发题包括 84 道辨义（81 道来自原 35 词之外）和 6 道回忆，每本书均出现原 35 词之外的辨义题。实际 GET 确认评分、FSRS、完成数和未评分游标未推进；没有评分、AI 或支付调用。该临时站点不能指向生产，账号和 cookie 不进入公开收据。收据为 181,017 字节，SHA-256 `3138f733e608e399d8fd22ef89bbc293e8cf5e9e30efba11a9aea1341d72ad7d`。
+[隔离真实账号验收](https://github.com/wudi000888-svg/nightstudy/actions/runs/39277036602) 在完整内容安装后，以 18 个独立普通账号经真实选书、目标确认、偏好、发题、揭晓和重试，共 360 次请求。90 道自然发题包括 84 道辨义（81 道来自原 35 词之外）和 6 道回忆，每本书均有新内容辨义题。实际 GET 确认评分、FSRS、完成数和未评分游标未推进；没有评分、AI 或支付调用。该临时站点不能指向生产，账号和 cookie 不进入公开收据。收据为 181,094 字节，SHA-256 `db314c75d1f4e50fd393615118d1da2e236c45f2d1a120219401e81338bf314e`。
 
-完整 101 包的独立成品校验、明确选择、全局内容引用和 79 个暂缓键的分区已在 [全量媒体任务](https://github.com/wudi000888-svg/nightstudy/actions/runs/39263429979) 通过，并保留公开语境及不可变计划镜像。当前根精确闭合为 199,377 新选择 + 32 既有复用 + 392 基线 + 79 暂缓，当前可用 199,801；缓存工具的 10 项定向回归通过。媒体发行已公开，全局收据与语境清单的匿名下载摘要复核通过。该任务的应用 verify 未运行，全部音包下载、严格新媒体冷安装、H5 与最终 main / 发行 CI 仍待完成；不能用媒体任务或工具自测代替完整应用验收。没有 0.13 生产部署成功的主张。
+完整 101 包的独立成品校验、明确选择、全局内容引用和 79 个暂缓键的分区已在 [全量媒体任务](https://github.com/wudi000888-svg/nightstudy/actions/runs/39263429979) 通过，并保留公开语境及不可变计划镜像。当前根精确闭合为 199,377 新选择 + 32 既有复用 + 392 基线 + 79 暂缓，当前可用 199,801；媒体与全局收据、语境清单公开后，完整文本和 105 个音包的隔离冷安装及数据库独立检查也已有通过记录。
 
-新媒体已作为独立、非 latest 的资源 prerelease [`media-sentence-v4-014-20261019`](https://github.com/wudi000888-svg/nightstudy/releases/tag/media-sentence-v4-014-20261019) 公开，旧公开附件不覆盖。固定清单和独立检查完成后，仍须核验全部音包下载、执行完整应用 CI，最后发布版本匹配的源码与镜像。`release.yml` 只为 `v` 前缀的应用版本进入验证/镜像任务，资源标签不触发应用容器发布。GitHub 公开源码不保证 GHCR package 自动公开，最终仍需匿名核验。安装等待默认 1800 秒，完整安装耗时与磁盘峰值不以压缩体积代替。
+[应用验收的独立收据](https://github.com/wudi000888-svg/nightstudy/actions/runs/39277036602) 确认 548 项匿名 HTTP 检查 / 101 次 GET 与 HEAD、18 本书的当前词义与例句抽样通过；HTTP 收据为 176,778 字节，SHA-256 `1fbde415971ddb8aa5682b5164e3db3b2b29656d04fbc3b3617ac949e150c544`。Chromium H5 收据为 65,592 字节，SHA-256 `fc4521d566e4950bfdce1744925c2973fb1df322084d916db9a13949245e1a05`，323 项检查通过，含两个不同多义词的真实前后切换与例句重置、两条句子的四次英美播放事件及四幅截图；浏览器业务写入尝试为零。此结果涵盖隔离手机视口与桌面悬停，不代替实体手机、Safari 或主屏幕安装态验收。分项收据不等于整轮工作流终态；最终 main / 发行 CI 与固定镜像摘要统一见 [版本发行页](https://github.com/wudi000888-svg/nightstudy/releases/tag/v0.13.0-alpha.1)，GitHub 发行不表示 Native / VPS 已部署。
+
+媒体使用独立、非 latest 的资源 prerelease [`media-sentence-v4-014-20261019`](https://github.com/wudi000888-svg/nightstudy/releases/tag/media-sentence-v4-014-20261019)，旧公开附件不覆盖。媒体选择与全局校验、完整应用 CI、版本匹配的源码与镜像分别留存证据。`release.yml` 只为 `v` 前缀的应用版本进入验证/镜像任务，资源标签不触发应用容器发布。GitHub 公开源码不保证 GHCR package 自动公开，发行镜像仍须匿名核验。安装等待默认 1800 秒，完整安装耗时与磁盘峰值不以压缩体积代替。
 
 ### 0.12 已部署历史基线
 

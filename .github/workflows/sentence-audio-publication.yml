@@ -64,9 +64,9 @@ jobs:
           candidate_id=$(gh release view "$CANDIDATE_RELEASE" --repo "$GITHUB_REPOSITORY" --json databaseId --jq .databaseId)
           media_id=$(gh release view "$MEDIA_RELEASE" --repo "$GITHUB_REPOSITORY" --json databaseId,isDraft --jq 'if .isDraft then .databaseId else error("media release must remain a draft") end')
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases/$candidate_id/assets?per_page=100" \
-            --jq 'add' > .ci-publication/candidate-assets.json
+            | jq 'add' > .ci-publication/candidate-assets.json
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases/$media_id/assets?per_page=100" \
-            --jq 'add' > .ci-publication/existing-media-assets.json
+            | jq 'add' > .ci-publication/existing-media-assets.json
       - name: Verify, select and copy immutable MP3 installers to the draft
         id: acceptance
         run: |
